@@ -27,29 +27,23 @@ function stacks(columns: string[]): LevelLootPlaced[] {
   })
 }
 
+/** A full grid; each string is one row (back→front), one letter per column. */
+function grid(rows: string[]): LevelLootPlaced[] {
+  return rows.flatMap((row, r) => [...row].map((ch, c) => item(`r${r + 1}c${c + 1}`, code[ch], [c, r])))
+}
+
+// Progression (ui-settings.md §6): colours and the queue first, waiting slots from level 2,
+// blocked loot from level 3, then real puzzles. Filling the third waiting slot loses.
 export const levels: Level[] = [
   {
     name: 'Kustbyn',
-    hint: 'Välj en viking – den plundrar två skatter i sin färg.',
-    queue: [R, B, Y],
-    loot: [
-      item('r1', R, [0.5, 1.5]), item('b1', B, [1.5, 1.5]), item('y1', Y, [2.5, 1.5]),
-      item('y2', Y, [0.5, 2.5]), item('r2', R, [1.5, 2.5]), item('b2', B, [2.5, 2.5]),
-    ],
-  },
-  {
-    name: 'Fiskeläget',
-    hint: 'Bara de tre främsta vikingarna kan väljas. Resten väntar i kön.',
-    queue: [Y, R, B, R, Y, B],
-    loot: [
-      item('r1', R, [0, 1]), item('b1', B, [1, 1]), item('y1', Y, [2, 1]), item('r2', R, [3, 1]),
-      item('b2', B, [0, 2]), item('y2', Y, [1, 2]), item('r3', R, [2, 2]), item('b3', B, [3, 2]),
-      item('y3', Y, [0, 3]), item('r4', R, [1, 3]), item('b4', B, [2, 3]), item('y4', Y, [3, 3]),
-    ],
+    hint: 'Välj en av de tre främsta vikingarna. Den plundrar två skatter i sin färg.',
+    queue: [R, B, Y, B, R, Y, R, B],
+    loot: grid(['rbyr', 'byrb', 'rbby', 'yrbr']),
   },
   {
     name: 'Bryggan',
-    hint: 'Blå skatter ligger bakom tunnorna. Skicka blå först – den väntar på skeppet tills vägen är fri.',
+    hint: 'De blå skatterna står bakom tunnorna. En viking utan byte väntar på skeppet – men fyll aldrig alla tre platser!',
     queue: [B, Y, R],
     loot: [
       item('b1', B, [0.5, 1.5], 'r1'), item('b2', B, [2.5, 1.5], 'r2'),
@@ -59,8 +53,8 @@ export const levels: Level[] = [
   },
   {
     name: 'Handelsbyn',
-    hint: 'Plundra framifrån. Varje skatt öppnar vägen till nästa.',
-    queue: [R, Y, B, Y],
+    hint: 'Låsta skatter kan bara plundras när skatten framför är borta. Börja framifrån.',
+    queue: [Y, R, B, Y],
     loot: [
       item('y3', Y, [0.5, 0], 'b1'), item('y4', Y, [2.5, 0], 'b2'),
       item('b1', B, [0.5, 1], 'r1'), item('b2', B, [2.5, 1], 'r2'),
@@ -69,15 +63,21 @@ export const levels: Level[] = [
     ],
   },
   {
+    name: 'Fiskeläget',
+    hint: 'Tre högar och sex vikingar. Fel ordning fyller skeppet – tänk ett drag framåt.',
+    queue: [R, Y, B, Y, R, B],
+    loot: stacks(['rryy', 'byry', 'bbbr']),
+  },
+  {
     name: 'Fästet',
-    hint: 'Ingen blå viking står först. Vem ska vänta på skeppet – och vem öppnar vägen?',
-    queue: [R, Y, R, Y, B, B],
-    loot: stacks(['yrbyrb', 'yyrrbb']),
+    hint: 'Bara två säkra väntplatser. Vem ska vänta på skeppet – och vem öppnar vägen?',
+    queue: [B, B, R, Y, Y, R],
+    loot: stacks(['ryyybb', 'rrbryb']),
   },
   {
     name: 'Stora räden',
-    hint: 'Två höga högar, åtta vikingar och tre väntplatser. Planera hela räden.',
-    queue: [B, B, R, R, B, Y, Y, Y],
-    loot: stacks(['yyyyybrb', 'brbbrryb']),
+    hint: 'Två höga högar, åtta vikingar och bara två säkra väntplatser. Planera hela räden.',
+    queue: [Y, B, Y, B, B, R, Y, R],
+    loot: stacks(['ryrrbbyb', 'yyybyrbb']),
   },
 ]

@@ -18,7 +18,7 @@ const won = computed(() => info.value.status === 'won')
 const lost = computed(() => info.value.status === 'lost')
 const lossText = computed(() =>
   info.value.lossReason === 'slots-full'
-    ? 'En viking hittade inget byte och alla tre väntplatser var redan fulla.'
+    ? 'En viking hittade inget byte och fick ta skeppets sista väntplats.'
     : 'Kön är slut och ingen väntande viking kan plundra något mer.')
 
 let game: Phaser.Game | undefined
@@ -51,7 +51,7 @@ onBeforeUnmount(() => game?.destroy(true))
   <main class="shell">
     <header>
       <div class="logo"><h1>VIKING LOOT</h1><div class="eyebrow">The First Raid · 0.2</div></div>
-      <p>Välj en av de tre främsta vikingarna. Plundra framifrån – och fyll inte skeppet med väntande vikingar!</p>
+      <p>Välj en av de tre främsta vikingarna. Plundra framifrån – och fyll aldrig skeppets tre väntplatser!</p>
     </header>
     <div class="stats">
       <span>🪙 Kvar: <strong>{{ info.remaining }}</strong></span>

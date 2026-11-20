@@ -27,6 +27,8 @@ För att undvika att spelet blir låst utan möjlighet att återhämta sig gäll
 5. En väntande viking som uppnår totalt två plundrade objekt lämnar sin väntplats.
 6. Om en viking behöver vänta när alla tre väntplatser redan är upptagna förlorar spelaren. Kontrollera detta **efter** att befintliga väntande vikingar fått chans att slutföra sina uppdrag.
 
+> **Ändrat (2026-11-20):** Spelaren förlorar redan när den **tredje** väntplatsen fylls, i linje med `ui-settings.md` §4. Två vikingar kan alltså vänta säkert. Kontrollen görs fortfarande efter att de väntande har fått plundra, och vinst går före förlust.
+
 Detta är den föreslagna exakta regelmodellen för MVP 0.2; den kan balanseras senare.
 
 ## 2. Vikingakö

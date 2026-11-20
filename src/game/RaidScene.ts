@@ -132,7 +132,8 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private drawSlots(used = this.state.waiting.length) {
-    const risk = used >= WAITING_SLOTS ? 0xe0392b : used === WAITING_SLOTS - 1 ? 0xe8a21b : null
+    // Filling the last slot loses: one seated viking is a caution, two is the danger zone.
+    const risk = used >= WAITING_SLOTS - 1 ? 0xe0392b : used >= 1 ? 0xe8a21b : null
     const g = this.slotsGfx!
     g.clear()
     for (let i = 0; i < WAITING_SLOTS; i++) {
@@ -143,8 +144,9 @@ export class RaidScene extends Phaser.Scene {
     const t = this.waitTab!
     t.clear(); drawTab(t, WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 10, 104, risk ?? 0x8a5a33)
     const w = this.warning!
-    if (used >= WAITING_SLOTS) w.setText('🔥 Alla platser fulla – nästa viking utan byte förlorar!').setBackgroundColor('#a3261bee')
-    else if (used === WAITING_SLOTS - 1) w.setText('⚠️ Bara en väntplats kvar').setBackgroundColor('#9a6a10ee')
+    if (used >= WAITING_SLOTS) w.setText('💀 Skeppet är fullt!').setBackgroundColor('#a3261bee')
+    else if (used === WAITING_SLOTS - 1) w.setText('🔥 Sista platsen – nästa viking utan byte förlorar!').setBackgroundColor('#a3261bee')
+    else if (used >= 1) w.setText('⚠️ En viking väntar – en säker plats kvar').setBackgroundColor('#9a6a10ee')
     else w.setText('').setBackgroundColor('#00000000')
   }
 
@@ -383,7 +385,7 @@ export class RaidScene extends Phaser.Scene {
         if (seated) this.setBadge(actor, seated.collectedCount)
         this.drawSlots()
       } else if (e.type === 'overflow') {
-        await this.runTo(actor, WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y + 10, 0.8)
+        // The viking has just taken the last seat (the preceding `wait` event put it there).
         this.cameras.main.shake(260, 0.012)
         this.cameras.main.flash(220, 160, 30, 20)
         await this.tween({ targets: actor, angle: { from: -12, to: 12 }, duration: 70, yoyo: true, repeat: 3 })

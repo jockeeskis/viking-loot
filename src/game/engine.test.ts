@@ -95,50 +95,52 @@ test('waiters resolve in arrival order', () => {
   assert.deepEqual(s.waiting, [{ id: 'v1', color: B, collectedCount: 1 }, { id: 'v2', color: B, collectedCount: 0 }])
 })
 
-test('filling the third slot is risky but not a loss', () => {
-  const s = pick(createGame([{ id: 'y1', color: Y }, { id: 'y2', color: Y }], [R, R, B, B, Y]), 'v1', 'v2', 'v3')
-  assert.equal(s.waiting.length, 3)
+test('two waiting vikings are safe', () => {
+  const s = pick(createGame([{ id: 'y1', color: Y }, { id: 'y2', color: Y }], [R, B, B, Y]), 'v1', 'v2')
+  assert.equal(s.waiting.length, 2)
   assert.equal(s.status, 'playing')
 })
 
-test('a fourth viking that needs to wait loses the raid', () => {
-  const s = pick(createGame([{ id: 'y1', color: Y }, { id: 'y2', color: Y }], [R, R, B, B, Y]), 'v1', 'v2', 'v3', 'v4')
+test('filling the third waiting slot loses the raid', () => {
+  const s = pick(createGame([{ id: 'y1', color: Y }, { id: 'y2', color: Y }], [R, B, B, Y]), 'v1', 'v2', 'v3')
   assert.equal(s.status, 'lost')
   assert.equal(s.lossReason, 'slots-full')
-  assert.ok(s.events.some(e => e.type === 'overflow' && e.vikingId === 'v4'))
-  assert.equal(selectViking(s, 'v5'), s, 'no moves after the game ends')
+  assert.equal(s.waiting.length, 3, 'the third viking is shown in its seat')
+  assert.deepEqual(s.events.slice(-2).map(e => e.type), ['wait', 'overflow'])
+  assert.equal(selectViking(s, 'v4'), s, 'no moves after the game ends')
 })
 
 test('full slots are checked only after the waiters have had their chance', () => {
-  // Three blue waiters; a red viking uncovers blue loot so they leave and the newcomer is fine.
+  // Two blue waiters; a red viking uncovers blue loot so they leave and nobody needs the third seat.
   const loot: LevelLoot[] = [
     { id: 'r1', color: R }, { id: 'r2', color: R },
-    ...['b1', 'b2', 'b3', 'b4', 'b5', 'b6'].map(id => ({ id, color: B, blockedBy: ['r1'] })),
+    ...['b1', 'b2', 'b3', 'b4'].map(id => ({ id, color: B, blockedBy: ['r1'] })),
   ]
-  let s = pick(createGame(loot, [B, B, B, R]), 'v1', 'v2', 'v3')
-  assert.equal(s.waiting.length, 3)
-  s = selectViking(s, 'v4')
+  let s = pick(createGame(loot, [B, B, R]), 'v1', 'v2')
+  assert.equal(s.waiting.length, 2)
+  s = selectViking(s, 'v3')
   assert.equal(s.status, 'won')
   assert.equal(s.waiting.length, 0)
 })
 
 test('newcomer that cannot finish still loses even if waiters partly progress', () => {
   const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'b1', color: B, blockedBy: ['r1'] }, { id: 'y1', color: Y }, { id: 'y2', color: Y }]
-  // v1-v3 wait (b, b, b). v4 red takes r1 (only 1) → b1 unlocks, v1 takes it but still waits. Red must wait → 4th.
-  const s = pick(createGame(loot, [B, B, B, R, Y]), 'v1', 'v2', 'v3', 'v4')
+  // v1, v2 wait (blue). v3 red takes r1 (only one) → b1 unlocks, v1 takes it but still waits. Red takes the third seat.
+  const s = pick(createGame(loot, [B, B, R, Y]), 'v1', 'v2', 'v3')
   assert.equal(s.status, 'lost')
   assert.equal(s.lossReason, 'slots-full')
+  assert.deepEqual(s.waiting.map(v => [v.id, v.collectedCount]), [['v1', 1], ['v2', 0], ['v3', 1]])
 })
 
 // --- Win / loss ----------------------------------------------------------
 
 test('collecting everything wins, and win beats loss', () => {
-  // The newcomer takes the last item but is only half full: it would need a slot (none free),
+  // The newcomer takes the last item but is only half full, so it takes the third seat –
   // yet the board is empty, so it must be a win.
   const loot: LevelLoot[] = [{ id: 'y1', color: Y }, { id: 'y2', color: Y }, { id: 'r1', color: R, blockedBy: ['y1'] }]
-  let s = pick(createGame(loot, [B, B, B, Y, R]), 'v1', 'v2', 'v3', 'v4')
-  assert.equal(s.waiting.length, 3)
-  s = selectViking(s, 'v5')
+  let s = pick(createGame(loot, [B, B, Y, R]), 'v1', 'v2', 'v3')
+  assert.equal(s.waiting.length, 2)
+  s = selectViking(s, 'v4')
   assert.equal(s.status, 'won')
   assert.equal(s.lossReason, null)
 })
@@ -190,13 +192,30 @@ test('there are at least five levels and every one is winnable', () => {
   }
 })
 
-test('Fästet has verified win and loss sequences', () => {
-  const l = levels.find(x => x.name === 'Fästet')!
-  const start = createGame(l.loot, l.queue)
-  // Win: red and yellow wait, blues clear the front, everyone finishes.
-  assert.equal(pick(start, 'v1', 'v2', 'v3', 'v5', 'v6', 'v4').status, 'won')
-  // Loss: three wait, then a fourth yellow finds nothing.
-  const lost = pick(start, 'v1', 'v2', 'v3', 'v4')
+test('the first levels follow the planned progression', () => {
+  const hasBlocking = (i: number) => levels[i].loot.some(l => (l.blockedBy ?? []).length > 0)
+  assert.equal(levels[0].loot.length, 16, 'Kustbyn uses a full 4×4 grid')
+  assert.ok(!hasBlocking(0), 'level 1 has no blocked loot')
+  // Level 2 is where waiting first happens.
+  const l2 = levels[1]
+  assert.ok(!solve(createGame(levels[0].loot, levels[0].queue)).lossPath, 'level 1 cannot be lost')
+  assert.equal(selectViking(createGame(l2.loot, l2.queue), 'v1').waiting.length, 1, 'level 2 teaches waiting')
+  assert.ok(hasBlocking(2), 'level 3 has blocked loot')
+})
+
+test('puzzle levels have verified win and loss sequences', () => {
+  const puzzles = levels.filter(l => solve(createGame(l.loot, l.queue)).lossPath)
+  assert.ok(puzzles.length >= 1)
+  for (const l of puzzles) {
+    const r = solve(createGame(l.loot, l.queue))
+    assert.equal(r.winPath!.reduce(selectViking, createGame(l.loot, l.queue)).status, 'won', `${l.name} win`)
+    assert.equal(r.lossPath!.reduce(selectViking, createGame(l.loot, l.queue)).status, 'lost', `${l.name} loss`)
+  }
+  // Hand-checked Fästet lines.
+  const f = levels.find(x => x.name === 'Fästet')!
+  const start = createGame(f.loot, f.queue)
+  assert.equal(pick(start, 'v1', 'v2', 'v3', 'v4', 'v5', 'v6').status, 'won')
+  const lost = pick(start, 'v1', 'v2', 'v3', 'v4', 'v6')
   assert.equal(lost.status, 'lost')
   assert.equal(lost.lossReason, 'slots-full')
 })

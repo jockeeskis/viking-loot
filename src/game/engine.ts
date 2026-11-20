@@ -40,6 +40,7 @@ export type GameState = {
 }
 
 export const SELECTABLE = 3
+/** Slots on the longship. Filling the last one loses, so at most WAITING_SLOTS - 1 can wait safely. */
 export const WAITING_SLOTS = 3
 export const CAPACITY = 2
 
@@ -140,16 +141,15 @@ export function selectViking(state: GameState, vikingId: string): GameState {
     if (again.viking.collectedCount >= CAPACITY) {
       events.push({ type: 'return', vikingId, fromWaiting: false })
       s = resolveWaiting(s, events)
-    } else if (s.waiting.length >= WAITING_SLOTS) {
-      events.push({ type: 'overflow', vikingId })
-      s = { ...s, events }
-      // Win still beats loss if the newcomer's own raid emptied the board.
-      if (isWon(s)) return { ...s, status: 'won', lossReason: null }
-      return { ...s, status: 'lost', lossReason: 'slots-full' }
     } else {
+      // Take a seat. Taking a seat changes nothing on the board, so no further resolution is needed.
       events.push({ type: 'wait', vikingId, slot: s.waiting.length })
       s = { ...s, waiting: [...s.waiting, again.viking] }
-      // Taking a seat changes nothing on the board, so no further resolution is needed.
+      if (s.waiting.length >= WAITING_SLOTS && !isWon(s)) {
+        // Filling the last slot sinks the raid (ui-settings.md §4). Win still beats loss.
+        events.push({ type: 'overflow', vikingId })
+        return { ...s, events, status: 'lost', lossReason: 'slots-full' }
+      }
     }
   }
 
@@ -164,7 +164,8 @@ function isWon(state: GameState) {
 function statusFields(state: GameState): { status: GameStatus; lossReason: LossReason | null } {
   if (state.status === 'lost') return { status: 'lost', lossReason: state.lossReason }
   const status = evaluateGameStatus(state)
-  return { status, lossReason: status === 'lost' ? 'stuck' : null }
+  if (status !== 'lost') return { status, lossReason: null }
+  return { status, lossReason: state.waiting.length >= WAITING_SLOTS ? 'slots-full' : 'stuck' }
 }
 
 /**
@@ -175,6 +176,7 @@ function statusFields(state: GameState): { status: GameStatus; lossReason: LossR
 export function evaluateGameStatus(state: GameState): GameStatus {
   if (isWon(state)) return 'won'
   if (state.status === 'lost') return 'lost'
+  if (state.waiting.length >= WAITING_SLOTS) return 'lost'
   if (state.queue.length > 0) return 'playing'
   const waiterCanMove = state.waiting.some(w => getAvailableLoot(state).some(l => l.color === w.color))
   return waiterCanMove ? 'playing' : 'lost'

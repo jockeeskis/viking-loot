@@ -19,11 +19,11 @@ npm run build          # produktionsbygge
 - Skatter (tunnor, kistor och hus) finns i tre färger: röd, blå och gul. Typen påverkar bara utseendet.
 - **Vikingakö:** Bara de tre främsta vikingarna kan väljas. Ett val förbrukas alltid.
 - En viking plundrar direkt upp till **två tillgängliga** skatter i sin färg. Om den får två åker den hem.
-- **Väntplatser:** En viking som får färre än två sätter sig på en av långskeppets **tre väntplatser**. Väntande vikingar plundrar automatiskt, i den ordning de kom, så fort nya skatter blir tillgängliga.
+- **Väntplatser:** En viking som får färre än två sätter sig på en av långskeppets **tre väntplatser**. Väntande vikingar plundrar automatiskt, i den ordning de kom, så fort nya skatter blir tillgängliga. Två vikingar kan vänta säkert. Den som tar den tredje platsen förlorar räden.
 - **Blockerade skatter:** En skatt är låst (mörk med 🔒) tills alla skatter i dess `blockedBy` har plundrats.
 - **Vinst:** Alla skatter är plundrade. Vinst går alltid före förlust.
 - **Förlust:**
-  - En viking behöver vänta men alla tre platser är fulla, även efter att de väntande har fått chansen att plundra.
+  - Den tredje väntplatsen fylls. Det kontrolleras efter att de väntande har fått chansen att plundra.
   - Eller: kön är tom och ingen väntande viking kan göra något mer.
 
 ## Struktur
@@ -40,11 +40,11 @@ npm run build          # produktionsbygge
 
 | # | Namn | Lär ut | Kan förloras? |
 |---|------|--------|----------------|
-| 1 | Kustbyn | Färgmatchning | Nej |
-| 2 | Fiskeläget | Kön, tre valbara | Nej |
-| 3 | Bryggan | Vänta och återvänd | Nej |
-| 4 | Handelsbyn | Blockeringskedjor | Nej |
-| 5 | Fästet | Riktigt pussel | Ja, ca 50 % av sekvenserna |
-| 6 | Stora räden | Större pussel | Ja, ca 50 % av sekvenserna |
+| 1 | Kustbyn | Färger och kön (4 × 4) | Nej |
+| 2 | Bryggan | Väntplatser | Nej |
+| 3 | Handelsbyn | Blockerade skatter | Nej |
+| 4 | Fiskeläget | Första pusslet | Ja, ca 22 % av sekvenserna |
+| 5 | Fästet | Riktigt pussel | Ja, ca 55 % av sekvenserna |
+| 6 | Stora räden | Större pussel | Ja, ca 63 % av sekvenserna |
 
 All grafik är tillfällig och ritas med Phaser Graphics. Inga externa filer används. Nästa steg för grafiken är 3D-modeller enligt referensbladet, renderade till sprite sheets.
