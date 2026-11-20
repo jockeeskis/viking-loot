@@ -7,7 +7,8 @@ import type { LootColor } from './engine'
 export type LootKind = 'barrel' | 'house' | 'chest'
 type G = Phaser.GameObjects.Graphics
 
-export const COLORS: Record<LootColor, number> = { red: 0xe2463b, blue: 0x2f7fe0, yellow: 0xf2bd2c }
+// Tokens from ui-settings.md §2 (color.red / color.blue / color.yellow)
+export const COLORS: Record<LootColor, number> = { red: 0xd96b46, blue: 0x458fc4, yellow: 0xf0bd55 }
 export const WOOD = 0x8a5a33, WOOD_DARK = 0x5b3a20, WOOD_LIGHT = 0xb07a45, GOLD = 0xf5c542
 export const INK = 0x3b2414
 
@@ -74,7 +75,7 @@ function drawChest(g: G, c: number) {
 
 const SKIN = 0xf6c29a, SKIN_DARK = 0xe39f78, HORN = 0xf4e6c8, STEEL = 0xa9b3bd, STEEL_DARK = 0x6c7680
 
-/** A viking head of radius r. Red: big red beard. Blue: grey beard. Yellow: blonde braids. */
+/** A viking head of radius r. Ragnar (red): big red beard. Björn (blue): grey beard. Freja (yellow): blonde braids. */
 export function drawHead(g: G, color: LootColor, r: number, x = 0, y = 0) {
   // horns
   g.fillStyle(HORN)
@@ -129,10 +130,9 @@ export function drawChibi(g: G, color: LootColor) {
     g.fillStyle(c); g.fillCircle(-15, 12, 7.5)
     g.fillStyle(0xffffff); g.fillRect(-16, 5, 2, 14)
     g.fillStyle(GOLD); g.fillCircle(-15, 12, 2.5)
-  } else { // mug
-    g.fillStyle(GOLD); g.fillRoundedRect(13, 4, 8, 10, 2)
-    g.fillStyle(0xffffff); g.fillEllipse(17, 4, 10, 5)
-    g.lineStyle(2, WOOD_DARK); g.strokeCircle(22, 9, 3)
+  } else { // Freja: small hand axe
+    g.lineStyle(2.5, WOOD_DARK); g.lineBetween(14, 14, 18, 0)
+    g.fillStyle(0xc9ced6); g.slice(19, 1, 5, -Math.PI / 2, Math.PI / 2, false); g.fillPath()
   }
   drawHead(g, color, 15, 0, -10)
 }

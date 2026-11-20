@@ -33,7 +33,8 @@ const PREVIEW_MAX = 6
 const CARD = { y: 584, w: 108, h: 100 }
 const cardX = (i: number) => 62 + i * 118
 
-const KINDS: LootKind[] = ['barrel', 'chest', 'house']
+// Houses are introduced later (ui-settings.md §5), so only levels that set `kind: 'house'` get them.
+const KINDS: LootKind[] = ['barrel', 'chest']
 function kindFor(id: string): LootKind {
   let h = 0
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
