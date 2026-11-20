@@ -1,6 +1,11 @@
 # Viking Loot 0.2 — The First Raid
 
-Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3. Specifikation för versionen: `VIKING_LOOT_0.2.md`.
+Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3.
+
+- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md`
+- Visuell stil, UI och plan för 3D-assets: `ui-settings.md`
+
+Repo: https://github.com/jockeeskis/viking-loot
 
 ## Kom igång
 
@@ -38,13 +43,19 @@ npm run build          # produktionsbygge
 
 ## Banor
 
-| # | Namn | Lär ut | Kan förloras? |
-|---|------|--------|----------------|
-| 1 | Kustbyn | Färger och kön (4 × 4) | Nej |
-| 2 | Bryggan | Väntplatser | Nej |
-| 3 | Handelsbyn | Blockerade skatter | Nej |
-| 4 | Fiskeläget | Första pusslet | Ja, ca 22 % av sekvenserna |
-| 5 | Fästet | Riktigt pussel | Ja, ca 55 % av sekvenserna |
-| 6 | Stora räden | Större pussel | Ja, ca 63 % av sekvenserna |
+| # | Namn | Lär ut | Vinstchans* |
+|---|------|--------|-------------|
+| 1 | Kustbyn | Färger och kön (4 × 4) | 100 % |
+| 2 | Bryggan | Väntplatser | 100 % |
+| 3 | Handelsbyn | Blockerade skatter | 100 % |
+| 4 | Fiskeläget | Första pusslet | ca 78 % |
+| 5 | Fästet | Riktigt pussel | ca 45 % |
+| 6 | Stora räden | Större pussel | ca 37 % |
 
-All grafik är tillfällig och ritas med Phaser Graphics. Inga externa filer används. Nästa steg för grafiken är 3D-modeller enligt referensbladet, renderade till sprite sheets.
+\* Andel av alla möjliga valordningar som leder till vinst, enligt `npm run check-levels`.
+
+## Status och nästa steg
+
+- Spelmekaniken för 0.2 är klar och testad. Det som återstår av acceptanskriterierna är test med touch på en riktig mobil.
+- All grafik är tillfällig och ritas med Phaser Graphics i `src/game/art.ts`, enligt paletten och layouten i `ui-settings.md`. Inga externa filer används.
+- Nästa steg för grafiken är 3D-modeller (Blender) renderade till sprite sheets, enligt §9 i `ui-settings.md`.

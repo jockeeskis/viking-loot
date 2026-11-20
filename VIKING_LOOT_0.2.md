@@ -1,5 +1,7 @@
 # Viking Loot 0.2 – Riktiga pussel och förlustvillkor
 
+> **Status (2026-11-20):** Implementerad. Regelmotor, 6 banor, tester och gränssnitt finns i `src/game/`. Förlustregeln för väntplatser är ändrad jämfört med första utkastet (se 1.6). Visuell stil styrs av `ui-settings.md`.
+
 ## Syfte
 
 Utveckla Viking Loot 0.1 från ett enkelt färgmatchningsspel till ett pusselspel där **ordningen på vikingarna spelar roll** och spelaren faktiskt kan förlora. Behåll befintlig Vue 3-, TypeScript- och Phaser-arkitektur samt den planerade färgglada 3D-liknande stilen.
@@ -25,9 +27,9 @@ För att undvika att spelet blir låst utan möjlighet att återhämta sig gäll
 3. Om den plundrar färre än två objekt placeras den på en ledig väntplats med kvarvarande kapacitet (1 eller 2 objekt).
 4. Efter varje förändring av spelplanen försöker väntande vikingar, i den ordning de anlände, automatiskt plundra nytillgängliga objekt av sin färg.
 5. En väntande viking som uppnår totalt två plundrade objekt lämnar sin väntplats.
-6. Om en viking behöver vänta när alla tre väntplatser redan är upptagna förlorar spelaren. Kontrollera detta **efter** att befintliga väntande vikingar fått chans att slutföra sina uppdrag.
+6. Om en viking behöver vänta och därmed fyller den **tredje** väntplatsen förlorar spelaren. Två vikingar kan alltså vänta säkert. Kontrollera detta **efter** att befintliga väntande vikingar fått chans att slutföra sina uppdrag. Om sista objektet försvinner i samma drag är det vinst.
 
-> **Ändrat (2026-11-20):** Spelaren förlorar redan när den **tredje** väntplatsen fylls, i linje med `ui-settings.md` §4. Två vikingar kan alltså vänta säkert. Kontrollen görs fortfarande efter att de väntande har fått plundra, och vinst går före förlust.
+> **Ändrat (2026-11-20):** I första utkastet förlorade man först när en fjärde viking behövde vänta. Regeln skärptes för att stämma med `ui-settings.md` §4.
 
 Detta är den föreslagna exakta regelmodellen för MVP 0.2; den kan balanseras senare.
 
@@ -61,7 +63,7 @@ Blå kista (B) ── blockerar ──> Gul skatt (C)
 
 **Vinst:** Alla objekt har plundrats. Visa en segerpanel med möjlighet att spela nästa bana.
 
-**Förlust – fulla väntplatser:** En ny viking måste vänta, men samtliga tre platser är upptagna efter att väntande vikingar har fått möjlighet att plundra.
+**Förlust – fulla väntplatser:** En ny viking måste vänta och fyller den tredje väntplatsen, efter att väntande vikingar har fått möjlighet att plundra.
 
 **Förlust – fastlåst spel:** Det finns objekt kvar, men inga valbara vikingar och ingen väntande viking kan göra ytterligare framsteg.
 
@@ -113,23 +115,27 @@ Använd oföränderliga state-uppdateringar eller en tydligt dokumenterad mutati
 - Visa tre valbara vikingar längst ner, nära långskeppet.
 - Visa tre väntplatser tydligt, inklusive upptagna platser och respektive vikings färg.
 - Visa hur många objekt varje väntande viking har kvar att plundra.
-- När två av tre platser är upptagna: visa en diskret men tydlig varning.
-- När tredje platsen fylls: visa högre risknivå, men förlora **först när ytterligare en viking behöver vänta**.
+- När en plats är upptagen: visa en diskret varning (gul).
+- När två platser är upptagna: visa hög risknivå (röd) – nästa viking som måste vänta förlorar räden.
+- När tredje platsen fylls: förlust.
 - Animera att vikingar springer ut, plundrar och antingen återvänder eller stannar i väntläge.
 - Visa tydliga paneler för vinst, förlust och omstart.
 - Behåll mobilanpassning i stående format.
 
 ## 7. Banor och svårighetsgrad
 
-Skapa minst fem handdesignade testbanor för 0.2:
+Progressionen följer `ui-settings.md` §6. Implementerade banor:
 
-1. **Introduktion:** Alla föremål tillgängliga; lär ut färgmatchning.
-2. **Kön:** Spelaren måste välja bland de tre främsta vikingarna.
-3. **Väntplatser:** Demonstrera att en viking kan vänta och sedan återvända.
-4. **Blockering:** Ett föremål måste plundras för att låsa upp ett annat.
-5. **Riktigt pussel:** Fel ordning fyller väntplatserna; rätt ordning leder till seger.
+| # | Bana | Lär ut | Kan förloras? |
+|---|------|--------|----------------|
+| 1 | Kustbyn | Färgmatchning och kön (fullt 4 × 4-rutnät, allt tillgängligt) | Nej |
+| 2 | Bryggan | Väntplatser: en viking väntar och återvänder | Nej |
+| 3 | Handelsbyn | Blockering i kedjor | Nej |
+| 4 | Fiskeläget | Första pusslet, tre högar | Ja (ca 78 % av valordningarna vinner) |
+| 5 | Fästet | Riktigt pussel: fel ordning fyller väntplatserna | Ja (ca 45 %) |
+| 6 | Stora räden | Större pussel, två höga högar | Ja (ca 37 %) |
 
-Varje bana ska ha minst en verifierad vinstsekvens. Skapa gärna en liten sökbaserad validator som simulerar alla tillåtna val för små banor. Säkerställ att minst en bana också har en verifierad förlustsekvens.
+Varje bana ska ha minst en verifierad vinstsekvens, och minst en bana ska ha en verifierad förlustsekvens. Detta kontrolleras av den sökbaserade validatorn `src/game/solver.ts` (`npm run check-levels`) och av testerna.
 
 ## 8. Implementation i projektet
 
@@ -146,19 +152,19 @@ Varje bana ska ha minst en verifierad vinstsekvens. Skapa gärna en liten sökba
 
 ## 9. Acceptanskriterier
 
-- [ ] Endast de tre första vikingarna kan väljas.
-- [ ] Vald viking tas bort ur kön.
-- [ ] Vikingar plundrar enbart tillgängliga objekt med matchande färg.
-- [ ] Vikingar kan vänta med kvarvarande kapacitet.
-- [ ] Väntande vikingar kan fortsätta plundra när nya objekt blir tillgängliga.
-- [ ] En fjärde viking som behöver vänta orsakar förlust om alla tre platser är upptagna.
-- [ ] Blockerade objekt kan inte plundras innan deras blockerare är borta.
-- [ ] Spelet upptäcker fastlåsta lägen när kön är tom.
-- [ ] Samtliga objekt plundrade ger vinst.
-- [ ] Omstart återställer hela banans tillstånd.
-- [ ] Minst fem banor är spelbara, varav minst en har både vinst- och förlustväg.
-- [ ] Tester täcker vinst, förlust, blockering, kö och väntplatser.
-- [ ] Spelet fungerar med mus och touch i mobilformat.
+- [x] Endast de tre första vikingarna kan väljas.
+- [x] Vald viking tas bort ur kön.
+- [x] Vikingar plundrar enbart tillgängliga objekt med matchande färg.
+- [x] Vikingar kan vänta med kvarvarande kapacitet.
+- [x] Väntande vikingar kan fortsätta plundra när nya objekt blir tillgängliga.
+- [x] En viking som fyller den tredje väntplatsen orsakar förlust (ändrad regel, se 1.6).
+- [x] Blockerade objekt kan inte plundras innan deras blockerare är borta.
+- [x] Spelet upptäcker fastlåsta lägen när kön är tom.
+- [x] Samtliga objekt plundrade ger vinst.
+- [x] Omstart återställer hela banans tillstånd.
+- [x] Minst fem banor är spelbara, varav minst en har både vinst- och förlustväg.
+- [x] Tester täcker vinst, förlust, blockering, kö och väntplatser (`npm test`, 21 tester).
+- [ ] Spelet fungerar med mus och touch i mobilformat. *(Mus verifierad i desktop-webbläsare; touch på riktig mobil ej testad ännu.)*
 
 ## 10. Utanför scope för 0.2
 

@@ -2,6 +2,8 @@
 
 Version: 1.0 · Art direction: **Cute 3D** · Target: portrait mobile (9:16)
 
+> **Nuläge (2026-11-20):** Prototypen använder platshållargrafik ritad i kod (`src/game/art.ts`) med paletten i §2, figurerna i §3 och layouten i §7. Den här filen beskriver målbilden för de riktiga 3D-asseten.
+
 ## 1. Designmål
 
 Viking Loot är ett färgglatt, humoristiskt pusselspel. Spelaren skickar färgmatchade vikingar från ett långskepp för att plundra en liten by. Gränssnittet ska vara lättläst på mobil, och alla viktiga val ska vara tydliga även när figurerna visas små.
@@ -43,8 +45,8 @@ Långskeppet ligger visuellt längst ner vid spelplanen. Design: rundat ekfärga
 
 - **Vikingakö:** visa kommande vikingar med tydlig färg; endast de tre främsta är valbara enligt 0.2-reglerna.
 - **Väntplatser:** tre synliga platser för vikingar som inte kan plundra; markera upptagna platser.
-- **Riskindikator:** tydlig visuell varning när två av tre platser är upptagna.
-- **Förlust:** tre upptagna väntplatser innebär förlust enligt 0.2-reglerna.
+- **Riskindikator:** gul varning när en plats är upptagen, röd när två är upptagna (nästa viking som måste vänta förlorar).
+- **Förlust:** tre upptagna väntplatser innebär förlust enligt 0.2-reglerna. Två vikingar kan vänta säkert.
 - **Återkoppling:** vikingar hoppar i land, springer till byte, plundrar och återvänder eller väntar. Animationerna får inte dölja spelets tillstånd.
 
 ## 5. Plundringsobjekt
