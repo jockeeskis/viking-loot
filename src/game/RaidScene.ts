@@ -1,9 +1,13 @@
 import Phaser from 'phaser'
 import { levels } from './levels'
 import {
-  createGame, selectViking, isAvailable, SELECTABLE, WAITING_SLOTS,
+  createGame, selectViking, isAvailable, SELECTABLE, WAITING_SLOTS, CAPACITY,
   type GameEvent, type GameState, type LootColor, type LossReason, type GameStatus,
 } from './engine'
+import {
+  COLORS, GOLD, INK, shade, cartoonText, drawLoot, drawChibi, drawPortrait, drawHead,
+  drawTree, drawRock, drawShip, drawPanel, drawTab, type LootKind,
+} from './art'
 
 export type RaidUpdate = {
   level: number
@@ -15,18 +19,26 @@ export type RaidUpdate = {
   moves: number
 }
 
-const palette: Record<LootColor, number> = { red: 0xd75a45, blue: 0x429bd5, yellow: 0xe7b84c }
-const dark: Record<LootColor, number> = { red: 0x8f3427, blue: 0x24618c, yellow: 0x9c7423 }
-const emoji: Record<LootColor, string> = { red: '🧰', blue: '💎', yellow: '🪙' }
-const font = 'Arial'
+// ---------- Layout (360×640 canvas) ----------
+const ISLAND = { x: 8, y: 58, w: 344, h: 326 }
+const ISLAND_CY = ISLAND.y + ISLAND.h / 2
+const SHIP = { x: 186, y: 428 }
+const BOARD = { x: SHIP.x, y: SHIP.y - 10 } // where vikings climb aboard
+const PANEL_Y = 462
+const WAIT_PANEL = { x: 6, w: 150 }
+const QUEUE_PANEL = { x: 160, w: 194 }
+const slotPos = (i: number) => ({ x: WAIT_PANEL.x + 30 + i * 45, y: PANEL_Y + 32 })
+const SLOT_SCALE = 0.62
+const PREVIEW_MAX = 6
+const CARD = { y: 584, w: 108, h: 100 }
+const cardX = (i: number) => 62 + i * 118
 
-// Layout (360×640 canvas)
-const SLOT_Y = 452
-const slotX = (i: number) => 100 + i * 80
-const PICK_Y = 562
-const pickX = (i: number) => 92 + i * 88
-const PREVIEW_Y = 615
-const GANGWAY = { x: 180, y: 410 }
+const KINDS: LootKind[] = ['barrel', 'chest', 'house']
+function kindFor(id: string): LootKind {
+  let h = 0
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return KINDS[h % KINDS.length]
+}
 
 type Sprite = Phaser.GameObjects.Container
 
@@ -36,17 +48,19 @@ export class RaidScene extends Phaser.Scene {
   private busy = false
   private generation = 0
   private lootSprites = new Map<string, Sprite>()
-  private vikingSprites = new Map<string, Sprite>()
-  private slotFrames: Phaser.GameObjects.Graphics[] = []
+  private actors = new Map<string, Sprite>() // vikings out on the island or seated on the ship
+  private cards: Sprite[] = []
+  private preview: Phaser.GameObjects.GameObject[] = []
+  private slotsGfx?: Phaser.GameObjects.Graphics
+  private waitTab?: Phaser.GameObjects.Graphics
   private warning?: Phaser.GameObjects.Text
   private title?: Phaser.GameObjects.Text
-  private previewLabel?: Phaser.GameObjects.Text
+  private lootOffsetY = 0
   private onUpdate?: (u: RaidUpdate) => void
 
   constructor() { super('Raid') }
 
   create() {
-    this.cameras.main.setBackgroundColor('#193a4b')
     this.drawEnvironment()
     this.reset(this.level)
   }
@@ -62,90 +76,114 @@ export class RaidScene extends Phaser.Scene {
     const data = levels[this.level]
     this.state = createGame(data.loot, data.queue)
     this.lootSprites.forEach(s => s.destroy()); this.lootSprites.clear()
-    this.vikingSprites.forEach(s => s.destroy()); this.vikingSprites.clear()
-    this.title?.setText(`⚔️ ${this.level + 1}. ${data.name}`)
-    this.drawLoot()
-    this.layoutVikings(false)
+    this.actors.forEach(s => s.destroy()); this.actors.clear()
+    this.title?.setText(`${this.level + 1}. ${data.name}`)
+    this.drawLootSprites()
+    this.layout(false)
     this.notify()
   }
 
-  // ---------- Static scenery ----------
+  // ---------- Scenery ----------
 
   private drawEnvironment() {
     const g = this.add.graphics()
-    g.fillStyle(0x325a68); g.fillRect(0, 0, 360, 640)
-    g.fillStyle(0x527f62); g.fillRoundedRect(10, 62, 340, 322, 22)
-    g.fillStyle(0x68946e); g.fillRoundedRect(22, 74, 316, 298, 14)
-    // Sea + longship
-    g.fillStyle(0x2c5b7a); g.fillRect(0, 392, 360, 118)
-    g.fillStyle(0x91633d); g.fillRoundedRect(48, 418, 264, 70, 30)
-    g.fillStyle(0xb98b54); g.fillRect(70, 432, 220, 6); g.fillRect(70, 470, 220, 6)
-    g.lineStyle(4, 0xe5c68e); g.strokeRoundedRect(48, 418, 264, 70, 30)
-    g.fillStyle(0xe5c68e); g.fillTriangle(312, 440, 340, 402, 322, 452); g.fillTriangle(48, 440, 22, 402, 38, 452)
-    // Dock
-    g.fillStyle(0x6b4a2e); g.fillRect(0, 510, 360, 130)
-    g.fillStyle(0x7d5735); for (let y = 516; y < 640; y += 22) g.fillRect(0, y, 360, 18)
-    for (let i = 0; i < WAITING_SLOTS; i++) this.slotFrames.push(this.add.graphics())
-    this.title = this.add.text(180, 32, '', { fontFamily: font, fontSize: '24px', fontStyle: 'bold', color: '#fff1ce' }).setOrigin(0.5)
-    this.add.text(180, 500, 'VÄNTPLATSER', { fontFamily: font, fontSize: '11px', color: '#d9edf5' }).setOrigin(0.5).setAlpha(0.8)
-    this.add.text(14, 522, 'VÄLJ VIKING', { fontFamily: font, fontSize: '11px', fontStyle: 'bold', color: '#f1c76d' })
-    this.previewLabel = this.add.text(14, PREVIEW_Y - 6, '', { fontFamily: font, fontSize: '11px', color: '#e8d6bb' })
-    this.warning = this.add.text(180, 402, '', { fontFamily: font, fontSize: '12px', fontStyle: 'bold', color: '#fff', backgroundColor: '#00000000', padding: { x: 8, y: 3 } }).setOrigin(0.5).setDepth(5)
+    // sea
+    g.fillStyle(0x1f6fb0); g.fillRect(0, 0, 360, 640)
+    g.fillStyle(0x2f8fd0); g.fillRect(0, 40, 360, 420)
+    g.lineStyle(2, 0x7cc4ef, 0.5)
+    for (let i = 0; i < 14; i++) {
+      const x = (i * 83) % 360, y = 392 + (i * 29) % 60
+      g.beginPath(); g.arc(x, y, 7, Math.PI * 1.15, Math.PI * 1.85); g.strokePath()
+    }
+    // island: rocky rim, sand, grass, cobbles
+    const { x, y, w, h } = ISLAND
+    g.fillStyle(0x7d8086); g.fillRoundedRect(x, y + 6, w, h, 30)
+    g.fillStyle(0xe6cf98); g.fillRoundedRect(x, y, w, h - 4, 30)
+    g.fillStyle(0x5fae45); g.fillRoundedRect(x + 8, y + 6, w - 16, h - 22, 24)
+    g.fillStyle(0x76c04f); g.fillRoundedRect(x + 14, y + 10, w - 28, h - 34, 20)
+    g.fillStyle(0x86cc5b, 0.7)
+    for (const [px, py, pw, ph] of [[70, 110, 70, 26], [260, 150, 80, 30], [120, 330, 90, 24], [300, 300, 50, 22]]) g.fillEllipse(px, py, pw, ph)
+    g.fillStyle(0xcfc6b3, 0.55)
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 9; c++) if ((r * 7 + c * 3) % 4 !== 0) g.fillEllipse(48 + c * 33 + (r % 2) * 15, 92 + r * 42, 22, 12)
+    // decorations along the edges
+    drawTree(g, 26, 120, 0.8); drawTree(g, 334, 104, 0.9); drawTree(g, 30, 300, 0.75); drawTree(g, 336, 260, 0.8)
+    drawRock(g, 22, 210, 0.8); drawRock(g, 340, 350, 0.9); drawRock(g, 300, 76, 0.7); drawRock(g, 60, 368, 0.8)
+    drawShip(g, SHIP.x, SHIP.y)
+    // HUD sign
+    const s = this.add.graphics()
+    s.fillStyle(0x000000, 0.25); s.fillRoundedRect(72, 10, 220, 40, 12)
+    s.fillStyle(0x5b3a20); s.fillRoundedRect(70, 6, 220, 40, 12)
+    s.fillStyle(0x8a5a33); s.fillRoundedRect(75, 10, 210, 32, 9)
+    s.fillStyle(0xc9925a); s.fillCircle(84, 26, 3); s.fillCircle(276, 26, 3)
+    this.title = this.add.text(180, 26, '', cartoonText(18)).setOrigin(0.5)
+    // bottom panels
+    const p = this.add.graphics()
+    p.fillStyle(0x3f2613); p.fillRect(0, PANEL_Y - 10, 360, 200)
+    p.fillStyle(0x4f311a); for (let yy = PANEL_Y - 4; yy < 640; yy += 20) p.fillRect(0, yy, 360, 16)
+    drawPanel(p, WAIT_PANEL.x, PANEL_Y, WAIT_PANEL.w, 62)
+    drawPanel(p, QUEUE_PANEL.x, PANEL_Y, QUEUE_PANEL.w, 62)
+    drawTab(p, QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y - 10, 100)
+    this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y - 1, 'VIKINGAKÖ', cartoonText(10)).setOrigin(0.5)
+    this.waitTab = this.add.graphics()
+    this.add.text(WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 1, 'VÄNTPLATSER', cartoonText(10)).setOrigin(0.5).setDepth(1)
+    this.slotsGfx = this.add.graphics()
+    this.warning = this.add.text(180, 436, '', { ...cartoonText(11), padding: { x: 8, y: 3 } }).setOrigin(0.5).setDepth(40)
   }
 
-  /** `used` lets the animation show the seat count as it unfolds, not just the final state. */
   private drawSlots(used = this.state.waiting.length) {
-    const risk = used >= WAITING_SLOTS ? 0xff5a4a : used === WAITING_SLOTS - 1 ? 0xf3c14e : 0xe5c68e
-    this.slotFrames.forEach((g, i) => {
-      g.clear()
-      g.fillStyle(0x5e3f25, 0.9); g.fillCircle(slotX(i), SLOT_Y, 27)
-      g.lineStyle(3, i < used ? risk : 0xe5c68e, i < used ? 1 : 0.45); g.strokeCircle(slotX(i), SLOT_Y, 27)
-    })
-    const w = this.warning!
-    if (used >= WAITING_SLOTS) {
-      w.setText('🔥 Alla platser fulla – nästa viking utan byte förlorar!').setBackgroundColor('#a3261bdd')
-    } else if (used === WAITING_SLOTS - 1) {
-      w.setText('⚠️ Bara en väntplats kvar').setBackgroundColor('#8a6a14cc')
-    } else {
-      w.setText('').setBackgroundColor('#00000000')
+    const risk = used >= WAITING_SLOTS ? 0xe0392b : used === WAITING_SLOTS - 1 ? 0xe8a21b : null
+    const g = this.slotsGfx!
+    g.clear()
+    for (let i = 0; i < WAITING_SLOTS; i++) {
+      const { x, y } = slotPos(i)
+      g.fillStyle(0x2a190c); g.fillCircle(x, y, 19)
+      g.lineStyle(3, i < used && risk ? risk : 0xc9925a, i < used ? 1 : 0.7); g.strokeCircle(x, y, 19)
     }
+    const t = this.waitTab!
+    t.clear(); drawTab(t, WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 10, 104, risk ?? 0x8a5a33)
+    const w = this.warning!
+    if (used >= WAITING_SLOTS) w.setText('🔥 Alla platser fulla – nästa viking utan byte förlorar!').setBackgroundColor('#a3261bee')
+    else if (used === WAITING_SLOTS - 1) w.setText('⚠️ Bara en väntplats kvar').setBackgroundColor('#9a6a10ee')
+    else w.setText('').setBackgroundColor('#00000000')
   }
 
   // ---------- Loot ----------
 
-  private lootOffsetY = 0
   private lootPos(at: [number, number]) { return { x: 54 + at[0] * 84, y: 112 + at[1] * 84 + this.lootOffsetY } }
 
-  private drawLoot() {
+  private makeLootGraphic(kind: LootKind, color: LootColor) {
+    const g = this.add.graphics()
+    drawLoot(g, kind, color)
+    return g
+  }
+
+  private drawLootSprites() {
     const placed = levels[this.level].loot
-    // Centre the level vertically on the island (inner area y 74–372).
     const rows = placed.map(p => p.at[1])
-    this.lootOffsetY = 226 - (112 + ((Math.min(...rows) + Math.max(...rows)) / 2) * 84)
-    // Shrink items on dense piles so they stay readable.
+    this.lootOffsetY = ISLAND_CY - 6 - (112 + ((Math.min(...rows) + Math.max(...rows)) / 2) * 84)
     let minGap = Infinity
     placed.forEach(a => placed.forEach(b => {
       if (a !== b && a.at[0] === b.at[0]) minGap = Math.min(minGap, Math.abs(a.at[1] - b.at[1]) * 84)
     }))
-    const scale = Phaser.Math.Clamp(minGap / 62, 0.7, 1)
-    // Draw back rows first so blockers sit on top of what they block.
-    ;[...placed].sort((a, b) => a.at[1] - b.at[1]).forEach(p => {
+    const scale = Phaser.Math.Clamp(minGap / 60, 0.68, 1)
+    // Back rows first so blockers stand in front of what they block.
+    ;[...placed].sort((a, b) => a.at[1] - b.at[1]).forEach((p, depth) => {
       const { x, y } = this.lootPos(p.at)
-      const shadow = this.add.ellipse(0, 22, 62, 20, 0x203c32, 0.35)
-      const base = this.add.graphics()
-      base.fillStyle(0x9a7956); base.fillRoundedRect(-31, -23, 62, 51, 10)
-      base.fillStyle(0xd6b38b); base.fillRoundedRect(-31, -27, 62, 43, 10)
-      base.lineStyle(4, palette[p.color]); base.strokeRoundedRect(-29, -25, 58, 40, 9)
-      const icon = this.add.text(0, -7, emoji[p.color], { fontFamily: font, fontSize: '30px' }).setOrigin(0.5)
-      const shade = this.add.graphics().setName('shade')
-      shade.fillStyle(0x0b1a22, 0.55); shade.fillRoundedRect(-31, -27, 62, 55, 10)
-      const lock = this.add.text(22, -24, '🔒', { fontFamily: font, fontSize: '15px' }).setOrigin(0.5).setName('lock')
-      const c = this.add.container(x, y, [shadow, base, icon, shade, lock]).setScale(scale)
+      const kind = p.kind ?? kindFor(p.id)
+      const art = this.makeLootGraphic(kind, p.color)
+      const shadeG = this.add.graphics().setName('shade')
+      shadeG.fillStyle(0x0b1a22, 0.55); shadeG.fillRoundedRect(-33, -36, 66, 62, 12)
+      const lock = this.add.graphics().setName('lock')
+      lock.lineStyle(3, GOLD); lock.beginPath(); lock.arc(22, -30, 5, Math.PI, 0); lock.strokePath()
+      lock.fillStyle(GOLD); lock.fillRoundedRect(14, -30, 16, 13, 3)
+      lock.fillStyle(INK); lock.fillRect(21, -26, 2, 5)
+      const c = this.add.container(x, y, [art, shadeG, lock]).setScale(scale).setDepth(2 + depth * 0.01)
+      c.setData('kind', kind).setData('color', p.color)
       this.lootSprites.set(p.id, c)
     })
     this.refreshLocks(this.state, false)
   }
 
-  /** Show which items are reachable. Animated when called mid-move. */
   private refreshLocks(state: GameState, animate: boolean) {
     for (const item of state.loot) {
       const c = this.lootSprites.get(item.id)
@@ -163,64 +201,86 @@ export class RaidScene extends Phaser.Scene {
 
   // ---------- Vikings ----------
 
-  private makeViking(color: LootColor, size: number): Sprite {
+  /** A chibi viking. The drawing sits in an inner "rig" so it can hop while the container moves. */
+  private makeActor(color: LootColor): Sprite {
     const g = this.add.graphics()
-    g.fillStyle(0x000000, 0.25); g.fillEllipse(0, size * 0.95, size * 1.6, size * 0.45)
-    g.fillStyle(palette[color]); g.fillCircle(0, 0, size)
-    g.lineStyle(3, 0xffffff); g.strokeCircle(0, 0, size)
-    const s = size / 22
-    g.fillStyle(0xf2c9a0); g.fillCircle(0, 2 * s, 11 * s) // face
-    g.fillStyle(dark[color]); g.fillTriangle(-11 * s, 4 * s, 11 * s, 4 * s, 0, 17 * s) // beard
-    g.fillStyle(0xa9b3ba); g.slice(0, -1 * s, 12 * s, Math.PI, 0, false); g.fillPath() // helmet
-    g.fillStyle(0xfff1ce)
-    g.fillTriangle(-11 * s, -4 * s, -19 * s, -15 * s, -8 * s, -9 * s)
-    g.fillTriangle(11 * s, -4 * s, 19 * s, -15 * s, 8 * s, -9 * s)
-    g.fillStyle(0x1d2b33); g.fillCircle(-4 * s, 2 * s, 1.6 * s); g.fillCircle(4 * s, 2 * s, 1.6 * s)
-    const badge = this.add.text(0, size + 6, '', { fontFamily: font, fontSize: '11px', fontStyle: 'bold', color: '#fff', backgroundColor: '#1d2b33cc', padding: { x: 4, y: 1 } }).setOrigin(0.5).setName('badge')
-    return this.add.container(0, 0, [g, badge]).setSize(size * 2.2, size * 2.2).setDepth(10)
+    drawChibi(g, color)
+    const rig = this.add.container(0, 0, [g]).setName('rig')
+    const carry = this.add.container(0, -36).setName('carry')
+    const badge = this.add.text(0, 34, '', { ...cartoonText(14), padding: { x: 4, y: 0 } }).setOrigin(0.5).setName('badge').setVisible(false)
+    return this.add.container(0, 0, [rig, carry, badge]).setDepth(30)
   }
 
-  /** Put every queued and waiting viking where the state says it belongs. */
-  private layoutVikings(animate: boolean) {
-    const live = new Set([...this.state.queue, ...this.state.waiting].map(v => v.id))
-    this.vikingSprites.forEach((s, id) => { if (!live.has(id)) { s.destroy(); this.vikingSprites.delete(id) } })
+  private setBadge(actor: Sprite, collected: number | null) {
+    const b = actor.getByName('badge') as Phaser.GameObjects.Text
+    if (collected === null) b.setVisible(false)
+    else b.setText(`${collected}/${CAPACITY}`).setBackgroundColor('#3b2414cc').setVisible(true)
+  }
 
+  private makeCard(color: LootColor, index: number): Sprite {
+    const c = COLORS[color]
+    const { w, h } = CARD
+    const g = this.add.graphics()
+    g.fillStyle(0x000000, 0.3); g.fillRoundedRect(-w / 2 + 2, -h / 2 + 5, w, h, 16)
+    g.fillStyle(0xf3dfb4); g.fillRoundedRect(-w / 2, -h / 2, w, h, 16)
+    g.fillStyle(shade(c, -0.25)); g.fillRoundedRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10, 12)
+    g.fillStyle(c); g.fillRoundedRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 26, 12)
+    g.fillStyle(shade(c, 0.35), 0.5); g.fillEllipse(-14, -h / 2 + 22, 50, 22)
+    const portrait = this.add.graphics()
+    drawPortrait(portrait, color, 25)
+    portrait.setPosition(0, -4)
+    // Clip the shoulders to the card. The mask lives in world space, so it is placed at the card's slot.
+    const mask = this.make.graphics({}, false)
+    mask.fillStyle(0xffffff); mask.fillRoundedRect(cardX(index) - w / 2 + 5, CARD.y - h / 2 + 5, w - 10, h - 10, 12)
+    portrait.setMask(mask.createGeometryMask())
+    const card = this.add.container(cardX(index), CARD.y, [g, portrait]).setSize(w, h).setDepth(20)
+    card.once(Phaser.GameObjects.Events.DESTROY, () => mask.destroy())
+    return card
+  }
+
+  /** Rebuild cards, the queue preview and seated vikings from the current state. */
+  private layout(animate: boolean) {
     const playing = this.state.status === 'playing'
-    const place = (id: string, color: LootColor, x: number, y: number, scale: number, alpha: number) => {
-      let s = this.vikingSprites.get(id)
-      if (!s) {
-        s = this.makeViking(color, 22).setPosition(x, y).setScale(scale).setAlpha(0)
-        this.vikingSprites.set(id, s)
+    this.cards.forEach(c => c.destroy())
+    this.cards = []
+    this.state.queue.slice(0, SELECTABLE).forEach((v, i) => {
+      const card = this.makeCard(v.color, i)
+      if (playing) {
+        card.setInteractive({ useHandCursor: true })
+        card.on('pointerdown', () => this.choose(v.id))
+        card.on('pointerover', () => { if (!this.busy) card.setScale(1.04) })
+        card.on('pointerout', () => card.setScale(1))
       }
-      this.tweens.killTweensOf(s)
-      s.setAngle(0)
-      if (animate) this.tweens.add({ targets: s, x, y, scale, alpha, duration: 260, ease: 'Sine.easeOut' })
-      else s.setPosition(x, y).setScale(scale).setAlpha(alpha)
-      return s
-    }
-
-    this.state.queue.forEach((v, i) => {
-      const selectable = i < SELECTABLE && playing
-      const s = i < SELECTABLE
-        ? place(v.id, v.color, pickX(i), PICK_Y, 1, 1)
-        : place(v.id, v.color, 92 + (i - SELECTABLE) * 30, PREVIEW_Y + 8, 0.45, i - SELECTABLE < 8 ? 0.85 : 0)
-      ;(s.getByName('badge') as Phaser.GameObjects.Text).setText('').setVisible(false)
-      s.removeAllListeners().disableInteractive()
-      if (selectable) {
-        s.setInteractive({ useHandCursor: true })
-        s.on('pointerdown', () => this.choose(v.id))
-        s.on('pointerover', () => s.setScale(1.08))
-        s.on('pointerout', () => s.setScale(1))
+      if (animate) {
+        card.setAlpha(0).setY(CARD.y + 16)
+        this.tweens.add({ targets: card, alpha: 1, y: CARD.y, duration: 240, delay: i * 50, ease: 'Back.easeOut' })
       }
+      this.cards.push(card)
     })
-    const hidden = this.state.queue.length - SELECTABLE
-    this.previewLabel?.setText(hidden > 0 ? 'Sedan:' : '')
 
+    this.preview.forEach(o => o.destroy()); this.preview = []
+    const rest = this.state.queue.slice(SELECTABLE)
+    const g = this.add.graphics().setDepth(5)
+    this.preview.push(g)
+    rest.slice(0, PREVIEW_MAX).forEach((v, i) => {
+      const x = QUEUE_PANEL.x + 24 + i * 29, y = PANEL_Y + 34
+      g.fillStyle(0x2a190c); g.fillCircle(x, y, 13)
+      g.lineStyle(2.5, COLORS[v.color]); g.strokeCircle(x, y, 13)
+      drawHead(g, v.color, 9, x, y + 1)
+    })
+    if (rest.length > PREVIEW_MAX) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w - 10, PANEL_Y + 34, `+${rest.length - PREVIEW_MAX}`, cartoonText(12)).setOrigin(1, 0.5).setDepth(6))
+    if (rest.length === 0) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y + 34, this.state.queue.length ? 'Sista vikingarna!' : 'Kön är tom', cartoonText(11, '#e8d6bb')).setOrigin(0.5).setDepth(6))
+
+    const seated = new Set(this.state.waiting.map(v => v.id))
+    this.actors.forEach((a, id) => { if (!seated.has(id)) { a.destroy(); this.actors.delete(id) } })
     this.state.waiting.forEach((v, i) => {
-      const s = place(v.id, v.color, slotX(i), SLOT_Y - 4, 0.9, 1)
-      s.removeAllListeners().disableInteractive()
-      const left = 2 - v.collectedCount
-      ;(s.getByName('badge') as Phaser.GameObjects.Text).setText(`${left} kvar`).setVisible(true)
+      let a = this.actors.get(v.id)
+      if (!a) { a = this.makeActor(v.color); this.actors.set(v.id, a) }
+      const { x, y } = slotPos(i)
+      this.tweens.killTweensOf(a)
+      if (animate) this.tweens.add({ targets: a, x, y: y - 6, scale: SLOT_SCALE, duration: 240 })
+      else a.setPosition(x, y - 6).setScale(SLOT_SCALE)
+      this.setBadge(a, v.collectedCount)
     })
     this.drawSlots()
   }
@@ -232,14 +292,15 @@ export class RaidScene extends Phaser.Scene {
     const before = this.state
     const after = selectViking(before, vikingId)
     if (after === before) return
-    // The logical outcome is decided here; the animation below only replays it.
+    // The outcome is decided here; the animation only replays the engine's events.
     this.state = after
     this.busy = true
+    this.cards.forEach(c => c.disableInteractive().setScale(1))
     const gen = this.generation
     this.playEvents(before, after.events, gen).then(() => {
       if (gen !== this.generation) return
       this.busy = false
-      this.layoutVikings(true)
+      this.layout(true)
       this.notify()
     })
   }
@@ -247,69 +308,87 @@ export class RaidScene extends Phaser.Scene {
   private tween(config: Phaser.Types.Tweens.TweenBuilderConfig): Promise<void> {
     return new Promise(resolve => this.tweens.add({ ...config, onComplete: () => resolve() }))
   }
+  private delay(ms: number) { return new Promise<void>(r => this.time.delayedCall(ms, r)) }
+
+  /** Run with a little hop in the step, facing the direction of travel. */
+  private async runTo(actor: Sprite, x: number, y: number, scale = 1) {
+    const rig = actor.getByName('rig') as Sprite
+    const dist = Phaser.Math.Distance.Between(actor.x, actor.y, x, y)
+    const duration = Phaser.Math.Clamp(dist * 1.1, 160, 520)
+    if (Math.abs(x - actor.x) > 4) rig.scaleX = x < actor.x ? -1 : 1
+    const hop = this.tweens.add({ targets: rig, y: -5, duration: 90, yoyo: true, repeat: -1 })
+    await this.tween({ targets: actor, x, y, scale, duration, ease: 'Sine.easeInOut' })
+    hop.stop(); rig.y = 0
+  }
 
   private async playEvents(before: GameState, events: GameEvent[], gen: number) {
     let view = before
-    const slotOf = (id: string) => view.waiting.findIndex(w => w.id === id)
+    const seatOf = (id: string) => view.waiting.findIndex(w => w.id === id)
     for (let i = 0; i < events.length; i++) {
       if (gen !== this.generation) return
       const e = events[i]
-      const actor = this.vikingSprites.get(e.vikingId)
-      if (!actor) continue
       const next = events[i + 1]
       const continues = next && next.vikingId === e.vikingId && (next.type === 'collect' || next.type === 'return')
 
       if (e.type === 'dispatch') {
-        actor.disableInteractive().setDepth(20)
-        this.tweens.killTweensOf(actor)
-        await this.tween({ targets: actor, y: actor.y - 14, scale: 0.95, duration: 120, yoyo: true })
-      } else if (e.type === 'collect') {
+        const index = view.queue.findIndex(v => v.id === e.vikingId)
+        const card = this.cards[index]
+        if (card) this.tweens.add({ targets: card, scale: 0.88, alpha: 0.3, duration: 160 })
+        const actor = this.makeActor(view.queue[index].color).setPosition(cardX(index), CARD.y - 10).setScale(0.4)
+        this.actors.set(e.vikingId, actor)
+        await this.tween({ targets: actor, scale: 1, y: CARD.y - 46, duration: 180, ease: 'Back.easeOut' })
+        continue
+      }
+      const actor = this.actors.get(e.vikingId)
+      if (!actor) continue
+
+      if (e.type === 'collect') {
         const target = this.lootSprites.get(e.lootId)!
-        actor.setDepth(20)
-        await this.tween({ targets: actor, x: target.x, y: target.y - 22, duration: 300, ease: 'Sine.easeInOut' })
+        await this.runTo(actor, target.x - 20, target.y + 4)
+        const rig = actor.getByName('rig') as Sprite
+        rig.scaleX = 1
+        await this.tween({ targets: rig, angle: 20, duration: 90, yoyo: true }) // plunder swing
         view = { ...view, loot: view.loot.map(l => (l.id === e.lootId ? { ...l, collected: true } : l)) }
-        this.tweens.add({ targets: target, scale: 0, alpha: 0, angle: 25, duration: 220, onComplete: () => target.destroy() })
         this.lootSprites.delete(e.lootId)
+        this.tweens.add({ targets: target, scale: 0, alpha: 0, y: target.y - 24, duration: 220, onComplete: () => target.destroy() })
         this.refreshLocks(view, true)
-        const w = slotOf(e.vikingId)
-        if (w >= 0) {
+        // carry a small copy of the loot above the head
+        const carry = actor.getByName('carry') as Sprite
+        carry.add(this.makeLootGraphic(target.getData('kind'), target.getData('color')).setScale(0.32).setPosition(0, -carry.length * 13))
+        const seat = seatOf(e.vikingId)
+        if (seat >= 0) {
           view = { ...view, waiting: view.waiting.map(v => (v.id === e.vikingId ? { ...v, collectedCount: v.collectedCount + 1 } : v)) }
-          const left = 2 - view.waiting[w].collectedCount
-          ;(actor.getByName('badge') as Phaser.GameObjects.Text).setText(`${left} kvar`)
+          this.setBadge(actor, view.waiting[seat].collectedCount)
         }
-        await this.delay(120)
+        await this.delay(80)
         if (!continues) {
-          // Step back to where it is waiting (or to the gangway while the turn plays out).
-          const home = w >= 0 ? { x: slotX(w), y: SLOT_Y - 4 } : GANGWAY
-          await this.tween({ targets: actor, x: home.x, y: home.y, duration: 260, ease: 'Sine.easeInOut' })
+          const home = seat >= 0 ? { ...slotPos(seat), s: SLOT_SCALE } : { x: BOARD.x, y: BOARD.y + 6, s: 0.9 }
+          await this.runTo(actor, home.x, home.y - 6, home.s)
         }
       } else if (e.type === 'return') {
-        // Mission complete: run aboard and head home.
         if (e.fromWaiting) {
           view = { ...view, waiting: view.waiting.filter(v => v.id !== e.vikingId) }
           this.drawSlots(view.waiting.length)
         }
-        ;(actor.getByName('badge') as Phaser.GameObjects.Text).setText('✓').setVisible(true)
-        await this.tween({ targets: actor, x: GANGWAY.x, y: GANGWAY.y + 40, duration: 240, ease: 'Sine.easeIn' })
-        await this.tween({ targets: actor, x: -40, alpha: 0, scale: 0.6, duration: 320, ease: 'Sine.easeIn' })
+        this.setBadge(actor, null)
+        await this.runTo(actor, BOARD.x, BOARD.y, 0.9)
+        await this.tween({ targets: actor, y: BOARD.y + 8, scale: 0.3, alpha: 0, duration: 260, ease: 'Sine.easeIn' })
         actor.destroy()
-        this.vikingSprites.delete(e.vikingId)
+        this.actors.delete(e.vikingId)
       } else if (e.type === 'wait') {
-        // `wait` is always the last event of a move, so the final state describes this seat.
+        const { x, y } = slotPos(e.slot)
+        await this.runTo(actor, x, y - 6, SLOT_SCALE)
         const seated = this.state.waiting.find(v => v.id === e.vikingId)
-        await this.tween({ targets: actor, x: slotX(e.slot), y: SLOT_Y - 4, scale: 0.9, duration: 320, ease: 'Back.easeOut' })
-        if (seated) (actor.getByName('badge') as Phaser.GameObjects.Text).setText(`${2 - seated.collectedCount} kvar`).setVisible(true)
+        if (seated) this.setBadge(actor, seated.collectedCount)
         this.drawSlots()
       } else if (e.type === 'overflow') {
-        await this.tween({ targets: actor, x: GANGWAY.x, y: SLOT_Y + 2, duration: 300 })
+        await this.runTo(actor, WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y + 10, 0.8)
         this.cameras.main.shake(260, 0.012)
         this.cameras.main.flash(220, 160, 30, 20)
         await this.tween({ targets: actor, angle: { from: -12, to: 12 }, duration: 70, yoyo: true, repeat: 3 })
       }
     }
   }
-
-  private delay(ms: number) { return new Promise<void>(r => this.time.delayedCall(ms, r)) }
 
   private notify() {
     const s = this.state

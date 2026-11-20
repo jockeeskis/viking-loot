@@ -1,7 +1,11 @@
 import type { LevelLoot, LootColor } from './engine.ts'
+import type { LootKind } from './art.ts'
 
-/** `at` is [column, row] on the island; row 0 is furthest back, blockers stand in front. */
-export type LevelLootPlaced = LevelLoot & { at: [number, number] }
+/**
+ * `at` is [column, row] on the island; row 0 is furthest back, blockers stand in front.
+ * `kind` only changes the look (barrel, chest or house); if omitted it is derived from the id.
+ */
+export type LevelLootPlaced = LevelLoot & { at: [number, number]; kind?: LootKind }
 export type Level = { name: string; hint: string; loot: LevelLootPlaced[]; queue: LootColor[] }
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'

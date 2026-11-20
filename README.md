@@ -16,7 +16,7 @@ npm run build          # produktionsbygge
 
 ## Spelregler (0.2)
 
-- Skatter finns i tre färger: röd 🧰, blå 💎 och gul 🪙.
+- Skatter (tunnor, kistor och hus) finns i tre färger: röd, blå och gul. Typen påverkar bara utseendet.
 - **Vikingakö:** Bara de tre främsta vikingarna kan väljas. Ett val förbrukas alltid.
 - En viking plundrar direkt upp till **två tillgängliga** skatter i sin färg. Om den får två åker den hem.
 - **Väntplatser:** En viking som får färre än två sätter sig på en av långskeppets **tre väntplatser**. Väntande vikingar plundrar automatiskt, i den ordning de kom, så fort nya skatter blir tillgängliga.
@@ -32,6 +32,7 @@ npm run build          # produktionsbygge
 - `src/game/levels.ts` — 6 handdesignade banor med stabila ID:n och `blockedBy`. Hjälpfunktionen `stacks()` bygger högar där varje föremål blockeras av föremålet framför.
 - `src/game/solver.ts` — söker igenom alla tillåtna val. Hittar vinst- och förlustsekvenser för en bana.
 - `src/game/engine.test.ts` — tester för kö, väntplatser, blockering, vinst, förlust och banornas lösbarhet (`node --test`).
+- `src/game/art.ts` — platshållargrafik ritad i kod i referensbildens stil (vikingar, tunnor, kistor, hus, långskepp, paneler).
 - `src/game/RaidScene.ts` — rendering. Visar regelmotorns `events` som animationer och kan inte påverka utfallet.
 - `src/App.vue` — UI, banval och sparad progression (`localStorage`-nyckel `viking-loot-0.2-unlocked`).
 
@@ -46,4 +47,4 @@ npm run build          # produktionsbygge
 | 5 | Fästet | Riktigt pussel | Ja, ca 50 % av sekvenserna |
 | 6 | Stora räden | Större pussel | Ja, ca 50 % av sekvenserna |
 
-All grafik är fortfarande tillfällig och ritas med Phaser och standardemoji.
+All grafik är tillfällig och ritas med Phaser Graphics. Inga externa filer används. Nästa steg för grafiken är 3D-modeller enligt referensbladet, renderade till sprite sheets.

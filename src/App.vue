@@ -50,8 +50,7 @@ onBeforeUnmount(() => game?.destroy(true))
 <template>
   <main class="shell">
     <header>
-      <div class="eyebrow">THE FIRST RAID · 0.2</div>
-      <h1>🪓 Viking Loot</h1>
+      <div class="logo"><h1>VIKING LOOT</h1><div class="eyebrow">The First Raid · 0.2</div></div>
       <p>Välj en av de tre främsta vikingarna. Plundra framifrån – och fyll inte skeppet med väntande vikingar!</p>
     </header>
     <div class="stats">
@@ -77,6 +76,6 @@ onBeforeUnmount(() => game?.destroy(true))
     <div class="levels">
       <button v-for="(l, i) in levels" :key="l.name" :disabled="i > unlocked" :class="{ active: current === i }" @click="openLevel(i)">{{ i > unlocked ? '🔒' : i + 1 }}</button>
     </div>
-    <p class="foot">Prototypen använder tillfällig grafik. 3D-renderade vikingar och miljöer kommer när pusslet känns rätt.</p>
+    <p class="foot">Tillfällig grafik ritad i kod. 3D-modellerade vikingar och miljöer kommer senare.</p>
   </main>
 </template>
