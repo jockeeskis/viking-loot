@@ -8,6 +8,10 @@ import {
   COLORS, GOLD, INK, shade, cartoonText, drawLoot, drawChibi, drawPortrait, drawHead,
   drawTree, drawRock, drawShip, drawPanel, drawTab, type LootKind,
 } from './art'
+import {
+  preloadAssets, createAnims, hasViking, hasLoot, hasShip, vikingAsset, lootAsset, shipAsset, lootFrame,
+  vikingKey, vikingAnimKey, portraitKey, LOOT_KEY, SHIP_KEY, type VikingAnim,
+} from './assets'
 
 export type RaidUpdate = {
   level: number
@@ -32,6 +36,10 @@ const SLOT_SCALE = 0.62
 const PREVIEW_MAX = 6
 const CARD = { y: 584, w: 108, h: 100 }
 const cardX = (i: number) => 62 + i * 118
+// Display scales for the rendered sprites (frame sizes come from the manifest).
+const VIKING_SCALE = 0.36
+const LOOT_SCALE = 0.42
+const SHIP_SCALE = 0.47
 
 // Houses are introduced later (ui-settings.md §5), so only levels that set `kind: 'house'` get them.
 const KINDS: LootKind[] = ['barrel', 'chest']
@@ -57,19 +65,27 @@ export class RaidScene extends Phaser.Scene {
   private warning?: Phaser.GameObjects.Text
   private title?: Phaser.GameObjects.Text
   private lootOffsetY = 0
+  private ready = false
   private onUpdate?: (u: RaidUpdate) => void
 
   constructor() { super('Raid') }
 
+  preload() { preloadAssets(this) }
+
   create() {
+    // The game canvas is 720x1280; zoom 2 keeps all coordinates in the 360x640 layout but renders sharper.
+    this.cameras.main.setZoom(2).centerOn(180, 320)
+    createAnims(this)
     this.drawEnvironment()
+    this.ready = true
     this.reset(this.level)
   }
 
   setUpdate(fn: (u: RaidUpdate) => void) { this.onUpdate = fn }
 
   reset(index: number) {
-    if (!this.sys.isActive()) { this.level = index; return }
+    // Before create() has run (assets still loading) just remember the level; create() will draw it.
+    if (!this.ready) { this.level = index; return }
     this.generation++
     this.tweens.killAll()
     this.busy = false
@@ -109,7 +125,10 @@ export class RaidScene extends Phaser.Scene {
     // decorations along the edges
     drawTree(g, 26, 120, 0.8); drawTree(g, 334, 104, 0.9); drawTree(g, 30, 300, 0.75); drawTree(g, 336, 260, 0.8)
     drawRock(g, 22, 210, 0.8); drawRock(g, 340, 350, 0.9); drawRock(g, 300, 76, 0.7); drawRock(g, 60, 368, 0.8)
-    drawShip(g, SHIP.x, SHIP.y)
+    if (hasShip(this)) {
+      const sh = shipAsset()!
+      this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_SCALE).play('ship-bob')
+    } else drawShip(g, SHIP.x, SHIP.y)
     // HUD sign
     const s = this.add.graphics()
     s.fillStyle(0x000000, 0.25); s.fillRoundedRect(72, 10, 220, 40, 12)
@@ -154,10 +173,18 @@ export class RaidScene extends Phaser.Scene {
 
   private lootPos(at: [number, number]) { return { x: 54 + at[0] * 84, y: 112 + at[1] * 84 + this.lootOffsetY } }
 
-  private makeLootGraphic(kind: LootKind, color: LootColor) {
+  /** One loot object: a rendered sprite with a ground shadow, or the code-drawn fallback. */
+  private makeLootGraphic(kind: LootKind, color: LootColor): Sprite {
+    const frame = lootFrame(kind, color)
+    if (hasLoot(this) && frame !== undefined) {
+      const a = lootAsset()!
+      const shadow = this.add.ellipse(0, 22, 54, 15, 0x000000, 0.22)
+      const img = this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_SCALE).setName('img')
+      return this.add.container(0, 0, [shadow, img]).setName('art')
+    }
     const g = this.add.graphics()
     drawLoot(g, kind, color)
-    return g
+    return this.add.container(0, 0, [g]).setName('art')
   }
 
   private drawLootSprites() {
@@ -175,7 +202,8 @@ export class RaidScene extends Phaser.Scene {
       const kind = p.kind ?? kindFor(p.id)
       const art = this.makeLootGraphic(kind, p.color)
       const shadeG = this.add.graphics().setName('shade')
-      shadeG.fillStyle(0x0b1a22, 0.55); shadeG.fillRoundedRect(-33, -36, 66, 62, 12)
+      // Sprites are darkened with a tint instead (see refreshLocks); the box is only for drawn art.
+      if (!art.getByName('img')) { shadeG.fillStyle(0x0b1a22, 0.55); shadeG.fillRoundedRect(-33, -36, 66, 62, 12) }
       const lock = this.add.graphics().setName('lock')
       lock.lineStyle(3, GOLD); lock.beginPath(); lock.arc(22, -30, 5, Math.PI, 0); lock.strokePath()
       lock.fillStyle(GOLD); lock.fillRoundedRect(14, -30, 16, 13, 3)
@@ -192,6 +220,8 @@ export class RaidScene extends Phaser.Scene {
       const c = this.lootSprites.get(item.id)
       if (!c || item.collected) continue
       const open = isAvailable(state, item)
+      const img = (c.getByName('art') as Sprite | null)?.getByName('img') as Phaser.GameObjects.Image | null
+      if (img) { if (open) img.clearTint(); else img.setTint(0x6d7488) }
       const parts = [c.getByName('shade'), c.getByName('lock')] as unknown as Phaser.GameObjects.Components.Alpha[]
       const target = open ? 0 : 1
       if (parts[0].alpha === target) continue
@@ -206,12 +236,33 @@ export class RaidScene extends Phaser.Scene {
 
   /** A chibi viking. The drawing sits in an inner "rig" so it can hop while the container moves. */
   private makeActor(color: LootColor): Sprite {
-    const g = this.add.graphics()
-    drawChibi(g, color)
-    const rig = this.add.container(0, 0, [g]).setName('rig')
+    let parts: Phaser.GameObjects.GameObject[]
+    if (hasViking(this, color)) {
+      const v = vikingAsset(color)!
+      const shadow = this.add.ellipse(0, 29, 34, 10, 0x000000, 0.22)
+      const body = this.add.sprite(0, 29, vikingKey(color)).setOrigin(v.originX, v.originY).setScale(VIKING_SCALE).setName('body')
+      body.play(vikingAnimKey(color, 'idle'))
+      parts = [shadow, body]
+    } else {
+      const g = this.add.graphics()
+      drawChibi(g, color)
+      parts = [g]
+    }
+    const rig = this.add.container(0, 0, parts).setName('rig')
+    rig.setData('color', color)
     const carry = this.add.container(0, -36).setName('carry')
     const badge = this.add.text(0, 34, '', { ...cartoonText(14), padding: { x: 4, y: 0 } }).setOrigin(0.5).setName('badge').setVisible(false)
     return this.add.container(0, 0, [rig, carry, badge]).setDepth(30)
+  }
+
+  /** Play one of the rendered animations (no-op for the drawn fallback). Resolves when a one-shot ends. */
+  private animate(actor: Sprite, anim: VikingAnim): Promise<void> {
+    const rig = actor.getByName('rig') as Sprite
+    const body = rig.getByName('body') as Phaser.GameObjects.Sprite | null
+    if (!body) return Promise.resolve()
+    const key = vikingAnimKey(rig.getData('color'), anim)
+    if (anim !== 'attack') { body.play(key, true); return Promise.resolve() }
+    return new Promise(res => { body.play(key); body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => res()) })
   }
 
   private setBadge(actor: Sprite, collected: number | null) {
@@ -229,9 +280,14 @@ export class RaidScene extends Phaser.Scene {
     g.fillStyle(shade(c, -0.25)); g.fillRoundedRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10, 12)
     g.fillStyle(c); g.fillRoundedRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 26, 12)
     g.fillStyle(shade(c, 0.35), 0.5); g.fillEllipse(-14, -h / 2 + 22, 50, 22)
-    const portrait = this.add.graphics()
-    drawPortrait(portrait, color, 25)
-    portrait.setPosition(0, -4)
+    let portrait: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image
+    if (this.textures.exists(portraitKey(color))) {
+      portrait = this.add.image(0, -2, portraitKey(color)).setScale(104 / 224)
+    } else {
+      portrait = this.add.graphics()
+      drawPortrait(portrait, color, 25)
+      portrait.setPosition(0, -4)
+    }
     // Clip the shoulders to the card. The mask lives in world space, so it is placed at the card's slot.
     const mask = this.make.graphics({}, false)
     mask.fillStyle(0xffffff); mask.fillRoundedRect(cardX(index) - w / 2 + 5, CARD.y - h / 2 + 5, w - 10, h - 10, 12)
@@ -269,7 +325,14 @@ export class RaidScene extends Phaser.Scene {
       const x = QUEUE_PANEL.x + 24 + i * 29, y = PANEL_Y + 34
       g.fillStyle(0x2a190c); g.fillCircle(x, y, 13)
       g.lineStyle(2.5, COLORS[v.color]); g.strokeCircle(x, y, 13)
-      drawHead(g, v.color, 9, x, y + 1)
+      if (this.textures.exists(portraitKey(v.color))) {
+        const head = this.add.image(x, y + 1, portraitKey(v.color)).setScale(34 / 224).setDepth(6)
+        const m = this.make.graphics({}, false)
+        m.fillStyle(0xffffff); m.fillCircle(x, y, 12)
+        head.setMask(m.createGeometryMask())
+        head.once(Phaser.GameObjects.Events.DESTROY, () => m.destroy())
+        this.preview.push(head)
+      } else drawHead(g, v.color, 9, x, y + 1)
     })
     if (rest.length > PREVIEW_MAX) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w - 10, PANEL_Y + 34, `+${rest.length - PREVIEW_MAX}`, cartoonText(12)).setOrigin(1, 0.5).setDepth(6))
     if (rest.length === 0) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y + 34, this.state.queue.length ? 'Sista vikingarna!' : 'Kön är tom', cartoonText(11, '#e8d6bb')).setOrigin(0.5).setDepth(6))
@@ -319,9 +382,14 @@ export class RaidScene extends Phaser.Scene {
     const dist = Phaser.Math.Distance.Between(actor.x, actor.y, x, y)
     const duration = Phaser.Math.Clamp(dist * 1.1, 160, 520)
     if (Math.abs(x - actor.x) > 4) rig.scaleX = x < actor.x ? -1 : 1
-    const hop = this.tweens.add({ targets: rig, y: -5, duration: 90, yoyo: true, repeat: -1 })
+    const sprite = !!rig.getByName('body')
+    const carrying = (actor.getByName('carry') as Sprite).length > 0
+    this.animate(actor, carrying ? 'carry' : 'run')
+    // The rendered run cycle already bobs, so the hop is smaller for sprites.
+    const hop = this.tweens.add({ targets: rig, y: sprite ? -2 : -5, duration: 90, yoyo: true, repeat: -1 })
     await this.tween({ targets: actor, x, y, scale, duration, ease: 'Sine.easeInOut' })
     hop.stop(); rig.y = 0
+    this.animate(actor, 'idle')
   }
 
   private async playEvents(before: GameState, events: GameEvent[], gen: number) {
@@ -350,7 +418,9 @@ export class RaidScene extends Phaser.Scene {
         await this.runTo(actor, target.x - 20, target.y + 4)
         const rig = actor.getByName('rig') as Sprite
         rig.scaleX = 1
-        await this.tween({ targets: rig, angle: 20, duration: 90, yoyo: true }) // plunder swing
+        if (rig.getByName('body')) await this.animate(actor, 'attack') // plunder swing
+        else await this.tween({ targets: rig, angle: 20, duration: 90, yoyo: true })
+        this.animate(actor, 'idle')
         view = { ...view, loot: view.loot.map(l => (l.id === e.lootId ? { ...l, collected: true } : l)) }
         this.lootSprites.delete(e.lootId)
         this.tweens.add({ targets: target, scale: 0, alpha: 0, y: target.y - 24, duration: 220, onComplete: () => target.destroy() })

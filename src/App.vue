@@ -38,10 +38,11 @@ function next() { if (current.value < levels.length - 1) openLevel(current.value
 onMounted(() => {
   scene = new RaidScene()
   game = new Phaser.Game({
-    type: Phaser.AUTO, parent: 'game', width: 360, height: 640, backgroundColor: '#193a4b',
+    type: Phaser.AUTO, parent: 'game', width: 720, height: 1280, backgroundColor: '#193a4b',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     render: { pixelArt: false, antialias: true }, scene: [scene],
   })
+  if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game // for debugging in the console
   game.events.once(Phaser.Core.Events.READY, () => { scene?.setUpdate(update); scene?.reset(current.value) })
 })
 onBeforeUnmount(() => game?.destroy(true))

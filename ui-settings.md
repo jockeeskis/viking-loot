@@ -2,7 +2,7 @@
 
 Version: 1.0 · Art direction: **Cute 3D** · Target: portrait mobile (9:16)
 
-> **Nuläge (2026-11-20):** Prototypen använder platshållargrafik ritad i kod (`src/game/art.ts`) med paletten i §2, figurerna i §3 och layouten i §7. Den här filen beskriver målbilden för de riktiga 3D-asseten.
+> **Nuläge (2026-11-20):** Ragnar, Björn, Freja, tunnor, kistor, hus och långskeppet är 3D-modeller byggda med skript i Blender (`art-source/blender/render_assets.py`). De renderas cel-shadade till sprite sheets i `public/assets/` enligt §10. Modellerna är egna och inga tredjepartsassets används ännu. Miljön ritas fortfarande i kod (`src/game/art.ts`).
 
 ## 1. Designmål
 
@@ -134,15 +134,15 @@ art-source/
 
 Bygg **en** polerad och fullt spelbar bana med:
 
-- [ ] Ragnar, Björn och Freja i enhetlig Cute 3D-stil.
-- [ ] `idle`, `run`, `attack` och `carry` för varje viking.
-- [ ] Ett långskepp med synlig kö och tre väntplatser.
-- [ ] En isometrisk Kustby med 4×4 positioner.
-- [ ] Färgade tunnor och skattkistor med plundringseffekter.
-- [ ] Visuell skillnad mellan tillgängligt och blockerat byte.
-- [ ] Tydliga tillstånd för vinst, förlust och omstart.
+- [x] Ragnar, Björn och Freja i enhetlig Cute 3D-stil.
+- [x] `idle`, `run`, `attack` och `carry` för varje viking.
+- [x] Ett långskepp med synlig kö och tre väntplatser.
+- [ ] En isometrisk Kustby med 4×4 positioner. *(4×4 finns; ön är fortfarande platt och ritad i kod.)*
+- [ ] Färgade tunnor och skattkistor med plundringseffekter. *(Modellerna är klara; mynt- och flisseffekter saknas.)*
+- [x] Visuell skillnad mellan tillgängligt och blockerat byte.
+- [x] Tydliga tillstånd för vinst, förlust och omstart.
 - [ ] Responsiv och läsbar mobilvy i 9:16.
-- [ ] Dokumenterade källor och licenser för alla tredjepartsassets.
+- [x] Dokumenterade källor och licenser för alla tredjepartsassets. *(Inga tredjepartsassets används – allt byggs med skript.)*
 
 ## 12. Gränsdragning och beroenden
 

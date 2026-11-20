@@ -21,6 +21,7 @@ export function shade(c: number, f: number) {
 export const cartoonText = (size: number, color = '#fff4d6'): Phaser.Types.GameObjects.Text.TextStyle => ({
   fontFamily: '"Arial Black", "Segoe UI Black", Arial, sans-serif',
   fontSize: `${size}px`, color, stroke: '#3b2414', strokeThickness: Math.max(3, Math.round(size / 4)),
+  resolution: 2, // the camera renders at zoom 2
 })
 
 // ---------- Loot ----------
