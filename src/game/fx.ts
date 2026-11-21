@@ -9,6 +9,8 @@ const CHIP = 'fx-chip'
 const DOT = 'fx-dot'
 const CONFETTI = 'fx-confetti'
 const DEPTH = 40
+/** The scene camera's resting zoom (the 720x1280 canvas shows the 360x640 layout). */
+export const CAMERA_ZOOM = 2
 
 /** Textures are drawn at 2x and shown at half scale to stay sharp on the zoomed camera. */
 export function createFxTextures(scene: Phaser.Scene) {
@@ -92,8 +94,11 @@ export function victory(scene: Phaser.Scene) {
   }).setDepth(DEPTH)
   scene.time.delayedCall(900, () => e.stop())
   scene.time.delayedCall(3600, () => e.destroy())
+  // Punch from the fixed base zoom and back. (Chaining camera.zoomTo from its own callback does not
+  // work – the first effect's completion cancels the second – so the zoom used to creep up per win.)
   const cam = scene.cameras.main
-  cam.zoomTo(cam.zoom * 1.04, 130, 'Sine.easeOut', true, (_c: unknown, p: number) => {
-    if (p === 1) cam.zoomTo(2, 260, 'Sine.easeInOut', true)
-  })
+  scene.tweens.killTweensOf(cam)
+  cam.setZoom(CAMERA_ZOOM)
+  scene.tweens.add({ targets: cam, zoom: CAMERA_ZOOM * 1.04, duration: 130, yoyo: true, hold: 40, ease: 'Sine.easeOut',
+    onComplete: () => cam.setZoom(CAMERA_ZOOM) })
 }

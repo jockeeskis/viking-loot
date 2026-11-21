@@ -12,7 +12,7 @@ import {
   preloadAssets, createAnims, hasViking, hasLoot, hasShip, hasIsland, vikingAsset, lootAsset, shipAsset, islandAsset, lootFrame,
   vikingKey, vikingAnimKey, portraitKey, LOOT_KEY, SHIP_KEY, ISLAND_KEY, type VikingAnim,
 } from './assets'
-import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory } from './fx'
+import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, CAMERA_ZOOM } from './fx'
 import { sfx } from './sfx'
 
 export type RaidUpdate = {
@@ -80,7 +80,7 @@ export class RaidScene extends Phaser.Scene {
 
   create() {
     // The game canvas is 720x1280; zoom 2 keeps all coordinates in the 360x640 layout but renders sharper.
-    this.cameras.main.setZoom(2).centerOn(180, 320)
+    this.cameras.main.setZoom(CAMERA_ZOOM).centerOn(180, 320)
     createAnims(this)
     createFxTextures(this)
     this.drawEnvironment()
@@ -95,6 +95,7 @@ export class RaidScene extends Phaser.Scene {
     if (!this.ready) { this.level = index; return }
     this.generation++
     this.tweens.killAll()
+    this.cameras.main.setZoom(CAMERA_ZOOM) // never carry a half-finished victory punch into the next level
     this.busy = false
     this.level = Phaser.Math.Clamp(index, 0, levels.length - 1)
     const data = levels[this.level]
