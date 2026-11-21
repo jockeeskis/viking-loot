@@ -1,6 +1,6 @@
 # Viking Loot 0.3 – Fjordarna: nya mekaniker, stjärnor och hjälp
 
-> **Status (2026-11-21):** Implementerad – alla fyra faserna är klara och spelet har 24 banor. Kvar att verifiera: ångra och tips på riktig mobil.
+> **Status (2026-11-21):** Implementerad – alla fyra faserna är klara och spelet har 24 banor. Allt är verifierat, även ångra och tips på Android.
 
 ## Syfte
 
@@ -130,7 +130,7 @@ Varje fas avslutas med `npm test`, `npm run build`, kontroll i webbläsaren och 
 - [x] Lösaren ger par (`minWaits`) och tips (`hint`) som leder till vinst.
 - [x] Stjärnor delas ut enligt par och sparas.
 - [x] Kartan visar båda världarna, stjärnor och upplåsning. *(Fjordarna visas som "kommer snart" tills fas 4.)*
-- [ ] Ångra och tips fungerar på mobil. *(Verifierat i desktop-webbläsare.)*
+- [x] Ångra och tips fungerar på mobil (testat på Android).
 - [x] Varje ny mekanik har en introduktion och en egen 3D-grafik.
 - [x] Banorna 13–24 är spelbara, och varje mekanik förekommer i minst en bana som går att förlora.
 - [x] Bildfilerna är tillsammans högst cirka 1,5 MB vid start. *(1,8 MB totalt, cirka 1 MB laddas direkt.)*
