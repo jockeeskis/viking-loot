@@ -2,8 +2,8 @@ import { levels } from '../src/game/levels.ts'
 import { createGame, validateLevelGraph } from '../src/game/engine.ts'
 import { solve } from '../src/game/solver.ts'
 for (const [i, l] of levels.entries()) {
-  validateLevelGraph(l.loot)
-  const g = createGame(l.loot, l.queue)
+  validateLevelGraph(l.loot, l.ships, l.queue)
+  const g = createGame(l.loot, l.queue, l.ships)
   const label = (id: string) => {
     const v = g.queue.find(x => x.id === id)!
     return id + (v.kind === 'wild' ? '*' : v.color![0].toUpperCase() + (v.kind === 'jarl' ? '+' : ''))

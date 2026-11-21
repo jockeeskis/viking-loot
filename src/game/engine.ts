@@ -9,16 +9,25 @@
 // - stones: `stone: true`, no colour; crumble on their own as soon as ANY item in `clearedBy` is taken
 // - jarl: a viking that carries 3; wild: a viking whose colour is set by the first item it takes
 // - hidden loot: colour not shown until the item becomes available (presentation only)
+//
+// 0.4 additions (also optional, so 0.2/0.3 levels behave exactly as before):
+// - keys and locked chests: a chest with `lockedBy` is unreachable until every listed key is taken
+// - ice: `frozen: N` keeps an item unreachable until move N starts (it thaws before that viking raids)
+// - ships: an optional colour ship gives extra safe seats to one colour; only the main ship sinks the raid
+// - scout: a queue entry that carries nothing; dispatching it reveals every hidden item
 
 export type LootColor = 'red' | 'blue' | 'yellow'
 export type ItemKind = 'loot' | 'stone'
-export type VikingKind = 'normal' | 'jarl' | 'wild'
+export type VikingKind = 'normal' | 'jarl' | 'wild' | 'scout'
 
 export type LootItem = {
   id: string
   kind: ItemKind
   color: LootColor | null // null only for stones
   blockedBy: string[]
+  lockedBy: string[] // chests only: keys that must all be taken first (anywhere on the island)
+  key: boolean // a key is ordinary loot that also unlocks chests
+  frozenLeft: number // moves until the ice thaws (0 = not frozen)
   clearedBy: string[] // stones only: crumbles when any of these is collected
   hitsLeft: number // 1 for ordinary loot, 2 for an unopened house
   hidden: boolean // colour not yet revealed to the player
@@ -28,10 +37,14 @@ export type LootItem = {
 export type Viking = {
   id: string
   kind: VikingKind
-  color: LootColor | null // null only for a wild viking that has not taken anything yet
+  color: LootColor | null // null for a scout and for a wild viking that has not taken anything yet
   capacity: number
   collectedCount: number
+  ship: number // index in GameState.ships of the seat it took (only meaningful while waiting)
 }
+
+/** A ship with seats for waiting vikings. Ship 0 is the main ship; a colour ship only seats its colour. */
+export type Ship = { slots: number; color: LootColor | null }
 
 export type GameStatus = 'playing' | 'won' | 'lost'
 export type LossReason = 'slots-full' | 'stuck'
@@ -43,14 +56,18 @@ export type GameEvent =
   | { type: 'collect'; vikingId: string; lootId: string; fromWaiting: boolean }
   | { type: 'crumble'; lootId: string } // a stone disappeared
   | { type: 'reveal'; lootId: string } // a hidden item became available and shows its colour
+  | { type: 'unlock'; lootId: string } // the last key of a chest was taken
+  | { type: 'thaw'; lootId: string } // the ice around an item melted
+  | { type: 'scout'; vikingId: string } // a scout looked over the island (reveal events follow)
   | { type: 'return'; vikingId: string; fromWaiting: boolean }
-  | { type: 'wait'; vikingId: string; slot: number }
+  | { type: 'wait'; vikingId: string; ship: number; slot: number }
   | { type: 'overflow'; vikingId: string }
 
 export type GameState = {
   loot: LootItem[]
   queue: Viking[]
-  waiting: Viking[] // max WAITING_SLOTS, in arrival order
+  waiting: Viking[] // every seated viking, in arrival order (`ship` says where it sits)
+  ships: Ship[]
   status: GameStatus
   lossReason: LossReason | null
   moves: number
@@ -59,7 +76,7 @@ export type GameState = {
 }
 
 export const SELECTABLE = 3
-/** Slots on the longship. Filling the last one loses, so at most WAITING_SLOTS - 1 can wait safely. */
+/** Seats on the main longship. Filling the last one loses, so at most WAITING_SLOTS - 1 can wait safely. */
 export const WAITING_SLOTS = 3
 export const CAPACITY = 2
 export const JARL_CAPACITY = 3
@@ -72,22 +89,32 @@ export type LevelLoot = {
   stone?: boolean
   clearedBy?: string[]
   hidden?: boolean
+  key?: boolean
+  lockedBy?: string[]
+  frozen?: number
 }
-export type QueueEntry = LootColor | { kind: 'jarl'; color: LootColor } | { kind: 'wild' }
+export type QueueEntry = LootColor | { kind: 'jarl'; color: LootColor } | { kind: 'wild' } | { kind: 'scout' }
+export type ShipSpec = { slots: number; color?: LootColor }
+/** One ship with WAITING_SLOTS seats, as in every level before 0.4. */
+export const DEFAULT_SHIPS: ShipSpec[] = [{ slots: WAITING_SLOTS }]
 
 export function makeViking(entry: QueueEntry, index: number): Viking {
-  const id = `v${index + 1}`
-  if (typeof entry === 'string') return { id, kind: 'normal', color: entry, capacity: CAPACITY, collectedCount: 0 }
-  if (entry.kind === 'jarl') return { id, kind: 'jarl', color: entry.color, capacity: JARL_CAPACITY, collectedCount: 0 }
-  return { id, kind: 'wild', color: null, capacity: CAPACITY, collectedCount: 0 }
+  const base = { id: `v${index + 1}`, collectedCount: 0, ship: 0 }
+  if (typeof entry === 'string') return { ...base, kind: 'normal', color: entry, capacity: CAPACITY }
+  if (entry.kind === 'jarl') return { ...base, kind: 'jarl', color: entry.color, capacity: JARL_CAPACITY }
+  if (entry.kind === 'scout') return { ...base, kind: 'scout', color: null, capacity: 0 }
+  return { ...base, kind: 'wild', color: null, capacity: CAPACITY }
 }
 
-export function createGame(loot: LevelLoot[], queue: QueueEntry[]): GameState {
+export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSpec[] = DEFAULT_SHIPS): GameState {
   const items: LootItem[] = loot.map(l => ({
     id: l.id,
     kind: l.stone ? 'stone' : 'loot',
     color: l.stone ? null : l.color ?? null,
     blockedBy: [...(l.blockedBy ?? [])],
+    lockedBy: [...(l.lockedBy ?? [])],
+    key: !!l.key,
+    frozenLeft: Math.max(0, l.frozen ?? 0),
     clearedBy: [...(l.clearedBy ?? [])],
     hitsLeft: l.stone ? 1 : Math.max(1, l.hits ?? 1),
     hidden: !!l.hidden,
@@ -97,6 +124,7 @@ export function createGame(loot: LevelLoot[], queue: QueueEntry[]): GameState {
     loot: items,
     queue: queue.map(makeViking),
     waiting: [],
+    ships: ships.map(sh => ({ slots: sh.slots, color: sh.color ?? null })),
     status: 'playing',
     lossReason: null,
     moves: 0,
@@ -110,8 +138,9 @@ export function createGame(loot: LevelLoot[], queue: QueueEntry[]): GameState {
 }
 
 export function isAvailable(state: GameState, item: LootItem): boolean {
-  if (item.collected) return false
-  return item.blockedBy.every(id => state.loot.find(l => l.id === id)?.collected ?? true)
+  if (item.collected || item.frozenLeft > 0) return false
+  const gone = (id: string) => state.loot.find(l => l.id === id)?.collected ?? true
+  return item.blockedBy.every(gone) && item.lockedBy.every(gone)
 }
 
 /** Loot (not stones) that a viking could take right now. */
@@ -123,18 +152,12 @@ export function getSelectableVikings(state: GameState): Viking[] {
   return state.status === 'playing' ? state.queue.slice(0, SELECTABLE) : []
 }
 
-const canTake = (v: Viking, l: LootItem) => v.color === null || l.color === v.color
+const canTake = (v: Viking, l: LootItem) => v.kind !== 'scout' && (v.color === null || l.color === v.color)
 const isFull = (v: Viking) => v.collectedCount >= v.capacity
 
-/** After an item is taken: crumble the stones it clears, then reveal newly reachable hidden items. */
-function settleBoard(state: GameState, takenId: string, events: GameEvent[]): GameState {
+/** Reveal hidden items that just became reachable. */
+function revealReachable(state: GameState, events: GameEvent[]): GameState {
   let s = state
-  for (const st of s.loot) {
-    if (st.kind === 'stone' && !st.collected && st.clearedBy.includes(takenId)) {
-      s = { ...s, loot: s.loot.map(l => (l.id === st.id ? { ...l, collected: true } : l)) }
-      events.push({ type: 'crumble', lootId: st.id })
-    }
-  }
   for (const l of s.loot) {
     if (l.hidden && isAvailable(s, l)) {
       s = { ...s, loot: s.loot.map(x => (x.id === l.id ? { ...x, hidden: false } : x)) }
@@ -143,6 +166,45 @@ function settleBoard(state: GameState, takenId: string, events: GameEvent[]): Ga
   }
   return s
 }
+
+/** After an item is taken: open chests whose last key it was, crumble the stones it clears, then reveal. */
+function settleBoard(state: GameState, takenId: string, events: GameEvent[]): GameState {
+  let s = state
+  const gone = (id: string) => s.loot.find(l => l.id === id)?.collected ?? true
+  for (const ch of s.loot) {
+    if (!ch.collected && ch.lockedBy.includes(takenId) && ch.lockedBy.every(gone)) events.push({ type: 'unlock', lootId: ch.id })
+  }
+  for (const st of s.loot) {
+    if (st.kind === 'stone' && !st.collected && st.clearedBy.includes(takenId)) {
+      s = { ...s, loot: s.loot.map(l => (l.id === st.id ? { ...l, collected: true } : l)) }
+      events.push({ type: 'crumble', lootId: st.id })
+    }
+  }
+  return revealReachable(s, events)
+}
+
+/** At the start of every move the ice melts a little; items whose ice is gone thaw. */
+function meltIce(state: GameState, events: GameEvent[]): GameState {
+  if (!state.loot.some(l => l.frozenLeft > 0)) return state
+  const loot = state.loot.map(l => {
+    if (l.frozenLeft <= 0) return l
+    if (l.frozenLeft === 1) events.push({ type: 'thaw', lootId: l.id })
+    return { ...l, frozenLeft: l.frozenLeft - 1 }
+  })
+  return revealReachable({ ...state, loot }, events)
+}
+
+/** Seat a viking: its colour ship first (if it has room), otherwise the main ship. */
+function seatFor(state: GameState, v: Viking): { ship: number; slot: number } {
+  const used = (i: number) => state.waiting.filter(w => w.ship === i).length
+  const own = state.ships.findIndex((sh, i) => i > 0 && sh.color !== null && sh.color === v.color && used(i) < sh.slots)
+  const ship = own >= 0 ? own : 0
+  return { ship, slot: used(ship) }
+}
+
+/** Seats taken on the main ship – the only ship whose last seat sinks the raid. */
+export const mainSeats = (state: GameState) => state.waiting.filter(w => w.ship === 0).length
+const mainFull = (state: GameState) => mainSeats(state) >= state.ships[0].slots
 
 /**
  * Let one viking take hits until it is full or nothing it may take is available.
@@ -207,6 +269,18 @@ export function selectViking(state: GameState, vikingId: string): GameState {
   const events: GameEvent[] = [{ type: 'dispatch', vikingId }]
   const viking = state.queue[index]
   let s: GameState = { ...state, queue: state.queue.filter((_, i) => i !== index), moves: state.moves + 1, events }
+  // 0. A new move begins: the ice melts before anyone raids.
+  s = meltIce(s, events)
+
+  if (viking.kind === 'scout') {
+    // The scout looks over the island and sails home; she carries nothing and never takes a seat.
+    events.push({ type: 'scout', vikingId })
+    for (const l of s.loot) if (l.hidden) events.push({ type: 'reveal', lootId: l.id })
+    s = { ...s, loot: s.loot.map(l => (l.hidden ? { ...l, hidden: false } : l)) }
+    events.push({ type: 'return', vikingId, fromWaiting: false })
+    s = { ...resolveWaiting(s, events), events } // thawed items may be waiting for a seated viking
+    return { ...s, ...statusFields(s) }
+  }
 
   // 1. The new viking raids immediately.
   const first = collectInto(s, viking, false, events)
@@ -226,10 +300,11 @@ export function selectViking(state: GameState, vikingId: string): GameState {
       s = resolveWaiting(s, events)
     } else {
       // Take a seat. Taking a seat changes nothing on the board, so no further resolution is needed.
-      events.push({ type: 'wait', vikingId, slot: s.waiting.length })
-      s = { ...s, waiting: [...s.waiting, again.viking], waits: s.waits + 1 }
-      if (s.waiting.length >= WAITING_SLOTS && !isWon(s)) {
-        // Filling the last slot sinks the raid (ui-settings.md §4). Win still beats loss.
+      const seat = seatFor(s, again.viking)
+      events.push({ type: 'wait', vikingId, ship: seat.ship, slot: seat.slot })
+      s = { ...s, waiting: [...s.waiting, { ...again.viking, ship: seat.ship }], waits: s.waits + 1 }
+      if (seat.ship === 0 && mainFull(s) && !isWon(s)) {
+        // Filling the last seat of the main ship sinks the raid (ui-settings.md §4). Win still beats loss.
         events.push({ type: 'overflow', vikingId })
         return { ...s, events, status: 'lost', lossReason: 'slots-full' }
       }
@@ -249,31 +324,38 @@ function statusFields(state: GameState): { status: GameStatus; lossReason: LossR
   if (state.status === 'lost') return { status: 'lost', lossReason: state.lossReason }
   const status = evaluateGameStatus(state)
   if (status !== 'lost') return { status, lossReason: null }
-  return { status, lossReason: state.waiting.length >= WAITING_SLOTS ? 'slots-full' : 'stuck' }
+  return { status, lossReason: mainFull(state) ? 'slots-full' : 'stuck' }
 }
 
 /**
  * Win has priority. A playing game is stuck when no viking can be chosen and
  * no waiting viking can take anything (waiters are always resolved to a fixed
  * point after each move, but we re-check here so the function stands alone).
+ * Ice only melts when a viking is dispatched, so with an empty queue it stays frozen.
  */
 export function evaluateGameStatus(state: GameState): GameStatus {
   if (isWon(state)) return 'won'
   if (state.status === 'lost') return 'lost'
-  if (state.waiting.length >= WAITING_SLOTS) return 'lost'
+  if (mainFull(state)) return 'lost'
   if (state.queue.length > 0) return 'playing'
   const available = getAvailableLoot(state)
   const waiterCanMove = state.waiting.some(w => available.some(l => canTake(w, l)))
   return waiterCanMove ? 'playing' : 'lost'
 }
 
-/** Throws if a level references unknown ids, contains a blocking cycle or a malformed item. */
-export function validateLevelGraph(loot: LevelLoot[]): void {
+/** Throws if a level references unknown ids, contains a blocking cycle or a malformed item or ship. */
+export function validateLevelGraph(loot: LevelLoot[], ships: ShipSpec[] = DEFAULT_SHIPS, queue?: QueueEntry[]): void {
   const ids = new Set(loot.map(l => l.id))
   if (ids.size !== loot.length) throw new Error('Duplicate loot id')
   const byId = new Map(loot.map(l => [l.id, l]))
   for (const l of loot) {
     for (const b of l.blockedBy ?? []) if (!ids.has(b)) throw new Error(`${l.id} blocked by unknown ${b}`)
+    for (const k of l.lockedBy ?? []) {
+      if (!ids.has(k)) throw new Error(`${l.id} locked by unknown ${k}`)
+      if (!byId.get(k)!.key) throw new Error(`${l.id} is locked by ${k}, which is not a key`)
+    }
+    if (l.frozen !== undefined && !(Number.isInteger(l.frozen) && l.frozen > 0)) throw new Error(`${l.id} needs a whole number of frozen moves > 0`)
+    if (l.key && (l.stone || l.lockedBy?.length)) throw new Error(`Key ${l.id} cannot be a stone or locked itself`)
     if (l.stone) {
       if (!l.clearedBy?.length) throw new Error(`Stone ${l.id} needs clearedBy`)
       for (const c of l.clearedBy) {
@@ -285,12 +367,14 @@ export function validateLevelGraph(loot: LevelLoot[]): void {
       if (l.clearedBy?.length) throw new Error(`Only stones use clearedBy (${l.id})`)
     }
   }
+  // Blocking and locking together must not form a cycle (a key behind its own chest, …).
   const state = new Map<string, 'visiting' | 'done'>()
   const visit = (id: string) => {
     if (state.get(id) === 'done') return
     if (state.get(id) === 'visiting') throw new Error(`Blocking cycle through ${id}`)
     state.set(id, 'visiting')
-    for (const b of byId.get(id)!.blockedBy ?? []) visit(b)
+    const l = byId.get(id)!
+    for (const b of [...(l.blockedBy ?? []), ...(l.lockedBy ?? [])]) visit(b)
     state.set(id, 'done')
   }
   loot.forEach(l => visit(l.id))
@@ -299,5 +383,15 @@ export function validateLevelGraph(loot: LevelLoot[]): void {
     (byId.get(id)!.blockedBy ?? []).some(b => b === target || behind(b, target))
   for (const st of loot.filter(l => l.stone)) {
     if (st.clearedBy!.every(c => behind(c, st.id))) throw new Error(`Stone ${st.id} blocks every item that clears it`)
+  }
+  // Ships: the main ship comes first and has no colour; colour ships need a colour some viking can have.
+  if (!ships.length || ships[0].color) throw new Error('The first ship must be the main ship (no colour)')
+  for (const [i, sh] of ships.entries()) {
+    if (!(Number.isInteger(sh.slots) && sh.slots > 0)) throw new Error(`Ship ${i} needs at least one seat`)
+    if (i > 0 && !sh.color) throw new Error(`Ship ${i} needs a colour (only the main ship has none)`)
+    if (i > 0 && queue && !queue.some(q => typeof q !== 'string' && q.kind === 'wild') &&
+      !queue.some(q => (typeof q === 'string' ? q : q.kind === 'jarl' ? q.color : null) === sh.color)) {
+      throw new Error(`No viking in the queue can use the ${sh.color} ship`)
+    }
   }
 }

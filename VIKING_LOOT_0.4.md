@@ -1,6 +1,6 @@
 # Viking Loot 0.4 – Isriket: nycklar, is, två skepp, dagens räd och app
 
-> **Status (2026-11-21):** Fas 1 (PWA) klar – installerbar och offline, verifierat i Chrome. Kvar: installera på mobil. Nästa: fas 2 (regelmotorn).
+> **Status (2026-11-21):** Fas 1 (PWA) och fas 2 (regelmotorn för nycklar, is, färgskepp och spejare, med tester) är klara. Nästa: fas 3 (Isriket – banor och grafik). Kvar att verifiera: installation på mobil.
 
 ## Syfte
 
@@ -28,15 +28,21 @@ Alla nya egenskaper är valfria i bandatan. Ett regressionstest kontrollerar att
 
 ### 1.2 Is
 
-- Ett objekt med `frozen: N` går inte att nå förrän **N drag** har gjorts. Varje utskickad viking räknas som ett drag.
-- Blocket visar hur många drag som är kvar. När isen smälter kommer händelsen `thaw`, och därefter kan även väntande vikingar ta objektet.
-- I `stacks()` skrivs is som `~3r`, alltså en röd skatt som tinar efter 3 drag.
+- Ett objekt med `frozen: N` tinar när **drag N börjar**, innan den vikingen hugger (händelsen `thaw`). `frozen: 1` tinar alltså redan i första draget. Varje utskickad viking, även Sigrid, räknas som ett drag.
+- Blocket visar hur många drag som är kvar. När isen har smält kan både den nya vikingen och de väntande ta objektet.
+- Isen smälter bara när en viking skickas ut. Är kön slut medan något fortfarande är fruset, är räden förlorad.
+- En dold skatt under is visas när isen har smält, om vägen fram till den är fri.
+- I `stacks()` skrivs is som `~3r`, en röd skatt som tinar i drag 3. Prefixen går att kombinera, till exempel `?~2b`.
 
 ### 1.3 Två skepp
 
 - En bana kan ha `ships: [{ slots: 3 }, { slots: 2, color: 'blue' }]`. Utan `ships` har banan ett skepp med tre platser, som förut.
 - En viking som ska sätta sig tar i första hand skeppet i sin egen färg, om det har plats. Annars tar den det vanliga skeppet. Händelsen `wait` talar om vilket skepp det blev.
-- Räden är förlorad när **något** skepp blir fullt.
+- **Bara huvudskeppet kan sänka räden**, när dess sista plats fylls. Färgskeppet är extra trygga platser för en färg. När det är fullt sätter sig nästa viking i den färgen på huvudskeppet.
+- Vikingar på färgskeppet fortsätter plundra precis som andra väntande vikingar.
+- Valideringen kräver att det första skeppet är huvudskeppet (utan färg), att varje färgskepp har en färg och att någon viking i kön kan använda det.
+
+*(Ändrat under fas 2: först var tanken att räden förloras när något skepp blir fullt. Men då hade färgskeppet varit en fälla och inte en hjälp.)*
 
 ### 1.4 Spejare – Sigrid
 
@@ -104,8 +110,8 @@ Pusselbanorna har en vinstandel som går från cirka 45 % ner till 12 %. Banorna
 
 - [ ] Spelet går att installera och fungerar offline (kontrollerat i Chrome DevTools och på mobil).
 - [ ] Alla 36 banor är vinnbara, och `par` stämmer med lösaren.
-- [ ] Banorna 1–24 ger samma siffror från lösaren som i 0.3.
-- [ ] Varje ny mekanik har tester och en introbana som inte går att förlora.
+- [x] Banorna 1–24 ger samma siffror från lösaren som i 0.3.
+- [ ] Varje ny mekanik har tester (klart i fas 2) och en introbana som inte går att förlora.
 - [ ] Dagens räd är samma för samma datum och går alltid att vinna.
 - [ ] Genereringen fryser inte sidan på mobil.
 - [ ] Prestationer och skepp sparas, och 0.3-progress migreras.

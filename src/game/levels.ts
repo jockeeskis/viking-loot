@@ -1,4 +1,4 @@
-import type { LevelLoot, LootColor, QueueEntry } from './engine.ts'
+import type { LevelLoot, LootColor, QueueEntry, ShipSpec } from './engine.ts'
 import type { LootKind } from './art.ts'
 
 /**
@@ -7,7 +7,11 @@ import type { LootKind } from './art.ts'
  */
 export type LevelLootPlaced = LevelLoot & { at: [number, number]; kind?: LootKind }
 /** `par` = fewest waiting-slot seats on a winning line (from the solver); it sets the stars. */
-export type Level = { name: string; hint: string; par: number; loot: LevelLootPlaced[]; queue: QueueEntry[] }
+export type Level = {
+  name: string; hint: string; par: number; loot: LevelLootPlaced[]; queue: QueueEntry[]
+  /** Optional since 0.4: ship 0 is the main ship, more ships are colour ships. Default: one ship, three seats. */
+  ships?: ShipSpec[]
+}
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
 const item = (id: string, color: LootColor, at: [number, number], ...blockedBy: string[]): LevelLootPlaced => ({ id, color, at, blockedBy })
@@ -22,15 +26,31 @@ export const hidden = (l: LevelLootPlaced): LevelLootPlaced => ({ ...l, hidden: 
 /** Queue entries for the special vikings. */
 export const jarl = (color: LootColor): QueueEntry => ({ kind: 'jarl', color })
 export const WILD: QueueEntry = { kind: 'wild' }
+export const SCOUT: QueueEntry = { kind: 'scout' }
 
 const code: Record<string, LootColor> = { r: R, b: B, y: Y }
 
-type Token = { ch: string; hidden: boolean }
-/** Split a pile string into tokens; `?` makes the next item hidden. */
+type Token = { ch: string; hidden: boolean; frozen: number; key: boolean; chest: boolean }
+/** Split a pile string into tokens. Prefixes (any order) apply to the next letter: `?` hidden, `~N` ice, `!` key, `#` locked chest. */
 function tokens(col: string): Token[] {
   const out: Token[] = []
+  let t: Omit<Token, 'ch'> = { hidden: false, frozen: 0, key: false, chest: false }
   for (let i = 0; i < col.length; i++) {
-    if (col[i] === '?') { out.push({ ch: col[i + 1], hidden: true }); i++ } else out.push({ ch: col[i], hidden: false })
+    const c = col[i]
+    if (c === '?') t.hidden = true
+    else if (c === '!') t.key = true
+    else if (c === '#') t.chest = true
+    else if (c === '~') {
+      const m = /^\d+/.exec(col.slice(i + 1))
+      if (!m) throw new Error(`"~" needs a number of moves in "${col}"`)
+      t.frozen = Number(m[0])
+      i += m[0].length
+    } else {
+      if (!/[rbyRBYs]/.test(c)) throw new Error(`Unknown pile letter "${c}" in "${col}"`)
+      if ((t.key || t.chest) && c !== c.toLowerCase()) throw new Error(`Keys and chests are ordinary loot, not houses ("${col}")`)
+      out.push({ ch: c, ...t })
+      t = { hidden: false, frozen: 0, key: false, chest: false }
+    }
   }
   return out
 }
@@ -41,6 +61,8 @@ function tokens(col: string): Token[] {
  *
  * Letters: `r b y` loot · `R B Y` a house in that colour (two hits) · `s` a stone ·
  * `?` before a letter hides that item's colour until it is reachable.
+ * 0.4: `!r` a red key · `#r` a red chest, locked until every key of the same colour is taken ·
+ * `~3r` red loot frozen until move 3 starts. Prefixes combine, e.g. `?~2b`.
  * A stone crumbles when an item next to it (in a neighbouring pile, at about the same
  * depth) is plundered. What stands behind a stone also stays behind the item in front of
  * the stone, so a pile is always emptied front to back.
@@ -52,7 +74,8 @@ export function stacks(columns: string[]): LevelLootPlaced[] {
   const xOf = (c: number) => (n === 1 ? 1.5 : n >= 4 ? (c * 3) / (n - 1) : 0.5 + (c * 2) / (n - 1))
   const yOf = (c: number, row: number) => (row * 3) / Math.max(1, piles[c].length - 1)
   const idOf = (c: number, row: number) => `c${c + 1}-${row + 1}`
-  return piles.flatMap((pile, c) => pile.map(({ ch, hidden }, row) => {
+  const keysOf = (color: LootColor) => piles.flatMap((p, c) => p.flatMap((t, row) => (t.key && code[t.ch] === color ? [idOf(c, row)] : [])))
+  return piles.flatMap((pile, c) => pile.map(({ ch, hidden, frozen, key, chest }, row) => {
     const id = idOf(c, row)
     const at: [number, number] = [xOf(c), yOf(c, row)]
     // Blocked by everything in front up to and including the first non-stone item.
@@ -73,8 +96,16 @@ export function stacks(columns: string[]): LevelLootPlaced[] {
       return stone(id, at, clearedBy, ...blockedBy)
     }
     const color = code[ch.toLowerCase()]
-    const l = ch === ch.toUpperCase() ? house(id, color, at, ...blockedBy) : item(id, color, at, ...blockedBy)
-    return hidden ? { ...l, hidden: true } : l
+    let l = ch === ch.toUpperCase() ? house(id, color, at, ...blockedBy) : item(id, color, at, ...blockedBy)
+    if (hidden) l = { ...l, hidden: true }
+    if (frozen) l = { ...l, frozen }
+    if (key) l = { ...l, key: true, kind: 'barrel' }
+    if (chest) {
+      const lockedBy = keysOf(color)
+      if (!lockedBy.length) throw new Error(`Chest ${id} has no ${color} key in the level`)
+      l = { ...l, lockedBy, kind: 'chest' }
+    }
+    return l
   }))
 }
 

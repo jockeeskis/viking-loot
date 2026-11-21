@@ -16,7 +16,8 @@ type Node = { win: string[] | null; loss: string[] | null; wins: number; losses:
 function key(s: GameState): string {
   const loot = s.loot.map(l => (l.collected ? '-' : l.hitsLeft)).join('')
   const queue = s.queue.map(v => v.id).join(',')
-  const waiting = s.waiting.map(v => `${v.id}:${v.color ?? '?'}:${v.collectedCount}`).join(',')
+  // Ice needs no entry of its own: how far it has melted follows from how many vikings have left the queue.
+  const waiting = s.waiting.map(v => `${v.id}:${v.color ?? '?'}:${v.collectedCount}:${v.ship}`).join(',')
   return `${loot}|${queue}|${waiting}`
 }
 

@@ -4,7 +4,7 @@ import {
   createGame, selectViking, getAvailableLoot, getSelectableVikings, resolveWaitingVikings,
   evaluateGameStatus, validateLevelGraph, type GameState, type LevelLoot, type LootColor,
 } from './engine.ts'
-import { levels } from './levels.ts'
+import { levels, stacks, SCOUT } from './levels.ts'
 import { solve, hint } from './solver.ts'
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
@@ -157,7 +157,7 @@ test('an empty queue with no waiter able to move is a stuck loss', () => {
 test('evaluateGameStatus and resolveWaitingVikings work as standalone functions', () => {
   const s = createGame([{ id: 'r1', color: R }], [R])
   assert.equal(evaluateGameStatus(s), 'playing')
-  const manual: GameState = { ...s, queue: [], waiting: [{ id: 'w', kind: 'normal', color: R, capacity: 2, collectedCount: 0 }] }
+  const manual: GameState = { ...s, queue: [], waiting: [{ id: "w", kind: "normal", color: R, capacity: 2, collectedCount: 0, ship: 0 }] }
   assert.equal(evaluateGameStatus(manual), 'playing', 'the waiter can still move')
   const resolved = resolveWaitingVikings(manual)
   assert.equal(resolved.status, 'won')
@@ -332,4 +332,139 @@ test('hint always suggests a move that can still win', () => {
   const f = levels.find(x => x.name === 'Fästet')!
   const doomed = pick(createGame(f.loot, f.queue), 'v1', 'v2', 'v3', 'v4')
   if (doomed.status === 'playing' && !solve(doomed).winnable) assert.equal(hint(doomed), null)
+})
+
+// --- 0.4: keys and locked chests -------------------------------------------------
+
+test('a chest stays locked until its key is taken, even from another pile', () => {
+  const loot: LevelLoot[] = [{ id: 'c', color: R, lockedBy: ['k'] }, { id: 'k', color: B, key: true }]
+  const s = createGame(loot, [R, B])
+  assert.deepEqual(getAvailableLoot(s).map(l => l.id), ['k'], 'the chest is not reachable yet')
+  const s1 = selectViking(s, 'v1')
+  assert.equal(s1.waiting.length, 1, 'red finds nothing and waits')
+  const s2 = selectViking(s1, 'v2')
+  const types = s2.events.map(e => e.type)
+  assert.ok(types.indexOf('unlock') > types.indexOf('collect'), 'taking the key unlocks the chest')
+  assert.deepEqual(s2.events.find(e => e.type === 'unlock'), { type: 'unlock', lootId: 'c' })
+  assert.ok(s2.events.some(e => e.type === 'collect' && e.lootId === 'c' && e.fromWaiting), 'the waiting red viking takes the chest')
+  assert.equal(s2.status, 'won')
+})
+
+test('a chest with two keys opens only when both are taken', () => {
+  const loot: LevelLoot[] = [{ id: 'c', color: Y, lockedBy: ['k1', 'k2'] }, { id: 'k1', color: R, key: true }, { id: 'k2', color: B, key: true }]
+  const s = pick(createGame(loot, [R, B, Y]), 'v1')
+  assert.ok(!s.events.some(e => e.type === 'unlock'))
+  assert.deepEqual(getAvailableLoot(s).map(l => l.id), ['k2'])
+  const s2 = pick(s, 'v2')
+  assert.ok(s2.events.some(e => e.type === 'unlock'))
+})
+
+test('stacks: ! is a key, # a chest locked by the keys of its colour, ~N ice', () => {
+  const loot = stacks(['#rb', '!r', '?~2y'])
+  const chest = loot.find(l => l.id === 'c1-1')!
+  assert.deepEqual([chest.lockedBy, chest.kind, chest.color], [['c2-1'], 'chest', R])
+  assert.equal(loot.find(l => l.id === 'c2-1')!.key, true)
+  const ice = loot.find(l => l.id === 'c3-1')!
+  assert.deepEqual([ice.frozen, ice.hidden, ice.color], [2, true, Y])
+  assert.throws(() => stacks(['#r', 'b']), /no red key/)
+  assert.throws(() => stacks(['!R']), /not houses/)
+  assert.throws(() => stacks(['~r']), /needs a number/)
+})
+
+// --- 0.4: ice --------------------------------------------------------------------
+
+test('ice thaws when move N starts, and a waiting viking can take the thawed item', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R, frozen: 2 }]
+  const s = createGame(loot, [R, B, R])
+  assert.equal(getAvailableLoot(s).length, 0)
+  const s1 = selectViking(s, 'v1')
+  assert.deepEqual(s1.loot[0].frozenLeft, 1)
+  assert.equal(s1.waiting.length, 1, 'still frozen during move 1: red waits')
+  const s2 = selectViking(s1, 'v2')
+  assert.deepEqual(s2.events.slice(0, 2), [{ type: 'dispatch', vikingId: 'v2' }, { type: 'thaw', lootId: 'r1' }], 'ice melts before the new viking raids')
+  assert.ok(s2.events.some(e => e.type === 'collect' && e.vikingId === 'v1' && e.fromWaiting))
+  assert.equal(s2.status, 'won')
+})
+
+test('ice with frozen: 1 thaws at the start of the first move; hidden ice is revealed when it thaws', () => {
+  const s = selectViking(createGame([{ id: 'r1', color: R, frozen: 1 }], [R]), 'v1')
+  assert.equal(s.status, 'won')
+  const h = createGame([{ id: 'y1', color: Y, frozen: 1, hidden: true }, { id: 'r1', color: R }], [R, Y])
+  assert.equal(h.loot[0].hidden, true, 'frozen items are not reachable, so they stay hidden')
+  const h1 = selectViking(h, 'v1')
+  assert.deepEqual(h1.events.slice(1, 3), [{ type: 'thaw', lootId: 'y1' }, { type: 'reveal', lootId: 'y1' }])
+})
+
+test('ice that can no longer thaw leaves the raid stuck', () => {
+  const s = pick(createGame([{ id: 'r1', color: R, frozen: 3 }], [R, B]), 'v1', 'v2')
+  assert.equal(s.status, 'lost')
+  assert.equal(s.lossReason, 'stuck')
+})
+
+test('with ice, timing matters: the hint waits for the thaw and the solver counts it', () => {
+  // Red first must wait for the ice; blue first lets red take r1 as soon as it thaws.
+  const loot: LevelLoot[] = [{ id: 'r1', color: R, frozen: 2 }, { id: 'r2', color: R, frozen: 2 }, { id: 'b1', color: B }, { id: 'b2', color: B }]
+  const start = createGame(loot, [R, B, B])
+  assert.equal(solve(start).minWaits, 0)
+  assert.equal(hint(start), 'v2')
+  assert.equal(pick(start, 'v1', 'v2').waits, 1)
+})
+
+// --- 0.4: two ships ----------------------------------------------------------------
+
+test('a colour ship seats its own colour first; when it is full they use the main ship', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'b1', color: B, blockedBy: ['r1'] }]
+  const ships = [{ slots: 3 }, { slots: 2, color: B }]
+  const s = pick(createGame(loot, [B, B, B, R], ships), 'v1', 'v2', 'v3')
+  assert.deepEqual(s.waiting.map(v => v.ship), [1, 1, 0])
+  assert.deepEqual(s.events.find(e => e.type === 'wait'), { type: 'wait', vikingId: 'v3', ship: 0, slot: 0 })
+  assert.equal(s.status, 'playing', 'a full colour ship does not sink the raid')
+})
+
+test('only the main ship sinks the raid', () => {
+  const ships = [{ slots: 3 }, { slots: 2, color: B }]
+  const s = pick(createGame([{ id: 'y1', color: Y }], [R, R, R, Y, B], ships), 'v1', 'v2', 'v3')
+  assert.equal(s.status, 'lost')
+  assert.equal(s.lossReason, 'slots-full')
+  assert.deepEqual(s.events.slice(-1), [{ type: 'overflow', vikingId: 'v3' }])
+})
+
+test('a seated viking on a colour ship keeps raiding like any waiter', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'b1', color: B, blockedBy: ['r1'] }]
+  const s = pick(createGame(loot, [B, R], [{ slots: 3 }, { slots: 1, color: B }]), 'v1', 'v2')
+  assert.ok(s.events.some(e => e.type === 'collect' && e.lootId === 'b1' && e.fromWaiting))
+  assert.equal(s.status, 'won')
+})
+
+// --- 0.4: scout ------------------------------------------------------------------
+
+test('the scout reveals every hidden item, carries nothing and never takes a seat', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'b1', color: B, blockedBy: ['r1'], hidden: true }]
+  const s = createGame(loot, [SCOUT, R, B])
+  assert.equal(s.queue[0].kind, 'scout')
+  const s1 = selectViking(s, 'v1')
+  assert.deepEqual(s1.events.map(e => e.type), ['dispatch', 'scout', 'reveal', 'return'])
+  assert.equal(s1.loot.find(l => l.id === 'b1')!.hidden, false)
+  assert.deepEqual([s1.waiting.length, s1.waits, s1.moves, collected(s1)], [0, 0, 1, []])
+  assert.equal(pick(s1, 'v2', 'v3').status, 'won')
+})
+
+test('the scout does not change who can win: same solver numbers with or without hidden items', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'b1', color: B, blockedBy: ['r1'], hidden: true }, { id: 'r2', color: R, blockedBy: ['b1'], hidden: true }]
+  const a = solve(createGame(loot, [SCOUT, B, R]))
+  const b = solve(createGame(loot.map(l => ({ ...l, hidden: false })), [SCOUT, B, R]))
+  assert.deepEqual([a.winningLines, a.losingLines, a.minWaits], [b.winningLines, b.losingLines, b.minWaits])
+})
+
+// --- 0.4: validation -----------------------------------------------------------
+
+test('validateLevelGraph catches broken keys, ice and ships', () => {
+  assert.throws(() => validateLevelGraph([{ id: 'c', color: R, lockedBy: ['x'] }]), /unknown/)
+  assert.throws(() => validateLevelGraph([{ id: 'c', color: R, lockedBy: ['k'] }, { id: 'k', color: B }]), /not a key/)
+  assert.throws(() => validateLevelGraph([{ id: 'c', color: R, lockedBy: ['k'] }, { id: 'k', color: B, key: true, blockedBy: ['c'] }]), /cycle/)
+  assert.throws(() => validateLevelGraph([{ id: 'r', color: R, frozen: 0 }]), /frozen/)
+  assert.throws(() => validateLevelGraph([{ id: 'r', color: R }], [{ slots: 2, color: B }]), /main ship/)
+  assert.throws(() => validateLevelGraph([{ id: 'r', color: R }], [{ slots: 3 }, { slots: 2 }]), /needs a colour/)
+  assert.throws(() => validateLevelGraph([{ id: 'r', color: R }], [{ slots: 3 }, { slots: 2, color: B }], [R, R]), /No viking/)
+  validateLevelGraph([{ id: 'c', color: R, lockedBy: ['k'] }, { id: 'k', color: B, key: true }], [{ slots: 3 }, { slots: 2, color: B }], [R, B])
 })

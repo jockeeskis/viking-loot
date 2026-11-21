@@ -104,7 +104,7 @@ export class RaidScene extends Phaser.Scene {
     const data = levels[this.level]
     this.history = []
     this.title?.setText(`${this.level + 1}. ${data.name}`)
-    const state = createGame(data.loot, data.queue)
+    const state = createGame(data.loot, data.queue, data.ships)
     this.rebuild(state)
     // Harald and Ylva are downloaded the first time a level needs them; refresh the cards when they arrive.
     const special = state.queue.filter(v => v.kind !== 'normal').map(assetFor).filter((a): a is VikingAsset => !!a)
@@ -557,7 +557,7 @@ export class RaidScene extends Phaser.Scene {
     ;(['red', 'blue', 'yellow'] as LootColor[]).forEach((color, i) => {
       const asset = teamAsset(color)
       if (!hasSheet(this, asset)) return
-      const crew = this.makeActor({ id: `cheer-${i}`, kind: 'normal', color, capacity: 2, collectedCount: 0 })
+      const crew = this.makeActor({ id: `cheer-${i}`, kind: 'normal', color, capacity: 2, collectedCount: 0, ship: 0 })
       crew.setPosition(BOARD.x - 40 + i * 40, BOARD.y + 30).setScale(0.3).setAlpha(0).setDepth(31)
       this.actors.set(`cheer-${i}`, crew)
       this.tweens.add({
@@ -639,6 +639,18 @@ export class RaidScene extends Phaser.Scene {
           this.tweens.add({ targets: target, scale: { from: target.scale * 0.6, to: target.scale }, duration: 260, ease: 'Back.easeOut' })
         }
         this.refreshLocks(view, false)
+        continue
+      }
+      if (e.type === 'unlock' || e.type === 'thaw') {
+        // 0.4 phase 2: simple feedback; the padlock and ice art arrive in phase 3.
+        if (e.type === 'thaw') setLoot(e.lootId, { frozenLeft: 0 })
+        const target = this.lootSprites.get(e.lootId)
+        if (target) {
+          sfx.reveal()
+          coinBurst(this, target.x, target.y - 6, target.getData('color'))
+        }
+        this.refreshLocks(view, true)
+        await this.delay(120)
         continue
       }
 

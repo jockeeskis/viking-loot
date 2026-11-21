@@ -14,7 +14,7 @@ test('stars follow par', () => {
 })
 
 test('every level stores the par the solver finds', () => {
-  for (const l of levels) assert.equal(l.par, solve(createGame(l.loot, l.queue)).minWaits, l.name)
+  for (const l of levels) assert.equal(l.par, solve(createGame(l.loot, l.queue, l.ships)).minWaits, l.name)
 })
 
 test('progress parsing tolerates junk and migrates 0.2 unlocks', () => {
@@ -58,10 +58,10 @@ test('Fjordarna introduces each mechanic on a level that cannot be lost, then us
     const fresh = mechanicsOf(l).filter(x => !seen.has(x))
     assert.deepEqual(fresh, [m], `${l.name} introduces exactly ${m}`)
     fresh.forEach(x => seen.add(x))
-    assert.equal(solve(createGame(l.loot, l.queue)).lossPath, null, `${l.name} cannot be lost`)
+    assert.equal(solve(createGame(l.loot, l.queue, l.ships)).lossPath, null, `${l.name} cannot be lost`)
     const puzzle = levels[i + 1]
     assert.ok(mechanicsOf(puzzle).includes(m as never), `${puzzle.name} uses ${m}`)
-    assert.ok(solve(createGame(puzzle.loot, puzzle.queue)).lossPath, `${puzzle.name} can be lost`)
+    assert.ok(solve(createGame(puzzle.loot, puzzle.queue, puzzle.ships)).lossPath, `${puzzle.name} can be lost`)
   }
   for (const l of levels.slice(22)) assert.ok(mechanicsOf(l).length >= 3, `${l.name} mixes mechanics`)
 })
