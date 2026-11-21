@@ -89,7 +89,8 @@ export class RaidScene extends Phaser.Scene {
   private title?: Phaser.GameObjects.Text
   private lootOffsetY = 0
   private ready = false
-  private history: GameState[] = [] // states before each move, for undo
+  // The state before the latest move. Only one step can be undone; then a new move is needed first.
+  private history: GameState[] = []
   private hintGfx?: Phaser.GameObjects.Graphics
   private onUpdate?: (u: RaidUpdate) => void
   private islandImg?: Phaser.GameObjects.Image
@@ -160,7 +161,7 @@ export class RaidScene extends Phaser.Scene {
     this.notify()
   }
 
-  /** Take back the last move. Allowed after a loss too, but not while a move is animating. */
+  /** Take back the latest move (one step only). Allowed after a loss too, but not while a move is animating. */
   undo() {
     if (!this.ready || this.busy || !this.history.length || this.state.status === 'won') return
     this.rebuild(this.history.pop()!)
@@ -695,7 +696,7 @@ export class RaidScene extends Phaser.Scene {
     const after = selectViking(before, vikingId)
     if (after === before) return
     // The outcome is decided here; the animation only replays the engine's events.
-    this.history.push(before)
+    this.history = [before]
     this.state = after
     this.busy = true
     this.clearHint()

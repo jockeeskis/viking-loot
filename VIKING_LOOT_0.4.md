@@ -113,6 +113,11 @@ Samma ordning som i 0.3, med två tillägg:
   - Allt körs i en Web Worker (`generator.worker.ts`). Under tiden visas "Kartlägger ön…". Om workern skulle hänga i 25 sekunder används en enkel reservö.
   - Tidtagning: `npm run bench-modes`. På dator tar de flesta öar under 0,5 s och de svåraste cirka 2 s.
 
+### Ångra (ändrat efter test)
+
+- Ångra tar bara tillbaka det **senaste** draget. Efter en ångring måste man göra ett nytt drag innan man kan ångra igen; annars gick det att backa en hel räd och pröva sig fram, vilket gjorde banorna för lätta.
+- Gäller kampanjen och Dagens räd. I den oändliga räden går det inte att ångra alls.
+
 ## 4. App (PWA)
 
 - Spelet går att installera på hemskärmen.
