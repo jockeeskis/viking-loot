@@ -1,6 +1,6 @@
 # Viking Loot 0.4 – Isriket: nycklar, is, två skepp, dagens räd och app
 
-> **Status (2026-11-21):** Fas 1 (PWA) och fas 2 (regelmotorn för nycklar, is, färgskepp och spejare, med tester) är klara. Nästa: fas 3 (Isriket – banor och grafik). Kvar att verifiera: installation på mobil.
+> **Status (2026-11-21):** Fas 1 (PWA) och fas 2 (regelmotorn för nycklar, is, färgskepp och spejare, med tester) är klara. Nästa: fas 3 (Isriket – banor och grafik). Appen är installerad och testad på Android.
 
 ## Syfte
 
@@ -108,7 +108,7 @@ Pusselbanorna har en vinstandel som går från cirka 45 % ner till 12 %. Banorna
 
 ## 7. Acceptanskriterier
 
-- [ ] Spelet går att installera och fungerar offline (kontrollerat i Chrome DevTools och på mobil).
+- [x] Spelet går att installera och fungerar offline (kontrollerat i Chrome DevTools och på Android).
 - [ ] Alla 36 banor är vinnbara, och `par` stämmer med lösaren.
 - [x] Banorna 1–24 ger samma siffror från lösaren som i 0.3.
 - [ ] Varje ny mekanik har tester (klart i fas 2) och en introbana som inte går att förlora.
