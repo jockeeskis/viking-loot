@@ -37,9 +37,10 @@ const PREVIEW_MAX = 6
 const CARD = { y: 584, w: 108, h: 100 }
 const cardX = (i: number) => 62 + i * 118
 // Display scales for the rendered sprites (frame sizes come from the manifest).
-const VIKING_SCALE = 0.36
-const LOOT_SCALE = 0.42
-const SHIP_SCALE = 0.47
+// On-screen widths in logical px; the scale follows from the rendered frame size.
+const VIKING_W = 92
+const LOOT_W = 81
+const SHIP_W = 210
 
 // Houses are introduced later (ui-settings.md §5), so only levels that set `kind: 'house'` get them.
 const KINDS: LootKind[] = ['barrel', 'chest']
@@ -127,7 +128,7 @@ export class RaidScene extends Phaser.Scene {
     drawRock(g, 22, 210, 0.8); drawRock(g, 340, 350, 0.9); drawRock(g, 300, 76, 0.7); drawRock(g, 60, 368, 0.8)
     if (hasShip(this)) {
       const sh = shipAsset()!
-      this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_SCALE).play('ship-bob')
+      this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_W / sh.frameWidth).play('ship-bob')
     } else drawShip(g, SHIP.x, SHIP.y)
     // HUD sign
     const s = this.add.graphics()
@@ -179,7 +180,7 @@ export class RaidScene extends Phaser.Scene {
     if (hasLoot(this) && frame !== undefined) {
       const a = lootAsset()!
       const shadow = this.add.ellipse(0, 22, 54, 15, 0x000000, 0.22)
-      const img = this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_SCALE).setName('img')
+      const img = this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName('img')
       return this.add.container(0, 0, [shadow, img]).setName('art')
     }
     const g = this.add.graphics()
@@ -240,7 +241,7 @@ export class RaidScene extends Phaser.Scene {
     if (hasViking(this, color)) {
       const v = vikingAsset(color)!
       const shadow = this.add.ellipse(0, 29, 34, 10, 0x000000, 0.22)
-      const body = this.add.sprite(0, 29, vikingKey(color)).setOrigin(v.originX, v.originY).setScale(VIKING_SCALE).setName('body')
+      const body = this.add.sprite(0, 29, vikingKey(color)).setOrigin(v.originX, v.originY).setScale(VIKING_W / v.frameWidth).setName('body')
       body.play(vikingAnimKey(color, 'idle'))
       parts = [shadow, body]
     } else {
@@ -282,7 +283,8 @@ export class RaidScene extends Phaser.Scene {
     g.fillStyle(shade(c, 0.35), 0.5); g.fillEllipse(-14, -h / 2 + 22, 50, 22)
     let portrait: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image
     if (this.textures.exists(portraitKey(color))) {
-      portrait = this.add.image(0, -2, portraitKey(color)).setScale(104 / 224)
+      portrait = this.add.image(0, -2, portraitKey(color))
+      portrait.setScale(104 / portrait.width)
     } else {
       portrait = this.add.graphics()
       drawPortrait(portrait, color, 25)
@@ -326,7 +328,8 @@ export class RaidScene extends Phaser.Scene {
       g.fillStyle(0x2a190c); g.fillCircle(x, y, 13)
       g.lineStyle(2.5, COLORS[v.color]); g.strokeCircle(x, y, 13)
       if (this.textures.exists(portraitKey(v.color))) {
-        const head = this.add.image(x, y + 1, portraitKey(v.color)).setScale(34 / 224).setDepth(6)
+        const head = this.add.image(x, y + 1, portraitKey(v.color)).setDepth(6)
+        head.setScale(34 / head.width)
         const m = this.make.graphics({}, false)
         m.fillStyle(0xffffff); m.fillCircle(x, y, 12)
         head.setMask(m.createGeometryMask())

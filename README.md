@@ -7,6 +7,10 @@ Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3.
 
 Repo: https://github.com/jockeeskis/viking-loot
 
+## Spela
+
+Senaste versionen läggs ut automatiskt på GitHub Pages vid varje push till `main`: https://jockeeskis.github.io/viking-loot/ (öppna länken i mobilen för att testa touch).
+
 ## Kom igång
 
 Kräver Node.js 22.18+ (för testerna; själva spelet går på 20.19+).
@@ -59,13 +63,13 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 
 ## 3D-grafik
 
-Vikingarna (Ragnar, Björn och Freja), tunnor, kistor, hus och långskeppet är 3D-modeller. De byggs helt med skript i Blender av rundade grundformer, så inga externa modeller eller licenser behövs. Renderingen är cel-shadad med kontur, och bilderna packas till sprite sheets:
+Vikingarna (Ragnar, Björn och Freja), tunnor, kistor, hus och långskeppet är 3D-modeller. De byggs helt med skript i Blender av rundade grundformer, så inga externa modeller eller licenser behövs. Renderingen är cel-shadad med kontur, och bilderna packas till sprite sheets i WebP (totalt cirka 0,7 MB):
 
 | Figur/objekt | Animationer | Fil |
 |---|---|---|
 | Ragnar, Björn, Freja | `idle`, `run`, `attack`, `carry` + porträtt | `public/assets/characters/<namn>/` |
-| Tunna, kista, hus × 3 färger | – | `public/assets/loot/loot.png` |
-| Långskepp | `bob` | `public/assets/ships/longship.png` |
+| Tunna, kista, hus × 3 färger | – | `public/assets/loot/loot.webp` |
+| Långskepp | `bob` | `public/assets/ships/longship.webp` |
 
 Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender automatiskt i standardmappen på Windows, eller via miljövariabeln `BLENDER`. Hela renderingen tar cirka 1,5 minut. Ändra modeller och poser i `render_assets.py`.
 
@@ -73,4 +77,4 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 
 - Spelmekaniken för 0.2 är klar och testad. Det som återstår av acceptanskriterierna är test med touch på en riktig mobil.
 - Figurer, skatter och skepp är renderade 3D-sprites. Miljön (ön, träd, paneler) ritas fortfarande i kod.
-- Nästa steg: plundringseffekter (mynt, träflisor), en renderad 3D-ö och mindre bildfiler (sprite sheets är cirka 1,6 MB per viking).
+- Nästa steg: plundringseffekter och ljud, fler banor och en renderad 3D-ö.

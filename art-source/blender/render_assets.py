@@ -543,6 +543,20 @@ def anchor(cam, world_point):
     return round(v.x, 4), round(1 - v.y, 4)
 
 
+SHEET_QUALITY = 86  # lossy WebP keeps the download small (alpha included)
+
+
+def save_image(img, path):
+    if path.endswith('.webp'):
+        img.file_format = 'WEBP'
+        img.filepath_raw = path
+        img.save(quality=SHEET_QUALITY)
+    else:
+        img.file_format = 'PNG'
+        img.filepath_raw = path
+        img.save()
+
+
 def pack(paths, fw, fh, cols, out_path):
     n = len(paths)
     cols = min(cols, n)
@@ -560,15 +574,14 @@ def pack(paths, fw, fh, cols, out_path):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     out = bpy.data.images.new('sheet', W, H, alpha=True)
     out.pixels.foreach_set(sheet.ravel())
-    out.filepath_raw = out_path
-    out.file_format = 'PNG'
-    out.save()
+    save_image(out, out_path)
     bpy.data.images.remove(out)
     return cols, rows
 
 
+
 VIKING_ANIMS = [('idle', 12, 8), ('run', 10, 16), ('attack', 10, 18), ('carry', 10, 14)]
-VIKING_FRAME = 256
+VIKING_FRAME = 192  # shown at ~92 logical px = 184 px on the 2x canvas
 
 
 def render_viking(who, manifest):
@@ -586,23 +599,25 @@ def render_viking(who, manifest):
             frames.append(path)
         anims[name] = {'start': idx, 'end': idx + count - 1, 'fps': fps}
         idx += count
-    rel = f'assets/characters/{who}/{who}.png'
+    rel = f'assets/characters/{who}/{who}.webp'
     pack(frames, VIKING_FRAME, VIKING_FRAME, 8, os.path.join(PUBLIC, rel))
     ox, oy = anchor(cam, (0, 0, 0))
     # portrait: head and shoulders, nearly frontal
     pose_viking(rig, 'idle', 0)
     rig['root'].rotation_euler.z = math.radians(12)
     bpy.data.objects.remove(cam)
-    camera((0, 0, 0.92), 1.2, (224, 224), elev=8)
-    prel = f'assets/characters/{who}/portrait.png'
-    render_to(os.path.join(PUBLIC, prel))
+    camera((0, 0, 0.92), 1.2, (208, 208), elev=8)
+    prel = f'assets/characters/{who}/portrait.webp'
+    tmp = os.path.join(TMP, who, 'portrait.png')
+    render_to(tmp)
+    pack([tmp], 208, 208, 1, os.path.join(PUBLIC, prel))
     manifest['vikings'][TEAM[who]] = {
         'name': who, 'sheet': rel, 'portrait': prel, 'frameWidth': VIKING_FRAME, 'frameHeight': VIKING_FRAME,
         'originX': ox, 'originY': oy, 'anims': anims,
     }
 
 
-LOOT_FRAME = 192
+LOOT_FRAME = 160  # shown at ~81 logical px
 
 
 def render_loot(manifest):
@@ -620,13 +635,13 @@ def render_loot(manifest):
             frames.append(path)
             names.append(f'{kind}-{color}')
     ox, oy = anchor(cam, (0, 0, 0))
-    rel = 'assets/loot/loot.png'
+    rel = 'assets/loot/loot.webp'
     pack(frames, LOOT_FRAME, LOOT_FRAME, 3, os.path.join(PUBLIC, rel))
     manifest['loot'] = {'sheet': rel, 'frameWidth': LOOT_FRAME, 'frameHeight': LOOT_FRAME, 'originX': ox, 'originY': oy,
                         'frames': {n: i for i, n in enumerate(names)}}
 
 
-SHIP_W, SHIP_H, SHIP_FRAMES = 448, 288, 16
+SHIP_W, SHIP_H, SHIP_FRAMES = 424, 272, 12
 
 
 def render_ship(manifest):
@@ -642,7 +657,7 @@ def render_ship(manifest):
         path = os.path.join(TMP, 'ship', f'bob_{f:02d}.png')
         render_to(path)
         frames.append(path)
-    rel = 'assets/ships/longship.png'
+    rel = 'assets/ships/longship.webp'
     pack(frames, SHIP_W, SHIP_H, 4, os.path.join(PUBLIC, rel))
     ox, oy = anchor(cam, (0, 0, 0.22))
     manifest['ship'] = {'sheet': rel, 'frameWidth': SHIP_W, 'frameHeight': SHIP_H, 'originX': ox, 'originY': oy,

@@ -5,10 +5,10 @@ export const MANIFEST: AssetManifest = {
   "vikings": {
     "red": {
       "name": "ragnar",
-      "sheet": "assets/characters/ragnar/ragnar.png",
-      "portrait": "assets/characters/ragnar/portrait.png",
-      "frameWidth": 256,
-      "frameHeight": 256,
+      "sheet": "assets/characters/ragnar/ragnar.webp",
+      "portrait": "assets/characters/ragnar/portrait.webp",
+      "frameWidth": 192,
+      "frameHeight": 192,
       "originX": 0.5,
       "originY": 0.8382,
       "anims": {
@@ -36,10 +36,10 @@ export const MANIFEST: AssetManifest = {
     },
     "blue": {
       "name": "bjorn",
-      "sheet": "assets/characters/bjorn/bjorn.png",
-      "portrait": "assets/characters/bjorn/portrait.png",
-      "frameWidth": 256,
-      "frameHeight": 256,
+      "sheet": "assets/characters/bjorn/bjorn.webp",
+      "portrait": "assets/characters/bjorn/portrait.webp",
+      "frameWidth": 192,
+      "frameHeight": 192,
       "originX": 0.5,
       "originY": 0.8382,
       "anims": {
@@ -67,10 +67,10 @@ export const MANIFEST: AssetManifest = {
     },
     "yellow": {
       "name": "freja",
-      "sheet": "assets/characters/freja/freja.png",
-      "portrait": "assets/characters/freja/portrait.png",
-      "frameWidth": 256,
-      "frameHeight": 256,
+      "sheet": "assets/characters/freja/freja.webp",
+      "portrait": "assets/characters/freja/portrait.webp",
+      "frameWidth": 192,
+      "frameHeight": 192,
       "originX": 0.5,
       "originY": 0.8382,
       "anims": {
@@ -98,9 +98,9 @@ export const MANIFEST: AssetManifest = {
     }
   },
   "loot": {
-    "sheet": "assets/loot/loot.png",
-    "frameWidth": 192,
-    "frameHeight": 192,
+    "sheet": "assets/loot/loot.webp",
+    "frameWidth": 160,
+    "frameHeight": 160,
     "originX": 0.5,
     "originY": 0.7914,
     "frames": {
@@ -116,15 +116,15 @@ export const MANIFEST: AssetManifest = {
     }
   },
   "ship": {
-    "sheet": "assets/ships/longship.png",
-    "frameWidth": 448,
-    "frameHeight": 288,
+    "sheet": "assets/ships/longship.webp",
+    "frameWidth": 424,
+    "frameHeight": 272,
     "originX": 0.4722,
-    "originY": 0.6973,
+    "originY": 0.6977,
     "anims": {
       "bob": {
         "start": 0,
-        "end": 15,
+        "end": 11,
         "fps": 8
       }
     }
