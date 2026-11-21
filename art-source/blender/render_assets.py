@@ -866,6 +866,46 @@ def render_island(manifest):
     manifest['island'] = {'image': rel, 'x': 0, 'y': ISLAND_TOP, 'width': 360, 'height': ISLAND_H}
 
 
+ICON_BG = '#193a4b'  # same sea blue as the game background / manifest
+
+
+def render_icons():
+    """App icons for the PWA: Ragnar's head on a sea-blue square (PNG, opaque)."""
+    reset_scene()
+    OUTLINE_W[0] = 0.013
+    rig = build_viking('ragnar', 'red')
+    pose_viking(rig, 'idle', 0)
+    rig['root'].rotation_euler.z = math.radians(12)
+    def srgb(h):
+        h = h.lstrip('#')
+        return np.array([int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)], dtype=np.float32)
+    edge, centre = srgb(ICON_BG), srgb('#2f6a82')
+    # (file, size, ortho scale): maskable icons keep the head inside the central 80 % safe zone
+    jobs = [('icon-192.png', 192, 1.15), ('icon-512.png', 512, 1.15), ('icon-maskable-512.png', 512, 1.6),
+            ('apple-touch-icon.png', 180, 1.25)]
+    for name, size, ortho in jobs:
+        for o in [o for o in bpy.data.objects if o.type == 'CAMERA']:
+            bpy.data.objects.remove(o)
+        camera((0, 0, 0.9), ortho, (size, size), elev=8)
+        tmp = os.path.join(TMP, 'icons', name)
+        render_to(tmp)
+        img = bpy.data.images.load(tmp)
+        px = np.empty(size * size * 4, dtype=np.float32)
+        img.pixels.foreach_get(px)
+        px = px.reshape(size, size, 4)
+        a = px[..., 3:4]
+        yy, xx = np.mgrid[0:size, 0:size] / (size - 1) - 0.5  # radial glow behind the head
+        t = np.clip(np.sqrt(xx ** 2 + yy ** 2) / 0.7, 0, 1)[..., None]
+        bg = centre * (1 - t) + edge * t
+        out_px = np.ones_like(px)
+        out_px[..., :3] = px[..., :3] * a + bg * (1 - a)
+        bpy.data.images.remove(img)
+        out = bpy.data.images.new('icon', size, size, alpha=True)
+        out.pixels.foreach_set(out_px.ravel())
+        save_image(out, os.path.join(PUBLIC, 'icons', name))
+        bpy.data.images.remove(out)
+
+
 def write_manifest(manifest):
     os.makedirs(os.path.dirname(MANIFEST_JSON), exist_ok=True)
     with open(MANIFEST_JSON, 'w', encoding='utf-8') as f:
@@ -900,6 +940,9 @@ def main():
     if 'island' in want:
         render_island(manifest)
         print('[viking-loot] rendered island')
+    if 'icons' in want and argv:  # only on request: icons are not part of the game manifest
+        render_icons()
+        print('[viking-loot] rendered icons')
     write_manifest(manifest)
     print('[viking-loot] done')
 

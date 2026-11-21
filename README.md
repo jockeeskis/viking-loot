@@ -2,7 +2,7 @@
 
 Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3.
 
-- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) och `VIKING_LOOT_0.3.md` (klar)
+- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) , `VIKING_LOOT_0.3.md` (klar) och `VIKING_LOOT_0.4.md` (pågår)
 - Visuell stil, UI och plan för 3D-assets: `ui-settings.md`
 
 Repo: https://github.com/jockeeskis/viking-loot
@@ -91,7 +91,7 @@ Vikingarna (Ragnar, Björn, Freja, jarlen Harald och Ylva), tunnor, kistor, hus,
 | Långskepp | `bob` | `public/assets/ships/longship.webp` |
 | Ön med brygga (bakgrund) | – | `public/assets/island/island.webp` |
 
-Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender automatiskt i standardmappen på Windows, eller via miljövariabeln `BLENDER`. Hela renderingen tar cirka 5 minuter (`npm run render-art -- loot harald` renderar bara delar). Ändra modeller och poser i `render_assets.py`.
+Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender automatiskt i standardmappen på Windows, eller via miljövariabeln `BLENDER`. Hela renderingen tar cirka 5 minuter (`npm run render-art -- loot harald` renderar bara delar, `-- icons` renderar app-ikonerna i `public/icons`). Ändra modeller och poser i `render_assets.py`.
 
 ## Status och nästa steg
 
@@ -100,3 +100,4 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen. En egen loopad melodi spelas i bakgrunden (🎵 slår av/på).
 - 24 banor i två världar, Kusten (1–12) och Fjordarna (13–24); 7–24 är framtagna med `npm run generate-levels`.
 - Version 0.3 är klar (se `VIKING_LOOT_0.3.md`): hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter, stjärnor efter banans par, karta, ångra, tips, introduktioner, ny 3D-grafik och musik. Kvar att testa: ångra och tips på riktig mobil.
+- Version 0.4 pågår (se `VIKING_LOOT_0.4.md`). Fas 1 är klar: spelet är en installerbar app (PWA via `vite-plugin-pwa`) som fungerar offline och visar "Ny version finns" när en uppdatering väntar. Service workern registreras bara i produktionsbygget (`npm run build` + `npx vite preview`).

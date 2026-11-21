@@ -8,6 +8,14 @@ import { isMuted, setMuted, unlockAudio, isMusicOn, setMusicOn } from './game/sf
 import { loadProgress, saveProgress, recordWin, starsFor } from './game/progress'
 import { INTROS, mechanicsOf, type Mechanic } from './game/intros'
 import LevelMap from './components/LevelMap.vue'
+import { registerSW } from 'virtual:pwa-register'
+
+// ---------- app updates (PWA) ----------
+// A new version is downloaded in the background; it is only activated when the player says so,
+// so a raid is never interrupted by a reload.
+const updateReady = ref(false)
+const updateSW = registerSW({ onNeedRefresh() { updateReady.value = true } })
+function reloadApp() { updateSW(true) }
 
 const progress = ref(loadProgress())
 const unlocked = computed(() => Math.min(progress.value.unlocked, levels.length - 1))
@@ -93,6 +101,11 @@ onBeforeUnmount(() => game?.destroy(true))
 
 <template>
   <main class="shell">
+    <div v-if="updateReady" class="update-banner" role="status">
+      <span>⛵ Ny version finns</span>
+      <button @click="reloadApp">Ladda om</button>
+      <button class="close" aria-label="Senare" @click="updateReady = false">✕</button>
+    </div>
     <header>
       <div class="logo"><h1>VIKING LOOT</h1><div class="eyebrow">The First Raid · 0.3</div></div>
       <p>Välj en av de tre främsta vikingarna. Plundra framifrån – och fyll aldrig skeppets tre väntplatser!</p>
