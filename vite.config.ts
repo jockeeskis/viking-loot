@@ -30,6 +30,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,webp,png,json}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // the Phaser bundle is larger than the 2 MB default
+        // Only Vite's own bundles have a hash in the name. Our art lives in public/assets with fixed
+        // names, so it must get a content revision – otherwise new art never replaces the cached copy.
+        dontCacheBustURLsMatching: /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(js|css)$/,
       },
     }),
   ],

@@ -14,7 +14,22 @@ import { registerSW } from 'virtual:pwa-register'
 // A new version is downloaded in the background; it is only activated when the player says so,
 // so a raid is never interrupted by a reload.
 const updateReady = ref(false)
-const updateSW = registerSW({ onNeedRefresh() { updateReady.value = true } })
+const updateSW = registerSW({
+  onNeedRefresh() { updateReady.value = true },
+  // An installed app is often resumed rather than reopened, which never re-checks for a new version.
+  // Check whenever it comes back to the foreground (at most every few minutes) and once an hour.
+  onRegisteredSW(_url, reg) {
+    if (!reg) return
+    let last = Date.now()
+    const check = () => {
+      if (Date.now() - last < 5 * 60 * 1000 || !navigator.onLine) return
+      last = Date.now()
+      void reg.update().catch(() => { /* offline or server hiccup – try again later */ })
+    }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check() })
+    setInterval(check, 60 * 60 * 1000)
+  },
+})
 function reloadApp() { updateSW(true) }
 
 const progress = ref(loadProgress())
