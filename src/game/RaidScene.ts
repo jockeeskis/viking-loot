@@ -12,6 +12,8 @@ import {
   preloadAssets, createAnims, hasViking, hasLoot, hasShip, vikingAsset, lootAsset, shipAsset, lootFrame,
   vikingKey, vikingAnimKey, portraitKey, LOOT_KEY, SHIP_KEY, type VikingAnim,
 } from './assets'
+import { createFxTextures, coinBurst, woodChips, dustPuff, floatText, victory } from './fx'
+import { sfx } from './sfx'
 
 export type RaidUpdate = {
   level: number
@@ -77,6 +79,7 @@ export class RaidScene extends Phaser.Scene {
     // The game canvas is 720x1280; zoom 2 keeps all coordinates in the 360x640 layout but renders sharper.
     this.cameras.main.setZoom(2).centerOn(180, 320)
     createAnims(this)
+    createFxTextures(this)
     this.drawEnvironment()
     this.ready = true
     this.reset(this.level)
@@ -366,7 +369,11 @@ export class RaidScene extends Phaser.Scene {
     this.busy = true
     this.cards.forEach(c => c.disableInteractive().setScale(1))
     const gen = this.generation
-    this.playEvents(before, after.events, gen).then(() => {
+    sfx.click()
+    this.playEvents(before, after.events, gen).then(async () => {
+      if (gen !== this.generation) return
+      if (after.status === 'won') { victory(this); sfx.win(); await this.delay(650) }
+      else if (after.status === 'lost') { sfx.lose(); await this.delay(350) }
       if (gen !== this.generation) return
       this.busy = false
       this.layout(true)
@@ -410,7 +417,9 @@ export class RaidScene extends Phaser.Scene {
         if (card) this.tweens.add({ targets: card, scale: 0.88, alpha: 0.3, duration: 160 })
         const actor = this.makeActor(view.queue[index].color).setPosition(cardX(index), CARD.y - 10).setScale(0.4)
         this.actors.set(e.vikingId, actor)
+        sfx.dispatch()
         await this.tween({ targets: actor, scale: 1, y: CARD.y - 46, duration: 180, ease: 'Back.easeOut' })
+        dustPuff(this, actor.x, actor.y + 28)
         continue
       }
       const actor = this.actors.get(e.vikingId)
@@ -421,12 +430,17 @@ export class RaidScene extends Phaser.Scene {
         await this.runTo(actor, target.x - 20, target.y + 4)
         const rig = actor.getByName('rig') as Sprite
         rig.scaleX = 1
-        if (rig.getByName('body')) await this.animate(actor, 'attack') // plunder swing
+        // plunder swing; the axe lands about 60% into the attack animation
+        this.time.delayedCall(rig.getByName('body') ? 320 : 90, () => { sfx.chop(); woodChips(this, target.x, target.y + 4) })
+        if (rig.getByName('body')) await this.animate(actor, 'attack')
         else await this.tween({ targets: rig, angle: 20, duration: 90, yoyo: true })
         this.animate(actor, 'idle')
         view = { ...view, loot: view.loot.map(l => (l.id === e.lootId ? { ...l, collected: true } : l)) }
         this.lootSprites.delete(e.lootId)
         this.tweens.add({ targets: target, scale: 0, alpha: 0, y: target.y - 24, duration: 220, onComplete: () => target.destroy() })
+        sfx.coin()
+        coinBurst(this, target.x, target.y - 4, target.getData('color'))
+        floatText(this, target.x, target.y - 22, '+1', target.getData('color'))
         this.refreshLocks(view, true)
         // carry a small copy of the loot above the head
         const carry = actor.getByName('carry') as Sprite
@@ -454,11 +468,13 @@ export class RaidScene extends Phaser.Scene {
       } else if (e.type === 'wait') {
         const { x, y } = slotPos(e.slot)
         await this.runTo(actor, x, y - 6, SLOT_SCALE)
+        sfx.wait()
         const seated = this.state.waiting.find(v => v.id === e.vikingId)
         if (seated) this.setBadge(actor, seated.collectedCount)
         this.drawSlots()
       } else if (e.type === 'overflow') {
         // The viking has just taken the last seat (the preceding `wait` event put it there).
+        sfx.overflow()
         this.cameras.main.shake(260, 0.012)
         this.cameras.main.flash(220, 160, 30, 20)
         await this.tween({ targets: actor, angle: { from: -12, to: 12 }, duration: 70, yoyo: true, repeat: 3 })

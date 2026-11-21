@@ -4,6 +4,7 @@ import Phaser from 'phaser'
 import { RaidScene, type RaidUpdate } from './game/RaidScene'
 import { levels } from './game/levels'
 import { WAITING_SLOTS } from './game/engine'
+import { isMuted, setMuted, unlockAudio } from './game/sfx'
 
 // Levels were redesigned in 0.2, so progress from 0.1 is not carried over.
 const STORAGE_KEY = 'viking-loot-0.2-unlocked'
@@ -33,9 +34,13 @@ function update(d: RaidUpdate) {
 }
 function openLevel(i: number) { if (i > unlocked.value) return; current.value = i; scene?.reset(i) }
 function restart() { scene?.reset(current.value) }
+const muted = ref(isMuted())
+function toggleSound() { setMuted(!muted.value); muted.value = isMuted(); unlockAudio() }
+
 function next() { if (current.value < levels.length - 1) openLevel(current.value + 1) }
 
 onMounted(() => {
+  window.addEventListener('pointerdown', unlockAudio, { once: true })
   scene = new RaidScene()
   game = new Phaser.Game({
     type: Phaser.AUTO, parent: 'game', width: 720, height: 1280, backgroundColor: '#193a4b',
@@ -72,11 +77,11 @@ onBeforeUnmount(() => game?.destroy(true))
         </div>
       </div>
     </div>
-    <div class="actions"><button @click="restart">↻ Starta om</button><span>{{ levels[current].name }}</span></div>
+    <div class="actions"><button @click="restart">↻ Starta om</button><span>{{ levels[current].name }}</span><button :aria-label="muted ? 'Slå på ljud' : 'Stäng av ljud'" @click="toggleSound">{{ muted ? '🔇' : '🔊' }}</button></div>
     <h2 class="section-title">Välj bana</h2>
     <div class="levels">
       <button v-for="(l, i) in levels" :key="l.name" :disabled="i > unlocked" :class="{ active: current === i }" @click="openLevel(i)">{{ i > unlocked ? '🔒' : i + 1 }}</button>
     </div>
-    <p class="foot">Tillfällig grafik ritad i kod. 3D-modellerade vikingar och miljöer kommer senare.</p>
+    <p class="foot">Vikingar, skatter och skepp är 3D-renderade i Blender. Ljuden är syntetiserade i webbläsaren.</p>
   </main>
 </template>

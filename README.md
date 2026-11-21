@@ -77,4 +77,5 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 
 - Spelmekaniken för 0.2 är klar och testad. Det som återstår av acceptanskriterierna är test med touch på en riktig mobil.
 - Figurer, skatter och skepp är renderade 3D-sprites. Miljön (ön, träd, paneler) ritas fortfarande i kod.
-- Nästa steg: plundringseffekter och ljud, fler banor och en renderad 3D-ö.
+- Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen.
+- Nästa steg: fler banor och en renderad 3D-ö.
