@@ -588,24 +588,22 @@ def build_hidden(_color=None):
 
 
 def build_key(color):
-    """A gold key resting on a cushion in its team colour (the colour decides who may take it)."""
+    """A big key in its team colour standing upright and facing the camera, shaped like a key icon
+    (ring, shaft, teeth) so it never reads as a barrel at phone size. The colour decides who may take it."""
     team = P[color]
+    dark = shade(team, -0.3)
     root = empty('root')
-    part('cushion', box(scale=(0.56, 0.44, 0.12), loc=(0, 0, 0.06)), team, root, smooth=False, bevel=0.05)
-    part('seam', box(scale=(0.58, 0.46, 0.02), loc=(0, 0, 0.06)), shade(team, -0.25), root, smooth=False, outline=False)
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            part('tassel', sphere(0.035, loc=(sx * 0.27, sy * 0.21, 0.06)), shade(team, -0.3), root, outline=False)
-    # A big iron key standing almost upright on the cushion, so its shape reads at small size.
-    key = empty('key', (0.02, 0.02, 0.36), root)
-    key.rotation_euler = (math.radians(80), math.radians(-35), math.radians(22))
-    iron = '#4F5863'
-    part('bow', torus(0.13, 0.045, seg=28, ring=10, loc=(-0.26, 0, 0)), iron, key)
-    part('bowgem', sphere(0.055, loc=(-0.26, 0, 0)), team, key, outline=False)
-    part('collar', torus(0.045, 0.02, seg=16, ring=6, rot=(0, math.pi / 2, 0), loc=(-0.1, 0, 0)), P['gold'], key, outline=False)
-    part('shaft', cyl(0.038, 0.038, 0.42, rot=(0, math.pi / 2, 0), loc=(0.08, 0, 0)), iron, key)
-    for x, d in ((0.2, 0.13), (0.27, 0.09)):
-        part('tooth', box(scale=(0.05, 0.05, d), loc=(x, 0, -d / 2 - 0.01)), iron, key, smooth=False, bevel=0.01)
+    key = empty('key', (0.1, 0, 0.02), root)
+    key.rotation_euler = (0, math.radians(-20), math.radians(22))
+    key.scale = (0.78, 0.78, 0.78)  # undo the loot turn so it faces the camera
+    part('bow', torus(0.17, 0.065, seg=32, ring=12, rot=(math.pi / 2, 0, 0), loc=(0, 0, 0.74)), team, key)
+    part('bowrim', torus(0.17, 0.03, seg=32, ring=8, rot=(math.pi / 2, 0, 0), loc=(0, -0.045, 0.74)), P['gold'], key, outline=False)
+    part('collar', torus(0.07, 0.028, seg=20, ring=8, loc=(0, 0, 0.53)), P['gold'], key)
+    part('shaft', cyl(0.05, 0.05, 0.5, seg=16, loc=(0, 0, 0.31)), team, key)
+    part('tip', sphere(0.05, seg=12, rings=8, loc=(0, 0, 0.06)), team, key, outline=False)
+    for z, w in ((0.1, 0.17), (0.22, 0.12)):
+        part('tooth', box(scale=(w, 0.08, 0.075), loc=(w / 2 + 0.02, 0, z)), team, key, smooth=False, bevel=0.015)
+        part('notch', box(scale=(w * 0.6, 0.02, 0.02), loc=(w / 2 + 0.03, -0.045, z)), dark, key, smooth=False, outline=False)
     return root
 
 

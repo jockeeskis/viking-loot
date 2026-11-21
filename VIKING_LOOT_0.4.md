@@ -83,7 +83,7 @@ Samma ordning som i 0.3, med två tillägg:
 - Första versionen av bana 30 hade ett blått skepp som ingen viking någonsin satte sig i, och det var så felet upptäcktes.
 
 **Grafik (Blender):**
-- nyckel på kudde i tre färger
+- stående nyckel i lagets färg, formad som en nyckelikon (en liggande nyckel på kudde såg ut som en vält tunna på mobilen)
 - hänglås och isblock som läggs ovanpå andra föremål
 - färgskepp i tre färger
 - spejaren Sigrid med kikare och animationen `look`
