@@ -1,0 +1,82 @@
+<script setup lang="ts">
+// World map: each world is a winding path of islands with stars underneath.
+import { computed } from 'vue'
+
+type World = { name: string; first: number; last: number }
+const props = defineProps<{
+  worlds: World[]
+  names: string[] // level names (only levels that exist)
+  stars: number[]
+  unlocked: number
+  current: number
+}>()
+const emit = defineEmits<{ select: [index: number] }>()
+
+const COLS = 4
+
+const view = computed(() => props.worlds.map(w => {
+  const last = Math.min(w.last, props.names.length - 1)
+  const indices = last >= w.first ? Array.from({ length: last - w.first + 1 }, (_, k) => w.first + k) : []
+  const rows = Math.ceil(indices.length / COLS)
+  // Snake layout: even rows run left→right, odd rows right→left.
+  const nodes = indices.map((index, k) => {
+    const row = Math.floor(k / COLS)
+    const col = row % 2 === 0 ? k % COLS : COLS - 1 - (k % COLS)
+    return { index, row, col }
+  })
+  const path = nodes.map(n => `${n.col + 0.5},${n.row + 0.42}`).join(' ')
+  const earned = indices.reduce((sum, i) => sum + (props.stars[i] ?? 0), 0)
+  const status = !indices.length ? 'soon' : w.first > props.unlocked ? 'locked' : 'open'
+  return { ...w, nodes, rows, path, earned, max: indices.length * 3, status }
+}))
+</script>
+
+<template>
+  <section v-for="w in view" :key="w.name" class="world">
+    <div class="world-head">
+      <h3>{{ w.name }}</h3>
+      <span v-if="w.status === 'open'" class="total">★ {{ w.earned }}/{{ w.max }}</span>
+    </div>
+    <div v-if="w.status === 'soon'" class="world-locked">🌊 Nya banor seglar in snart – med hus, stenar, jarlar och dolda skatter.</div>
+    <div v-else-if="w.status === 'locked'" class="world-locked">🔒 Vinn bana {{ w.first }} för att segla vidare hit.</div>
+    <div v-else class="map" :style="{ gridTemplateRows: `repeat(${w.rows}, 86px)` }">
+      <svg class="path" :viewBox="`0 0 ${COLS} ${w.rows}`" preserveAspectRatio="none" aria-hidden="true">
+        <polyline :points="w.path" />
+      </svg>
+      <button
+        v-for="n in w.nodes" :key="n.index"
+        class="node" :class="{ current: n.index === current, locked: n.index > unlocked, done: (stars[n.index] ?? 0) > 0 }"
+        :style="{ gridRow: n.row + 1, gridColumn: n.col + 1 }"
+        :disabled="n.index > unlocked"
+        :title="names[n.index]"
+        @click="emit('select', n.index)"
+      >
+        <span class="isle">{{ n.index > unlocked ? '🔒' : n.index + 1 }}</span>
+        <span class="stars" :aria-label="`${stars[n.index] ?? 0} av 3 stjärnor`">
+          <i v-for="s in 3" :key="s" :class="{ on: s <= (stars[n.index] ?? 0) }">★</i>
+        </span>
+      </button>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.world{margin:0 0 18px}
+.world-head{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 8px}
+.world-head h3{margin:0;font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;font-size:16px;color:#ffd45a;text-shadow:0 2px 0 #3b2414}
+.total{font-weight:800;color:#ffe3a8;font-size:13px}
+.world-locked{padding:14px;border-radius:14px;background:#00000033;border:2px dashed #ffffff33;color:#cfe3ee;font-size:13px;text-align:center}
+.map{position:relative;display:grid;grid-template-columns:repeat(4,1fr);padding:4px 0;border-radius:18px;background:radial-gradient(circle at 30% 20%,#2f8fd0,#1f6fb0);border:3px solid #3b2414;box-shadow:inset 0 0 0 2px #7cc4ef55}
+.path{position:absolute;inset:4px 0;width:100%;height:calc(100% - 8px);pointer-events:none}
+.path polyline{fill:none;stroke:#f3e3c5;stroke-width:4;stroke-dasharray:2 7;stroke-linecap:round;vector-effect:non-scaling-stroke;opacity:.85}
+.node{position:relative;justify-self:center;align-self:start;margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:0;background:none;border:0;box-shadow:none;cursor:pointer}
+.node:active{transform:translateY(2px)}
+.isle{display:grid;place-items:center;width:52px;height:46px;border-radius:50% 50% 46% 46%;background:radial-gradient(circle at 40% 35%,#86cc5b,#5fae45 60%,#3f7f2f);border:3px solid #3b2414;box-shadow:0 5px 0 #e6cf98,0 7px 0 #3b2414;font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;font-size:18px;color:#fff;text-shadow:0 2px 0 #3b2414}
+.node.current .isle{outline:3px solid #ffd45a;outline-offset:3px}
+.node.locked{cursor:not-allowed}
+.node.locked .isle{filter:grayscale(.8) brightness(.75);font-size:16px}
+.stars{display:flex;gap:1px;font-style:normal;margin-top:4px}
+.stars i{font-style:normal;font-size:13px;color:#00000055;text-shadow:0 1px 0 #ffffff22}
+.stars i.on{color:#ffd45a;text-shadow:0 1px 0 #b86b12,0 0 1px #3b2414}
+.node:disabled{opacity:1}
+</style>

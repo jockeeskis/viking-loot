@@ -6,7 +6,8 @@ import type { LootKind } from './art.ts'
  * `kind` only changes the look (barrel, chest or house); if omitted it is derived from the id.
  */
 export type LevelLootPlaced = LevelLoot & { at: [number, number]; kind?: LootKind }
-export type Level = { name: string; hint: string; loot: LevelLootPlaced[]; queue: QueueEntry[] }
+/** `par` = fewest waiting-slot seats on a winning line (from the solver); it sets the stars. */
+export type Level = { name: string; hint: string; par: number; loot: LevelLootPlaced[]; queue: QueueEntry[] }
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
 const item = (id: string, color: LootColor, at: [number, number], ...blockedBy: string[]): LevelLootPlaced => ({ id, color, at, blockedBy })
@@ -50,12 +51,14 @@ function grid(rows: string[]): LevelLootPlaced[] {
 export const levels: Level[] = [
   {
     name: 'Kustbyn',
+    par: 0,
     hint: 'Välj en av de tre främsta vikingarna. Den plundrar två skatter i sin färg.',
     queue: [R, B, Y, B, R, Y, R, B],
     loot: grid(['rbyr', 'byrb', 'rbby', 'yrbr']),
   },
   {
     name: 'Bryggan',
+    par: 0,
     hint: 'De blå skatterna står bakom tunnorna. En viking utan byte väntar på skeppet – men fyll aldrig alla tre platser!',
     queue: [B, Y, R],
     loot: [
@@ -66,6 +69,7 @@ export const levels: Level[] = [
   },
   {
     name: 'Handelsbyn',
+    par: 0,
     hint: 'Låsta skatter kan bara plundras när skatten framför är borta. Börja framifrån.',
     queue: [Y, R, B, Y],
     loot: [
@@ -77,18 +81,21 @@ export const levels: Level[] = [
   },
   {
     name: 'Fiskeläget',
+    par: 1,
     hint: 'Tre högar och sex vikingar. Fel ordning fyller skeppet – tänk ett drag framåt.',
     queue: [R, Y, B, Y, R, B],
     loot: stacks(['rryy', 'byry', 'bbbr']),
   },
   {
     name: 'Fästet',
+    par: 1,
     hint: 'Bara två säkra väntplatser. Vem ska vänta på skeppet – och vem öppnar vägen?',
     queue: [B, B, R, Y, Y, R],
     loot: stacks(['ryyybb', 'rrbryb']),
   },
   {
     name: 'Stora räden',
+    par: 2,
     hint: 'Två höga högar, åtta vikingar och bara två säkra väntplatser. Planera hela räden.',
     queue: [Y, B, Y, B, B, R, Y, R],
     loot: stacks(['ryrrbbyb', 'yyybyrbb']),
@@ -96,38 +103,50 @@ export const levels: Level[] = [
   // 7–12 were found with `npm run generate-levels` (target win share per level, front-only play loses).
   {
     name: 'Klosterön',
+    par: 1,
     hint: 'Tre högar igen – men nu måste du välja vem som får vänta.',
     queue: [B, R, B, Y, R],
     loot: stacks(['rrb', 'bbyr', 'bry']),
   },
   {
     name: 'Bärnstensviken',
+    par: 1,
     hint: 'Tre lika höga högar. Räkna färgerna innan du skickar ut någon.',
     queue: [R, R, Y, B, Y, R],
     loot: stacks(['yrrr', 'yrbr', 'yybr']),
   },
   {
     name: 'Vintermarknaden',
+    par: 2,
     hint: 'Fyra högar fyller hela ön. Öppna vägen för vikingarna längre bak i kön.',
     queue: [Y, Y, Y, B, R, B, B, R],
     loot: stacks(['bbbr', 'yrbr', 'yybr', 'yyby']),
   },
   {
     name: 'Jarlens gård',
+    par: 2,
     hint: 'Höga högar och sju vikingar. Spara väntplatserna tills de verkligen behövs.',
     queue: [B, R, Y, Y, R, Y, B],
     loot: stacks(['ybbbr', 'yyyy', 'rrrby']),
   },
   {
     name: 'Runstensfältet',
+    par: 1,
     hint: 'Fyra högar och åtta vikingar. Det säkra draget är sällan det första.',
     queue: [R, B, R, Y, B, R, R, Y],
     loot: stacks(['yyrr', 'brrr', 'bryr', 'bbyr']),
   },
   {
     name: 'Kungsgården',
+    par: 2,
     hint: 'Den sista räden. Varje val räknas – planera hela vägen till sista skatten.',
     queue: [Y, R, R, B, Y, B, Y, Y],
     loot: stacks(['byybyy', 'byyr', 'rryrby']),
   },
+]
+
+/** Worlds on the map. Fjordarna gets its levels in 0.3 phase 4. */
+export const worlds = [
+  { name: 'Kusten', first: 0, last: 11 },
+  { name: 'Fjordarna', first: 12, last: 23 },
 ]

@@ -1,6 +1,6 @@
 {
   "name": "viking-loot", "private": true, "version": "0.2.0", "type": "module",
-  "scripts": {"dev":"vite --host 0.0.0.0", "build":"vue-tsc --noEmit && vite build", "preview":"vite preview", "test":"node --test src/game/engine.test.ts", "check-levels":"node scripts/check-levels.ts", "generate-levels":"node scripts/generate-levels.ts", "render-art":"node scripts/render-art.ts"},
+  "scripts": {"dev":"vite --host 0.0.0.0", "build":"vue-tsc --noEmit && vite build", "preview":"vite preview", "test":"node --test src/game/engine.test.ts src/game/progress.test.ts", "check-levels":"node scripts/check-levels.ts", "generate-levels":"node scripts/generate-levels.ts", "render-art":"node scripts/render-art.ts"},
   "dependencies": {"vue":"^3.5.13", "phaser":"^3.90.0"},
   "devDependencies": {"@vitejs/plugin-vue":"^5.2.1", "vite":"^6.1.0", "typescript":"~5.7.3", "vue-tsc":"^2.2.0"}
 }

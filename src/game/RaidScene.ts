@@ -14,9 +14,13 @@ import {
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, CAMERA_ZOOM } from './fx'
 import { sfx } from './sfx'
+import { hint } from './solver'
 
 export type RaidUpdate = {
   level: number
+  busy: boolean // an animation is playing; undo and hints wait for it
+  canUndo: boolean
+  waits: number
   status: GameStatus
   lossReason: LossReason | null
   remaining: number
@@ -72,6 +76,8 @@ export class RaidScene extends Phaser.Scene {
   private title?: Phaser.GameObjects.Text
   private lootOffsetY = 0
   private ready = false
+  private history: GameState[] = [] // states before each move, for undo
+  private hintGfx?: Phaser.GameObjects.Graphics
   private onUpdate?: (u: RaidUpdate) => void
 
   constructor() { super('Raid') }
@@ -93,20 +99,56 @@ export class RaidScene extends Phaser.Scene {
   reset(index: number) {
     // Before create() has run (assets still loading) just remember the level; create() will draw it.
     if (!this.ready) { this.level = index; return }
-    this.generation++
-    this.tweens.killAll()
-    this.cameras.main.setZoom(CAMERA_ZOOM) // never carry a half-finished victory punch into the next level
-    this.busy = false
     this.level = Phaser.Math.Clamp(index, 0, levels.length - 1)
     const data = levels[this.level]
-    this.state = createGame(data.loot, data.queue)
+    this.history = []
+    this.title?.setText(`${this.level + 1}. ${data.name}`)
+    this.rebuild(createGame(data.loot, data.queue))
+  }
+
+  /** Draw any state of the current level from scratch, without animation (restart and undo). */
+  private rebuild(state: GameState) {
+    this.generation++
+    this.tweens.killAll()
+    this.time.removeAllEvents()
+    this.cameras.main.setZoom(CAMERA_ZOOM) // never carry a half-finished victory punch into the next level
+    this.busy = false
+    this.state = state
     this.lootSprites.forEach(s => s.destroy()); this.lootSprites.clear()
     this.actors.forEach(s => s.destroy()); this.actors.clear()
-    this.title?.setText(`${this.level + 1}. ${data.name}`)
     this.drawLootSprites()
     this.layout(false)
     this.notify()
   }
+
+  /** Take back the last move. Allowed after a loss too, but not while a move is animating. */
+  undo() {
+    if (!this.ready || this.busy || !this.history.length || this.state.status === 'won') return
+    this.rebuild(this.history.pop()!)
+  }
+
+  /**
+   * Point at a move that can still win (fewest waits first). Returns false when the raid is
+   * already lost or cannot be won any more.
+   */
+  showHint(): boolean {
+    if (!this.ready || this.busy || this.state.status !== 'playing') return false
+    const id = hint(this.state)
+    if (!id) return false
+    const index = this.state.queue.findIndex(v => v.id === id)
+    const card = this.cards[index]
+    if (!card) return false
+    this.clearHint()
+    const g = this.add.graphics().setDepth(21)
+    g.lineStyle(4, GOLD); g.strokeRoundedRect(card.x - CARD.w / 2 - 4, CARD.y - CARD.h / 2 - 4, CARD.w + 8, CARD.h + 8, 18)
+    this.hintGfx = g
+    this.tweens.add({ targets: g, alpha: { from: 1, to: 0.35 }, duration: 420, yoyo: true, repeat: -1 })
+    this.tweens.add({ targets: card, y: CARD.y - 8, duration: 160, yoyo: true, repeat: 2, ease: 'Sine.easeOut' })
+    sfx.reveal()
+    return true
+  }
+
+  private clearHint() { this.hintGfx?.destroy(); this.hintGfx = undefined }
 
   // ---------- Scenery ----------
 
@@ -251,9 +293,10 @@ export class RaidScene extends Phaser.Scene {
     const scale = Phaser.Math.Clamp(minGap / 60, 0.68, 1)
     // Back rows first so blockers stand in front of what they block.
     ;[...placed].sort((a, b) => a.at[1] - b.at[1]).forEach((p, depth) => {
+      const item = this.state.loot.find(l => l.id === p.id)!
+      if (item.collected) return // already plundered (after undo)
       const { x, y } = this.lootPos(p.at)
       const kind = p.kind ?? kindFor(p.id)
-      const item = this.state.loot.find(l => l.id === p.id)!
       const art = this.makeItemGraphic(p, item.hidden)
       const shadeG = this.add.graphics().setName('shade')
       // Sprites are darkened with a tint instead (see refreshLocks); the box is only for drawn art.
@@ -264,6 +307,7 @@ export class RaidScene extends Phaser.Scene {
       lock.fillStyle(INK); lock.fillRect(21, -26, 2, 5)
       const c = this.add.container(x, y, [art, shadeG, lock]).setScale(scale).setDepth(2 + depth * 0.01)
       c.setData('kind', kind).setData('color', p.color).setData('stone', !!p.stone)
+      if (item.hitsLeft < (p.hits ?? 1)) this.markOpened(c)
       this.lootSprites.set(p.id, c)
     })
     this.refreshLocks(this.state, false)
@@ -387,6 +431,7 @@ export class RaidScene extends Phaser.Scene {
   /** Rebuild cards, the queue preview and seated vikings from the current state. */
   private layout(animate: boolean) {
     const playing = this.state.status === 'playing'
+    this.clearHint()
     this.cards.forEach(c => c.destroy())
     this.cards = []
     this.state.queue.slice(0, SELECTABLE).forEach((v, i) => {
@@ -447,9 +492,12 @@ export class RaidScene extends Phaser.Scene {
     const after = selectViking(before, vikingId)
     if (after === before) return
     // The outcome is decided here; the animation only replays the engine's events.
+    this.history.push(before)
     this.state = after
     this.busy = true
+    this.clearHint()
     this.cards.forEach(c => c.disableInteractive().setScale(1))
+    this.notify()
     const gen = this.generation
     sfx.click()
     this.playEvents(before, after.events, gen).then(async () => {
@@ -618,9 +666,12 @@ export class RaidScene extends Phaser.Scene {
     const s = this.state
     this.onUpdate?.({
       level: this.level,
+      busy: this.busy,
+      canUndo: this.history.length > 0 && s.status !== 'won',
+      waits: s.waits,
       status: s.status,
       lossReason: s.lossReason,
-      remaining: s.loot.filter(l => !l.collected).length,
+      remaining: s.loot.filter(l => l.kind === 'loot' && !l.collected).length,
       queue: s.queue.length,
       waiting: s.waiting.length,
       moves: s.moves,

@@ -87,4 +87,4 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Figurer, skatter, skepp och ön (med granar, stenar och buskar) är renderade i 3D. Havet och panelerna ritas i kod.
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen.
 - 12 banor; 7–12 är framtagna med `npm run generate-levels`.
-- Version 0.3 pågår (se `VIKING_LOOT_0.3.md`): regelmotorn stöder redan hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter. Nästa fas: stjärnor, karta, ångra och tips.
+- Version 0.3 pågår (se `VIKING_LOOT_0.3.md`): regelmotorn stöder redan hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter. Stjärnor (efter banans par), karta, ångra, tips och introduktioner är klara. Nästa fas: 3D-grafik och ljud för de nya mekanikerna.

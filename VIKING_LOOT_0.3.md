@@ -1,6 +1,6 @@
 # Viking Loot 0.3 – Fjordarna: nya mekaniker, stjärnor och hjälp
 
-> **Status (2026-11-21):** Fas 1 klar: regelmotorn stöder alla nya mekaniker och är testad. Fas 2–4 återstår (se 7).
+> **Status (2026-11-21):** Fas 1–2 klara: regelmotorn stöder alla nya mekaniker, och stjärnor, karta, ångra, tips och introduktioner finns i spelet. Fas 3–4 återstår (se 7).
 
 ## Syfte
 
@@ -106,7 +106,7 @@ Alla nya egenskaper är valfria i bandatan. Banorna 1–12 beter sig exakt som i
 ## 7. Faser
 
 1. **Regelmotor och tester** – klar. Nya fält, händelser, `minWaits` och `hint()`, enkel tillfällig grafik i scenen samt 10 nya tester (totalt 31).
-2. **Stjärnor, karta och hjälp** – `par` i bandatan, ny sparnyckel, `LevelMap.vue`, ångra (`RaidScene.rebuild(state)`), tips och introduktioner.
+2. **Stjärnor, karta och hjälp** – klar. `par` i bandatan (testat mot lösaren), `src/game/progress.ts` (stjärnor, sparning, migrering från 0.2), `src/components/LevelMap.vue`, ångra via `RaidScene.rebuild(state)`, tips via `hint()` och introduktioner i `src/game/intros.ts`. 36 tester.
 3. **Grafik och ljud** – nya modeller och animationer, dekor på ön, musik.
 4. **Fjordarna** – generatorn utökas och bana 13–24 läggs till.
 
@@ -120,9 +120,9 @@ Varje fas avslutas med `npm test`, `npm run build`, kontroll i webbläsaren och 
 - [x] Dolda skatter visas när de blir tillgängliga och ändrar inte utfallet.
 - [x] Banorna 1–12 ger samma resultat i lösaren som i 0.2.
 - [x] Lösaren ger par (`minWaits`) och tips (`hint`) som leder till vinst.
-- [ ] Stjärnor delas ut enligt par och sparas.
-- [ ] Kartan visar båda världarna, stjärnor och upplåsning.
-- [ ] Ångra och tips fungerar på mobil.
+- [x] Stjärnor delas ut enligt par och sparas.
+- [x] Kartan visar båda världarna, stjärnor och upplåsning. *(Fjordarna visas som "kommer snart" tills fas 4.)*
+- [ ] Ångra och tips fungerar på mobil. *(Verifierat i desktop-webbläsare.)*
 - [ ] Varje ny mekanik har en introduktion och en egen 3D-grafik.
 - [ ] Banorna 13–24 är spelbara, och varje mekanik förekommer i minst en bana som går att förlora.
 - [ ] Bildfilerna är tillsammans högst cirka 1,5 MB.
