@@ -1,6 +1,6 @@
 # Viking Loot 0.2 – Riktiga pussel och förlustvillkor
 
-> **Status (2026-11-20):** Implementerad. Regelmotor, 6 banor, tester och gränssnitt finns i `src/game/`. Förlustregeln för väntplatser är ändrad jämfört med första utkastet (se 1.6). Visuell stil styrs av `ui-settings.md`.
+> **Status (2026-11-20):** Implementerad. Regelmotor, 12 banor, tester och gränssnitt finns i `src/game/`. Förlustregeln för väntplatser är ändrad jämfört med första utkastet (se 1.6). Visuell stil styrs av `ui-settings.md`.
 
 ## Syfte
 
@@ -134,8 +134,14 @@ Progressionen följer `ui-settings.md` §6. Implementerade banor:
 | 4 | Fiskeläget | Första pusslet, tre högar | Ja (ca 78 % av valordningarna vinner) |
 | 5 | Fästet | Riktigt pussel: fel ordning fyller väntplatserna | Ja (ca 45 %) |
 | 6 | Stora räden | Större pussel, två höga högar | Ja (ca 37 %) |
+| 7 | Klosterön | Tre högar, vem ska vänta? | Ja (ca 44 %) |
+| 8 | Bärnstensviken | Tre lika höga högar | Ja (ca 36 %) |
+| 9 | Vintermarknaden | Fyra högar fyller hela ön | Ja (ca 32 %) |
+| 10 | Jarlens gård | Höga högar, sju vikingar | Ja (ca 23 %) |
+| 11 | Runstensfältet | Fyra högar, åtta vikingar | Ja (ca 16 %) |
+| 12 | Kungsgården | Final: tre höga högar | Ja (ca 17 %) |
 
-Varje bana ska ha minst en verifierad vinstsekvens, och minst en bana ska ha en verifierad förlustsekvens. Detta kontrolleras av den sökbaserade validatorn `src/game/solver.ts` (`npm run check-levels`) och av testerna.
+Varje bana ska ha minst en verifierad vinstsekvens, och minst en bana ska ha en verifierad förlustsekvens. Detta kontrolleras av den sökbaserade validatorn `src/game/solver.ts` (`npm run check-levels`) och av testerna. Banorna 7–12 är framtagna med `npm run generate-levels`, som slumpar högar och köer, löser dem och behåller dem vars vinstandel ligger i ett målintervall och där det inte räcker att alltid välja den främsta vikingen.
 
 ## 8. Implementation i projektet
 

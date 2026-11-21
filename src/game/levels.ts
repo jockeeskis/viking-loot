@@ -16,9 +16,11 @@ const code: Record<string, LootColor> = { r: R, b: B, y: Y }
  * Piles of loot: each string is one column listed back→front. Only the front item of a
  * pile is reachable; each item is blocked by the one directly in front of it.
  */
-function stacks(columns: string[]): LevelLootPlaced[] {
+export function stacks(columns: string[]): LevelLootPlaced[] {
+  const n = columns.length
+  // 2–3 piles sit in the middle of the 4-wide island; 4 piles use every column.
   return columns.flatMap((col, c) => {
-    const x = columns.length === 1 ? 1.5 : 0.5 + (c * 2) / (columns.length - 1)
+    const x = n === 1 ? 1.5 : n >= 4 ? (c * 3) / (n - 1) : 0.5 + (c * 2) / (n - 1)
     return [...col].map((ch, row) => {
       const id = `c${c + 1}-${row + 1}`
       const front = row === col.length - 1 ? [] : [`c${c + 1}-${row + 2}`]
@@ -79,5 +81,42 @@ export const levels: Level[] = [
     hint: 'Två höga högar, åtta vikingar och bara två säkra väntplatser. Planera hela räden.',
     queue: [Y, B, Y, B, B, R, Y, R],
     loot: stacks(['ryrrbbyb', 'yyybyrbb']),
+  },
+  // 7–12 were found with `npm run generate-levels` (target win share per level, front-only play loses).
+  {
+    name: 'Klosterön',
+    hint: 'Tre högar igen – men nu måste du välja vem som får vänta.',
+    queue: [B, R, B, Y, R],
+    loot: stacks(['rrb', 'bbyr', 'bry']),
+  },
+  {
+    name: 'Bärnstensviken',
+    hint: 'Tre lika höga högar. Räkna färgerna innan du skickar ut någon.',
+    queue: [R, R, Y, B, Y, R],
+    loot: stacks(['yrrr', 'yrbr', 'yybr']),
+  },
+  {
+    name: 'Vintermarknaden',
+    hint: 'Fyra högar fyller hela ön. Öppna vägen för vikingarna längre bak i kön.',
+    queue: [Y, Y, Y, B, R, B, B, R],
+    loot: stacks(['bbbr', 'yrbr', 'yybr', 'yyby']),
+  },
+  {
+    name: 'Jarlens gård',
+    hint: 'Höga högar och sju vikingar. Spara väntplatserna tills de verkligen behövs.',
+    queue: [B, R, Y, Y, R, Y, B],
+    loot: stacks(['ybbbr', 'yyyy', 'rrrby']),
+  },
+  {
+    name: 'Runstensfältet',
+    hint: 'Fyra högar och åtta vikingar. Det säkra draget är sällan det första.',
+    queue: [R, B, R, Y, B, R, R, Y],
+    loot: stacks(['yyrr', 'brrr', 'bryr', 'bbyr']),
+  },
+  {
+    name: 'Kungsgården',
+    hint: 'Den sista räden. Varje val räknas – planera hela vägen till sista skatten.',
+    queue: [Y, R, R, B, Y, B, Y, Y],
+    loot: stacks(['byybyy', 'byyr', 'rryrby']),
   },
 ]

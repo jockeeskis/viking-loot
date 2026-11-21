@@ -20,6 +20,7 @@ npm install
 npm run dev            # starta spelet (http://localhost:5173)
 npm test               # regeltester
 npm run check-levels   # lösbarhetsrapport för alla banor
+npm run generate-levels # sök fram nya högbanor med en viss svårighet
 npm run build          # produktionsbygge
 npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar loot ship)
 ```
@@ -58,6 +59,12 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 | 4 | Fiskeläget | Första pusslet | ca 78 % |
 | 5 | Fästet | Riktigt pussel | ca 45 % |
 | 6 | Stora räden | Större pussel | ca 37 % |
+| 7 | Klosterön | Tre högar, vem ska vänta? | ca 44 % |
+| 8 | Bärnstensviken | Tre lika höga högar | ca 36 % |
+| 9 | Vintermarknaden | Fyra högar fyller ön | ca 32 % |
+| 10 | Jarlens gård | Höga högar, sju vikingar | ca 23 % |
+| 11 | Runstensfältet | Fyra högar, åtta vikingar | ca 16 % |
+| 12 | Kungsgården | Final | ca 17 % |
 
 \* Andel av alla möjliga valordningar som leder till vinst, enligt `npm run check-levels`.
 
@@ -78,4 +85,5 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Spelmekaniken för 0.2 är klar och testad. Det som återstår av acceptanskriterierna är test med touch på en riktig mobil.
 - Figurer, skatter och skepp är renderade 3D-sprites. Miljön (ön, träd, paneler) ritas fortfarande i kod.
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen.
-- Nästa steg: fler banor och en renderad 3D-ö.
+- 12 banor; 7–12 är framtagna med `npm run generate-levels`.
+- Nästa steg: en renderad 3D-ö.
