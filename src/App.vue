@@ -116,6 +116,7 @@ onBeforeUnmount(() => game?.destroy(true))
             Byn är plundrad på {{ info.moves }} drag med {{ waitsText(info.waits) }}.<br />
             <small v-if="lastStars < 3">Tre stjärnor: högst {{ waitsText(par) }}.</small>
             <small v-else>Perfekt räd!</small>
+            <template v-if="current === levels.length - 1"><br /><strong>⚔️ Du har plundrat hela Norden – alla {{ levels.length }} räder är klara!</strong></template>
           </p>
           <p v-else>{{ lossText }}</p>
           <button v-if="won && current < levels.length - 1" @click="next">Nästa bana →</button>

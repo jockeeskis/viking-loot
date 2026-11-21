@@ -24,21 +24,58 @@ export const jarl = (color: LootColor): QueueEntry => ({ kind: 'jarl', color })
 export const WILD: QueueEntry = { kind: 'wild' }
 
 const code: Record<string, LootColor> = { r: R, b: B, y: Y }
+
+type Token = { ch: string; hidden: boolean }
+/** Split a pile string into tokens; `?` makes the next item hidden. */
+function tokens(col: string): Token[] {
+  const out: Token[] = []
+  for (let i = 0; i < col.length; i++) {
+    if (col[i] === '?') { out.push({ ch: col[i + 1], hidden: true }); i++ } else out.push({ ch: col[i], hidden: false })
+  }
+  return out
+}
+
 /**
  * Piles of loot: each string is one column listed back→front. Only the front item of a
  * pile is reachable; each item is blocked by the one directly in front of it.
+ *
+ * Letters: `r b y` loot · `R B Y` a house in that colour (two hits) · `s` a stone ·
+ * `?` before a letter hides that item's colour until it is reachable.
+ * A stone crumbles when an item next to it (in a neighbouring pile, at about the same
+ * depth) is plundered. What stands behind a stone also stays behind the item in front of
+ * the stone, so a pile is always emptied front to back.
  */
 export function stacks(columns: string[]): LevelLootPlaced[] {
   const n = columns.length
+  const piles = columns.map(tokens)
   // 2–3 piles sit in the middle of the 4-wide island; 4 piles use every column.
-  return columns.flatMap((col, c) => {
-    const x = n === 1 ? 1.5 : n >= 4 ? (c * 3) / (n - 1) : 0.5 + (c * 2) / (n - 1)
-    return [...col].map((ch, row) => {
-      const id = `c${c + 1}-${row + 1}`
-      const front = row === col.length - 1 ? [] : [`c${c + 1}-${row + 2}`]
-      return item(id, code[ch], [x, (row * 3) / Math.max(1, col.length - 1)], ...front)
-    })
-  })
+  const xOf = (c: number) => (n === 1 ? 1.5 : n >= 4 ? (c * 3) / (n - 1) : 0.5 + (c * 2) / (n - 1))
+  const yOf = (c: number, row: number) => (row * 3) / Math.max(1, piles[c].length - 1)
+  const idOf = (c: number, row: number) => `c${c + 1}-${row + 1}`
+  return piles.flatMap((pile, c) => pile.map(({ ch, hidden }, row) => {
+    const id = idOf(c, row)
+    const at: [number, number] = [xOf(c), yOf(c, row)]
+    // Blocked by everything in front up to and including the first non-stone item.
+    const blockedBy: string[] = []
+    for (let k = row + 1; k < pile.length; k++) {
+      blockedBy.push(idOf(c, k))
+      if (pile[k].ch !== 's') break
+    }
+    if (ch === 's') {
+      // Cleared by the closest non-stone item(s) in each neighbouring pile.
+      const clearedBy: string[] = []
+      for (const nc of [c - 1, c + 1]) {
+        if (nc < 0 || nc >= n) continue
+        const cands = piles[nc].map((t, r) => ({ r, t, d: Math.abs(yOf(nc, r) - at[1]) })).filter(o => o.t.ch !== 's')
+        const best = Math.min(...cands.map(o => o.d))
+        cands.filter(o => o.d === best).forEach(o => clearedBy.push(idOf(nc, o.r)))
+      }
+      return stone(id, at, clearedBy, ...blockedBy)
+    }
+    const color = code[ch.toLowerCase()]
+    const l = ch === ch.toUpperCase() ? house(id, color, at, ...blockedBy) : item(id, color, at, ...blockedBy)
+    return hidden ? { ...l, hidden: true } : l
+  }))
 }
 
 /** A full grid; each string is one row (back→front), one letter per column. */
@@ -143,9 +180,95 @@ export const levels: Level[] = [
     queue: [Y, R, R, B, Y, B, Y, Y],
     loot: stacks(['byybyy', 'byyr', 'rryrby']),
   },
+  // ---------- Fjordarna (0.3) ----------
+  // Found with `npm run generate-levels`: each mechanic first on a level that cannot be lost, then in a puzzle.
+  {
+    name: 'Fjordmynningen',
+    par: 0,
+    hint: 'Husen tål två hugg. En viking med två tomma platser tar ett helt hus.',
+    queue: [Y, B, R, Y, Y],
+    loot: stacks(['byY', 'yb', 'Yrr']),
+  },
+  {
+    name: 'Båthusen',
+    par: 1,
+    hint: 'Ett halvt uppbrutet hus kan en annan viking i samma färg göra klart.',
+    queue: [R, Y, B, R, Y, B, B],
+    loot: stacks(['yrBb', 'brr', 'YryB']),
+  },
+  {
+    name: 'Stenbrottet',
+    par: 0,
+    hint: 'Stenen rasar när du plundrar något bredvid den – och den kostar ingen bärplats.',
+    queue: [B, Y, Y, R],
+    loot: stacks(['yrr', 'yys', 'bby']),
+  },
+  {
+    name: 'Klipporna',
+    par: 1,
+    hint: 'Vilken skatt bredvid stenarna ska bort först? Fel ordning lämnar vikingar väntande.',
+    queue: [R, Y, R, Y, B],
+    loot: stacks(['yrsr', 'ybrb', 'yysr']),
+  },
+  {
+    name: 'Jarlens hall',
+    par: 1,
+    hint: 'Jarlen Harald bär tre skatter. Skicka honom när tre i hans färg går att nå.',
+    queue: [jarl(Y), B, R, R],
+    loot: stacks(['byb', 'rrr', 'yyr']),
+  },
+  {
+    name: 'Mjödsalen',
+    par: 2,
+    hint: 'Jarlen står sist i kön. Se till att hans tre skatter ligger framme när han kommer.',
+    queue: [B, R, B, R, B, R, R, jarl(Y)],
+    loot: stacks(['ryrr', 'ybbr', 'rrbr', 'bByr']),
+  },
+  {
+    name: 'Regnbågsbron',
+    par: 0,
+    hint: 'Ylva tar färgen från den första skatten hon når – räknat från högen längst till vänster.',
+    queue: [B, WILD, Y, R],
+    loot: stacks(['rrr', 'br', 'byy']),
+  },
+  {
+    name: 'Regnbågsstranden',
+    par: 1,
+    hint: 'Ylva kan ta hand om en färg som annars blir över. Välj noga när hon går.',
+    queue: [Y, B, Y, B, WILD, R, B],
+    loot: stacks(['yBrr', 'bbby', 'byBy']),
+  },
+  {
+    name: 'Dimmans vik',
+    par: 0,
+    hint: 'Skatterna under presenning visar sin färg först när vägen fram till dem är fri.',
+    queue: [Y, R, R, B],
+    loot: stacks(['?r?yr', '?by', '?r?br']),
+  },
+  {
+    name: 'Dimfjorden',
+    par: 2,
+    hint: 'Fyra högar i dimma. Planera med det du ser – och håll en plats ledig på skeppet.',
+    queue: [B, Y, B, Y, B, B, R, R],
+    loot: stacks(['?r?b?bb', '?b?y?rb', '?b?b?yr', '?y?b?yr']),
+  },
+  {
+    name: 'Stormnäset',
+    par: 1,
+    hint: 'Hus, sten, dimma och en jarl – allt du har lärt dig på en och samma ö.',
+    queue: [Y, R, R, R, Y, B, jarl(R), B],
+    loot: stacks(['?y?b?rr', '?b?R?rr', '?y?Y?br', '?rs?rb']),
+  },
+  {
+    name: 'Valhalls port',
+    par: 0,
+    hint: 'Den sista räden: Ylva, Harald, hus och stenar. Tre stjärnor kräver en räd helt utan väntan.',
+    queue: [Y, Y, B, R, B, WILD, R, Y, jarl(R)],
+    loot: stacks(['?y?r?ysR', '?B?b?yy', '?ys?rr', '?B?r?r?by']),
+  },
 ]
 
-/** Worlds on the map. Fjordarna gets its levels in 0.3 phase 4. */
+/** Worlds on the map. */
 export const worlds = [
   { name: 'Kusten', first: 0, last: 11 },
   { name: 'Fjordarna', first: 12, last: 23 },

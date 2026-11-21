@@ -7,7 +7,7 @@ export const INTROS: Record<Mechanic, { icon: string; title: string; text: strin
   house: { icon: '🏠', title: 'Nytt: Hus', text: 'Ett hus tål två hugg. Varje hugg kostar vikingen en bärplats – två vikingar i samma färg kan dela på det.' },
   stone: { icon: '🪨', title: 'Nytt: Stenhinder', text: 'Stenen går inte att plundra. Den rasar av sig själv när någon skatt bredvid plundras.' },
   jarl: { icon: '👑', title: 'Nytt: Jarlen', text: 'Jarlen är starkare än andra vikingar och bär tre skatter i stället för två.' },
-  wild: { icon: '🌈', title: 'Nytt: Ylva', text: 'Ylva har ingen färg. Den första skatten hon når bestämmer hennes färg för resten av räden.' },
+  wild: { icon: '🌈', title: 'Nytt: Ylva', text: 'Ylva har ingen färg. Den första skatten hon når – räknat från högen längst till vänster – bestämmer hennes färg för resten av räden.' },
   hidden: { icon: '❓', title: 'Nytt: Dolda skatter', text: 'Skatter under presenning visar sin färg först när vägen fram till dem är fri.' },
 }
 

@@ -336,7 +336,8 @@ export class RaidScene extends Phaser.Scene {
     for (const item of state.loot) {
       const c = this.lootSprites.get(item.id)
       if (!c || item.collected) continue
-      const open = isAvailable(state, item)
+      // Stones are never plundered, so they never look locked; they simply crumble.
+      const open = item.kind === 'stone' || isAvailable(state, item)
       const img = (c.getByName('art') as Sprite | null)?.getByName('img') as Phaser.GameObjects.Image | null
       if (img) { if (open) img.clearTint(); else img.setTint(0x6d7488) }
       const parts = [c.getByName('shade'), c.getByName('lock')] as unknown as Phaser.GameObjects.Components.Alpha[]

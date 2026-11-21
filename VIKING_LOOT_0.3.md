@@ -1,6 +1,6 @@
 # Viking Loot 0.3 – Fjordarna: nya mekaniker, stjärnor och hjälp
 
-> **Status (2026-11-21):** Fas 1–3 klara: regelmotor, stjärnor, karta, ångra, tips, introduktioner, ny 3D-grafik, animationer och musik. Fas 4 (Fjordarna) återstår (se 7).
+> **Status (2026-11-21):** Implementerad – alla fyra faserna är klara och spelet har 24 banor. Kvar att verifiera: ångra och tips på riktig mobil.
 
 ## Syfte
 
@@ -39,7 +39,7 @@ Alla nya egenskaper är valfria i bandatan. Banorna 1–12 beter sig exakt som i
 | Viking | Kö-post | Regel |
 |---|---|---|
 | **Jarl** | `jarl(R)` | Bär **3** i stället för 2. Kortet visar 👑 och "BÄR 3". |
-| **Flerfärgad** | `WILD` | Har ingen färg från början. Den första tillgängliga skatten den når, framifrån i banans ordning, bestämmer färgen (händelsen `color`). Därefter beter den sig som en vanlig viking i den färgen, även om den hamnar på en väntplats. |
+| **Flerfärgad** | `WILD` | Har ingen färg från början. Den första tillgängliga skatten i banans ordning (i högbanor: högen längst till vänster) bestämmer färgen (händelsen `color`). Därefter beter den sig som en vanlig viking i den färgen, även om den hamnar på en väntplats. |
 
 ### 1.4 Dolda skatter
 
@@ -91,14 +91,22 @@ Alla nya egenskaper är valfria i bandatan. Banorna 1–12 beter sig exakt som i
 
 ## 6. Banor – Fjordarna (13–24)
 
-| # | Lär ut | Kan förloras? |
-|---|---|---|
-| 13–14 | Hus | 13 nej, 14 ja |
-| 15–16 | Stenhinder | 15 nej, 16 ja |
-| 17–18 | Jarl | 17 nej, 18 ja |
-| 19–20 | Flerfärgad viking | 19 nej, 20 ja |
-| 21–22 | Dolda skatter | 21 nej, 22 ja |
-| 23–24 | Allt blandat (final) | ja |
+| # | Bana | Lär ut | Vinstchans | Par |
+|---|---|---|---|---|
+| 13 | Fjordmynningen | Hus (introduktion) | 100 % | 0 |
+| 14 | Båthusen | Hus | ca 46 % | 1 |
+| 15 | Stenbrottet | Stenhinder (introduktion) | 100 % | 0 |
+| 16 | Klipporna | Stenhinder | ca 38 % | 1 |
+| 17 | Jarlens hall | Jarl (introduktion) | 100 % | 1 |
+| 18 | Mjödsalen | Jarl + hus | ca 30 % | 2 |
+| 19 | Regnbågsbron | Flerfärgad viking (introduktion) | 100 % | 0 |
+| 20 | Regnbågsstranden | Flerfärgad viking + hus | ca 32 % | 1 |
+| 21 | Dimmans vik | Dolda skatter (introduktion) | 100 % | 0 |
+| 22 | Dimfjorden | Dolda skatter | ca 33 % | 2 |
+| 23 | Stormnäset | Hus, sten, dolda, jarl | ca 28 % | 1 |
+| 24 | Valhalls port | Allt (final) | ca 12 % | 0 |
+
+Högarna skrivs som strängar i `stacks()`: `r b y` skatter, `R B Y` hus, `s` sten och `?` före en bokstav för dold. En sten rasar när den närmaste skatten i en grannhög plundras.
 
 - Banorna tas fram med `npm run generate-levels`, utökad med de nya elementen.
 - Varje bana verifieras av lösaren: den ska vara vinnbar, ha en vinstandel inom målintervallet (cirka 40 % ner till 15 %) och gå att förlora om man alltid väljer den främsta vikingen.
@@ -108,7 +116,7 @@ Alla nya egenskaper är valfria i bandatan. Banorna 1–12 beter sig exakt som i
 1. **Regelmotor och tester** – klar. Nya fält, händelser, `minWaits` och `hint()`, enkel tillfällig grafik i scenen samt 10 nya tester (totalt 31).
 2. **Stjärnor, karta och hjälp** – klar. `par` i bandatan (testat mot lösaren), `src/game/progress.ts` (stjärnor, sparning, migrering från 0.2), `src/components/LevelMap.vue`, ångra via `RaidScene.rebuild(state)`, tips via `hint()` och introduktioner i `src/game/intros.ts`. 36 tester.
 3. **Grafik och ljud** – klar. Harald (tre färger), Ylva, uppbrutet hus, sten, presenning, `victory`/`fail` för alla vikingar, brygga på ön, tätare rader så att seglet går fritt, syntetiserad musik med egen knapp, lat laddning av Harald och Ylva (`ensureVikings` i `assets.ts`).
-4. **Fjordarna** – generatorn utökas och bana 13–24 läggs till.
+4. **Fjordarna** – klar. `stacks()` förstår hus, stenar och dolda skatter, `npm run generate-levels` söker banor med alla nya element, och bana 13–24 är inlagda och testade (37 tester).
 
 Varje fas avslutas med `npm test`, `npm run build`, kontroll i webbläsaren och commit + push, som deployas till GitHub Pages.
 
@@ -124,7 +132,7 @@ Varje fas avslutas med `npm test`, `npm run build`, kontroll i webbläsaren och 
 - [x] Kartan visar båda världarna, stjärnor och upplåsning. *(Fjordarna visas som "kommer snart" tills fas 4.)*
 - [ ] Ångra och tips fungerar på mobil. *(Verifierat i desktop-webbläsare.)*
 - [x] Varje ny mekanik har en introduktion och en egen 3D-grafik.
-- [ ] Banorna 13–24 är spelbara, och varje mekanik förekommer i minst en bana som går att förlora.
+- [x] Banorna 13–24 är spelbara, och varje mekanik förekommer i minst en bana som går att förlora.
 - [x] Bildfilerna är tillsammans högst cirka 1,5 MB vid start. *(1,8 MB totalt, cirka 1 MB laddas direkt.)*
 
 ## 9. Utanför scope för 0.3

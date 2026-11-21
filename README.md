@@ -2,7 +2,7 @@
 
 Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3.
 
-- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) och `VIKING_LOOT_0.3.md` (pågår)
+- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) och `VIKING_LOOT_0.3.md` (klar)
 - Visuell stil, UI och plan för 3D-assets: `ui-settings.md`
 
 Repo: https://github.com/jockeeskis/viking-loot
@@ -47,7 +47,7 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 - `src/game/assets.ts` — laddar de renderade sprite sheets och skapar animationerna. `assets.generated.ts` skrivs av renderingsskriptet.
 - `art-source/blender/render_assets.py` — bygger 3D-modellerna i Blender med skript och renderar dem till `public/assets/`.
 - `src/game/RaidScene.ts` — rendering. Visar regelmotorns `events` som animationer och kan inte påverka utfallet.
-- `src/App.vue` — UI, banval och sparad progression (`localStorage`-nyckel `viking-loot-0.2-unlocked`).
+- `src/App.vue` — UI, karta (`src/components/LevelMap.vue`), ångra/tips och sparad progression (`src/game/progress.ts`, `localStorage`-nyckel `viking-loot-0.3-progress`).
 
 ## Banor
 
@@ -65,6 +65,18 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 | 10 | Jarlens gård | Höga högar, sju vikingar | ca 23 % |
 | 11 | Runstensfältet | Fyra högar, åtta vikingar | ca 16 % |
 | 12 | Kungsgården | Final | ca 17 % |
+| 13 | Fjordmynningen | Hus (två hugg) | 100 % |
+| 14 | Båthusen | Hus | ca 46 % |
+| 15 | Stenbrottet | Stenhinder | 100 % |
+| 16 | Klipporna | Stenhinder | ca 38 % |
+| 17 | Jarlens hall | Jarlen (bär 3) | 100 % |
+| 18 | Mjödsalen | Jarl + hus | ca 30 % |
+| 19 | Regnbågsbron | Ylva, flerfärgad viking | 100 % |
+| 20 | Regnbågsstranden | Ylva + hus | ca 32 % |
+| 21 | Dimmans vik | Dolda skatter | 100 % |
+| 22 | Dimfjorden | Dolda skatter | ca 33 % |
+| 23 | Stormnäset | Blandat | ca 28 % |
+| 24 | Valhalls port | Final | ca 12 % |
 
 \* Andel av alla möjliga valordningar som leder till vinst, enligt `npm run check-levels`.
 
@@ -86,5 +98,5 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Version 0.2 är klar: alla acceptanskriterier är uppfyllda, inklusive touch på riktig mobil (testat via GitHub Pages).
 - Figurer, skatter, skepp och ön (med granar, stenar och buskar) är renderade i 3D. Havet och panelerna ritas i kod.
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen. En egen loopad melodi spelas i bakgrunden (🎵 slår av/på).
-- 12 banor; 7–12 är framtagna med `npm run generate-levels`.
-- Version 0.3 pågår (se `VIKING_LOOT_0.3.md`): regelmotorn stöder redan hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter. Stjärnor (efter banans par), karta, ångra, tips, introduktioner samt 3D-grafik, animationer och musik för de nya mekanikerna är klara. Nästa fas: världen Fjordarna (bana 13–24).
+- 24 banor i två världar, Kusten (1–12) och Fjordarna (13–24); 7–24 är framtagna med `npm run generate-levels`.
+- Version 0.3 är klar (se `VIKING_LOOT_0.3.md`): hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter, stjärnor efter banans par, karta, ångra, tips, introduktioner, ny 3D-grafik och musik. Kvar att testa: ångra och tips på riktig mobil.

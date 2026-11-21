@@ -46,3 +46,22 @@ test('mechanicsOf finds the new mechanics in a level', () => {
   }
   assert.deepEqual(mechanicsOf(l), ['house', 'stone', 'jarl', 'wild', 'hidden'])
 })
+
+test('Fjordarna introduces each mechanic on a level that cannot be lost, then uses it in a puzzle', () => {
+  assert.equal(levels.length, 24)
+  const intros: [number, string][] = [[12, 'house'], [14, 'stone'], [16, 'jarl'], [18, 'wild'], [20, 'hidden']]
+  const seen = new Set<string>()
+  levels.slice(0, 12).forEach(l => mechanicsOf(l).forEach(m => seen.add(m)))
+  assert.equal(seen.size, 0, 'Kusten uses none of the new mechanics')
+  for (const [i, m] of intros) {
+    const l = levels[i]
+    const fresh = mechanicsOf(l).filter(x => !seen.has(x))
+    assert.deepEqual(fresh, [m], `${l.name} introduces exactly ${m}`)
+    fresh.forEach(x => seen.add(x))
+    assert.equal(solve(createGame(l.loot, l.queue)).lossPath, null, `${l.name} cannot be lost`)
+    const puzzle = levels[i + 1]
+    assert.ok(mechanicsOf(puzzle).includes(m as never), `${puzzle.name} uses ${m}`)
+    assert.ok(solve(createGame(puzzle.loot, puzzle.queue)).lossPath, `${puzzle.name} can be lost`)
+  }
+  for (const l of levels.slice(22)) assert.ok(mechanicsOf(l).length >= 3, `${l.name} mixes mechanics`)
+})
