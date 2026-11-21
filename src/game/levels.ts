@@ -1,4 +1,4 @@
-import type { LevelLoot, LootColor } from './engine.ts'
+import type { LevelLoot, LootColor, QueueEntry } from './engine.ts'
 import type { LootKind } from './art.ts'
 
 /**
@@ -6,10 +6,21 @@ import type { LootKind } from './art.ts'
  * `kind` only changes the look (barrel, chest or house); if omitted it is derived from the id.
  */
 export type LevelLootPlaced = LevelLoot & { at: [number, number]; kind?: LootKind }
-export type Level = { name: string; hint: string; loot: LevelLootPlaced[]; queue: LootColor[] }
+export type Level = { name: string; hint: string; loot: LevelLootPlaced[]; queue: QueueEntry[] }
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
 const item = (id: string, color: LootColor, at: [number, number], ...blockedBy: string[]): LevelLootPlaced => ({ id, color, at, blockedBy })
+/** A house that takes two hits (two carry slots) before its loot is taken. */
+export const house = (id: string, color: LootColor, at: [number, number], ...blockedBy: string[]): LevelLootPlaced =>
+  ({ id, color, at, blockedBy, hits: 2, kind: 'house' })
+/** A stone: blocks what is behind it and crumbles when any item in `clearedBy` is plundered. */
+export const stone = (id: string, at: [number, number], clearedBy: string[], ...blockedBy: string[]): LevelLootPlaced =>
+  ({ id, stone: true, clearedBy, at, blockedBy })
+/** Loot whose colour is hidden until it becomes reachable. */
+export const hidden = (l: LevelLootPlaced): LevelLootPlaced => ({ ...l, hidden: true })
+/** Queue entries for the special vikings. */
+export const jarl = (color: LootColor): QueueEntry => ({ kind: 'jarl', color })
+export const WILD: QueueEntry = { kind: 'wild' }
 
 const code: Record<string, LootColor> = { r: R, b: B, y: Y }
 /**

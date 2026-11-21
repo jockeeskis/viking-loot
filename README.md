@@ -2,7 +2,7 @@
 
 Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3.
 
-- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md`
+- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) och `VIKING_LOOT_0.3.md` (pågår)
 - Visuell stil, UI och plan för 3D-assets: `ui-settings.md`
 
 Repo: https://github.com/jockeeskis/viking-loot
@@ -87,4 +87,4 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Figurer, skatter, skepp och ön (med granar, stenar och buskar) är renderade i 3D. Havet och panelerna ritas i kod.
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen.
 - 12 banor; 7–12 är framtagna med `npm run generate-levels`.
-- Möjliga nästa steg: justera skepp/segel så att det inte skymmer främre skatter, fler banor eller nya mekaniker (version 0.3).
+- Version 0.3 pågår (se `VIKING_LOOT_0.3.md`): regelmotorn stöder redan hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter. Nästa fas: stjärnor, karta, ångra och tips.

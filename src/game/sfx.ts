@@ -105,5 +105,14 @@ export const sfx = {
   lose() {
     ;[392, 330, 262].forEach((f, i) => tone(f, i === 2 ? 0.6 : 0.22, { type: 'triangle', vol: 0.11, at: i * 0.2 }))
   },
+  /** A stone crumbles. */
+  crumble() {
+    noise(0.35, 420, 0.55)
+    tone(90, 0.3, { type: 'sine', vol: 0.12, slide: 50 })
+  },
+  /** Hidden loot shows its colour. */
+  reveal() {
+    ;[880, 1109, 1319].forEach((f, i) => tone(f, 0.14, { type: 'sine', vol: 0.07, at: i * 0.05 }))
+  },
   click() { tone(880, 0.05, { type: 'square', vol: 0.03, lowpass: 2500 }) },
 }

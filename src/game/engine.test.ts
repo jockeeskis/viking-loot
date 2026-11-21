@@ -5,10 +5,11 @@ import {
   evaluateGameStatus, validateLevelGraph, type GameState, type LevelLoot, type LootColor,
 } from './engine.ts'
 import { levels } from './levels.ts'
-import { solve } from './solver.ts'
+import { solve, hint } from './solver.ts'
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
 const pick = (s: GameState, ...ids: string[]) => ids.reduce(selectViking, s)
+const slim = (vs: GameState['waiting']) => vs.map(({ id, color, collectedCount }) => ({ id, color, collectedCount }))
 const collected = (s: GameState) => s.loot.filter(l => l.collected).map(l => l.id).sort()
 
 // --- Queue ---------------------------------------------------------------
@@ -32,7 +33,7 @@ test('a pick is used up even when the viking finds nothing', () => {
   const s = createGame([{ id: 'r1', color: R }, { id: 'r2', color: R }], [B, R])
   const next = selectViking(s, 'v1')
   assert.deepEqual(next.queue.map(v => v.id), ['v2'])
-  assert.deepEqual(next.waiting, [{ id: 'v1', color: B, collectedCount: 0 }])
+  assert.deepEqual(slim(next.waiting), [{ id: 'v1', color: B, collectedCount: 0 }])
 })
 
 // --- Raiding and blocking ------------------------------------------------
@@ -54,7 +55,7 @@ test('blocked items cannot be collected before their blockers are gone', () => {
   assert.deepEqual(getAvailableLoot(s).map(l => l.id), ['r1', 'b2'])
   const afterBlue = selectViking(s, 'v1')
   assert.deepEqual(collected(afterBlue), ['b2'], 'b1 is still behind r1')
-  assert.deepEqual(afterBlue.waiting, [{ id: 'v1', color: B, collectedCount: 1 }])
+  assert.deepEqual(slim(afterBlue.waiting), [{ id: 'v1', color: B, collectedCount: 1 }])
 })
 
 test('an item blocked by several others needs all of them gone', () => {
@@ -80,7 +81,7 @@ test('waiting vikings keep their remaining capacity and finish when loot is unlo
   ]
   let s = createGame(loot, [B, R])
   s = selectViking(s, 'v1')
-  assert.deepEqual(s.waiting, [{ id: 'v1', color: B, collectedCount: 1 }])
+  assert.deepEqual(slim(s.waiting), [{ id: 'v1', color: B, collectedCount: 1 }])
   s = selectViking(s, 'v2')
   assert.equal(s.waiting.length, 0, 'blue viking finished and left its slot')
   assert.equal(s.status, 'won')
@@ -92,7 +93,7 @@ test('waiters resolve in arrival order', () => {
   // Two blue vikings wait; red uncovers a single blue item – the first to arrive gets it.
   const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'r2', color: R }, { id: 'b1', color: B, blockedBy: ['r1'] }]
   const s = pick(createGame(loot, [B, B, R]), 'v1', 'v2', 'v3')
-  assert.deepEqual(s.waiting, [{ id: 'v1', color: B, collectedCount: 1 }, { id: 'v2', color: B, collectedCount: 0 }])
+  assert.deepEqual(slim(s.waiting), [{ id: 'v1', color: B, collectedCount: 1 }, { id: 'v2', color: B, collectedCount: 0 }])
 })
 
 test('two waiting vikings are safe', () => {
@@ -156,7 +157,7 @@ test('an empty queue with no waiter able to move is a stuck loss', () => {
 test('evaluateGameStatus and resolveWaitingVikings work as standalone functions', () => {
   const s = createGame([{ id: 'r1', color: R }], [R])
   assert.equal(evaluateGameStatus(s), 'playing')
-  const manual: GameState = { ...s, queue: [], waiting: [{ id: 'w', color: R, collectedCount: 0 }] }
+  const manual: GameState = { ...s, queue: [], waiting: [{ id: 'w', kind: 'normal', color: R, capacity: 2, collectedCount: 0 }] }
   assert.equal(evaluateGameStatus(manual), 'playing', 'the waiter can still move')
   const resolved = resolveWaitingVikings(manual)
   assert.equal(resolved.status, 'won')
@@ -218,4 +219,117 @@ test('puzzle levels have verified win and loss sequences', () => {
   const lost = pick(start, 'v1', 'v2', 'v3', 'v4', 'v6')
   assert.equal(lost.status, 'lost')
   assert.equal(lost.lossReason, 'slots-full')
+})
+
+// --- Regression: 0.3 rules must not change the 0.2 levels ----------------
+
+test('levels 1–12 keep their 0.2 solver numbers', () => {
+  const expected: [number, number][] = [
+    [1458, 0], [6, 0], [18, 0], [122, 34], [68, 83], [256, 429],
+    [22, 28], [52, 91], [168, 360], [104, 340], [208, 1055], [88, 419],
+  ]
+  expected.forEach(([wins, losses], i) => {
+    const r = solve(createGame(levels[i].loot, levels[i].queue))
+    assert.deepEqual([r.winningLines, r.losingLines], [wins, losses], levels[i].name)
+  })
+})
+
+// --- 0.3: houses -------------------------------------------------------------
+
+test('a house takes two hits, and one viking with two slots empties it', () => {
+  const s = pick(createGame([{ id: 'h', color: R, hits: 2 }], [R]), 'v1')
+  assert.deepEqual(s.events.map(e => e.type), ['dispatch', 'hit', 'collect', 'return'])
+  assert.equal(s.status, 'won')
+})
+
+test('a house can be shared between two vikings and blocks until the last hit', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'h', color: R, hits: 2 }, { id: 'b', color: B, blockedBy: ['h'] }]
+  const s1 = pick(createGame(loot, [R, R, B]), 'v1') // takes r1, then one hit on the house
+  assert.equal(s1.loot.find(l => l.id === 'h')!.hitsLeft, 1)
+  assert.ok(!getAvailableLoot(s1).some(l => l.id === 'b'), 'still blocked by the opened house')
+  const s2 = pick(s1, 'v2') // second hit takes the house; it waits with 1/2
+  assert.ok(s2.loot.find(l => l.id === 'h')!.collected)
+  assert.ok(getAvailableLoot(s2).some(l => l.id === 'b'))
+  assert.equal(s2.waiting.length, 1, 'v2 spent one slot on the last hit and waits with the other free')
+  assert.equal(pick(s2, 'v3').status, 'won', 'taking the last item wins even with a viking still seated')
+})
+
+// --- 0.3: stones -------------------------------------------------------------
+
+test('a stone crumbles when any clearer is taken and costs no capacity', () => {
+  const loot: LevelLoot[] = [
+    { id: 'r1', color: R }, { id: 'y1', color: Y },
+    { id: 'st', stone: true, clearedBy: ['r1', 'y1'] },
+    { id: 'b1', color: B, blockedBy: ['st'] }, { id: 'b2', color: B, blockedBy: ['st'] },
+  ]
+  const s = pick(createGame(loot, [Y, B, R]), 'v1')
+  assert.ok(s.events.some(e => e.type === 'crumble'), 'the yellow alone clears it (OR)')
+  assert.equal(s.waiting.length, 1, 'the yellow viking still only carried one item')
+  const end = pick(s, 'v2', 'v3')
+  assert.equal(end.status, 'won', 'blue takes both freed items and red takes r1')
+})
+
+test('stones need valid clearers', () => {
+  assert.throws(() => validateLevelGraph([{ id: 's', stone: true }]), /clearedBy/)
+  assert.throws(() => validateLevelGraph([{ id: 's', stone: true, clearedBy: ['x'] }]), /unknown/)
+  assert.throws(() => validateLevelGraph([{ id: 'b', color: B, blockedBy: ['s'] }, { id: 's', stone: true, clearedBy: ['b'] }]), /blocks every item/)
+  validateLevelGraph([{ id: 'b', color: B, blockedBy: ['s'] }, { id: 'r', color: R }, { id: 's', stone: true, clearedBy: ['b', 'r'] }])
+})
+
+// --- 0.3: special vikings ----------------------------------------------------
+
+test('a jarl carries three', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'r2', color: R }, { id: 'r3', color: R }]
+  const s = pick(createGame(loot, [{ kind: 'jarl', color: R }]), 'v1')
+  assert.equal(s.status, 'won')
+  assert.equal(s.waits, 0)
+})
+
+test('a wild viking takes the colour of the first item it reaches and keeps it', () => {
+  const loot: LevelLoot[] = [{ id: 'b1', color: B }, { id: 'r1', color: R }, { id: 'b2', color: B, blockedBy: ['r1'] }]
+  const s = pick(createGame(loot, [{ kind: 'wild' }, R]), 'v1')
+  assert.deepEqual(s.events.slice(0, 3).map(e => e.type), ['dispatch', 'color', 'collect'])
+  assert.equal(s.waiting[0].color, B, 'took b1, then waits as a blue viking (b2 is blocked)')
+  const end = pick(s, 'v2')
+  assert.equal(end.status, 'won', 'red frees b2 and the waiting wild viking takes it')
+})
+
+// --- 0.3: hidden loot ----------------------------------------------------------
+
+test('hidden loot is revealed when it becomes reachable and does not change the outcome', () => {
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'r2', color: R }, { id: 'b1', color: B, blockedBy: ['r1'], hidden: true }, { id: 'b2', color: B, hidden: true }]
+  const start = createGame(loot, [R, B])
+  assert.equal(start.loot.find(l => l.id === 'b1')!.hidden, true)
+  assert.equal(start.loot.find(l => l.id === 'b2')!.hidden, false, 'reachable from the start, so shown')
+  const s = pick(start, 'v1')
+  assert.ok(s.events.some(e => e.type === 'reveal' && e.lootId === 'b1'))
+  const plain = loot.map(l => ({ ...l, hidden: false }))
+  const a = solve(start), b = solve(createGame(plain, [R, B]))
+  assert.deepEqual([a.winningLines, a.losingLines], [b.winningLines, b.losingLines])
+})
+
+// --- 0.3: solver helpers ---------------------------------------------------------
+
+test('minWaits is the fewest seats needed on a winning line', () => {
+  // r2 hides behind b2 and b1 behind r1: whoever goes first has to wait once.
+  const loot: LevelLoot[] = [{ id: 'r1', color: R }, { id: 'b2', color: B }, { id: 'b1', color: B, blockedBy: ['r1'] }, { id: 'r2', color: R, blockedBy: ['b2'] }]
+  const r = solve(createGame(loot, [B, R]))
+  assert.equal(r.minWaits, 1)
+  assert.equal(r.winPath!.reduce(selectViking, createGame(loot, [B, R])).waits, 1)
+  assert.equal(solve(createGame(levels[0].loot, levels[0].queue)).minWaits, 0)
+})
+
+test('hint always suggests a move that can still win', () => {
+  for (const l of levels.slice(3, 6)) {
+    let s = createGame(l.loot, l.queue)
+    while (s.status === 'playing') {
+      const id = hint(s)
+      assert.ok(id, `${l.name}: a hint exists while the level is winnable`)
+      s = selectViking(s, id!)
+    }
+    assert.equal(s.status, 'won', `${l.name}: following hints wins`)
+  }
+  const f = levels.find(x => x.name === 'Fästet')!
+  const doomed = pick(createGame(f.loot, f.queue), 'v1', 'v2', 'v3', 'v4')
+  if (doomed.status === 'playing' && !solve(doomed).winnable) assert.equal(hint(doomed), null)
 })

@@ -58,6 +58,15 @@ export function woodChips(scene: Phaser.Scene, x: number, y: number) {
   })
 }
 
+/** Grey fragments when a stone crumbles. */
+export function rockBits(scene: Phaser.Scene, x: number, y: number) {
+  burst(scene, x, y, CHIP, 9, {
+    speed: { min: 60, max: 140 }, angle: { min: 200, max: 340 }, gravityY: 560,
+    lifespan: 650, scale: { start: 0.6, end: 0.35 }, rotate: { min: 0, max: 360 },
+    tint: [0x7d8086, 0xa7a9ad, 0x5f6266], alpha: { start: 1, end: 0, ease: 'Expo.easeIn' },
+  })
+}
+
 /** A soft puff of dust where a viking lands. */
 export function dustPuff(scene: Phaser.Scene, x: number, y: number) {
   burst(scene, x, y, DOT, 6, {
