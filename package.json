@@ -7,9 +7,10 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --test src/game/engine.test.ts src/game/progress.test.ts",
+    "test": "node --test src/game/engine.test.ts src/game/progress.test.ts src/game/modes.test.ts",
     "check-levels": "node scripts/check-levels.ts",
     "generate-levels": "node scripts/generate-levels.ts",
+    "bench-modes": "node scripts/bench-modes.ts",
     "render-art": "node scripts/render-art.ts"
   },
   "dependencies": {

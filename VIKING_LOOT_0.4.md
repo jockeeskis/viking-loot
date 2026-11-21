@@ -1,6 +1,6 @@
 # Viking Loot 0.4 – Isriket: nycklar, is, två skepp, dagens räd och app
 
-> **Status (2026-11-21):** Fas 1–3 är klara: PWA (testad på Android), regelmotorn och Isriket med bana 25–36, ny grafik och introduktioner. Nästa: fas 4 (Dagens räd och oändlig räd).
+> **Status (2026-11-21):** Fas 1–4 är klara: PWA (testad på Android), regelmotorn, Isriket med bana 25–36 och Dagens räd / oändlig räd. Nästa: fas 5 (prestationer, statistik och skepp).
 
 ## Syfte
 
@@ -97,13 +97,21 @@ Samma ordning som i 0.3, med två tillägg:
 
 ## 3. Dagens räd och oändlig räd
 
+- **Mekaniker:** bara från världar man har *klarat* (sista banan vunnen), så att man alltid har sett introduktionerna. Kusten har inga egna, så nivåerna är: 0 = vanliga skatter, 1 = + Fjordarna, 2 = + Isriket.
 - **Dagens räd:**
-  - En ny bana varje dag. Seed räknas fram från det lokala datumet, så alla får samma bana.
-  - Mekanikerna hämtas från de världar man har låst upp.
-  - Stjärnor räknas på första vinsten den dagen, och en svit med dagar i rad sparas.
+  - En ny ö varje dag. Seed = hash av lokalt datum + nivå, så alla med samma klarade världar får samma ö.
+  - Fyra högar med 3–4 skatter, en eller två mekaniker (minst en från den senast klarade världen), 20–50 % vinnande valordningar.
+  - Första vinsten för dagen ger stjärnorna och förlänger sviten. Sviten bryts om man missar en hel dag. Man kan spela om, men det räknas inte.
+  - Ön sparas för dagen, så den tas bara fram en gång.
 - **Oändlig räd:**
-  - Slumpade banor som blir svårare för varje vinst. Räden tar slut vid en förlust, och bästa rekordet sparas.
-- Banorna genereras i en Web Worker med tidsgräns och kontrolleras av lösaren: de ska vara vinnbara, ha rätt par och "alltid främsta" ska förlora.
+  - Runda för runda: fler och högre högar, fler mekaniker (upp till tre) och färre vinnande valordningar.
+  - Ingen ångra, inga tips och ingen omstart. En förlust avslutar räden. Rekordet sparas efter varje vunnen runda.
+  - Nästa runda genereras medan man spelar den nuvarande.
+- **Generering** (`src/game/generator.ts`, `modes.ts`):
+  - Banorna ska vara vinnbara, `par` kommer från lösaren, och "alltid främsta" ska förlora.
+  - Sökningen räknar försök, aldrig tid, så samma seed ger samma ö på alla enheter. Hittas inget provas först andra mekanikblandningar, sedan lättare krav och till sist en vanlig ö.
+  - Allt körs i en Web Worker (`generator.worker.ts`). Under tiden visas "Kartlägger ön…". Om workern skulle hänga i 25 sekunder används en enkel reservö.
+  - Tidtagning: `npm run bench-modes`. På dator tar de flesta öar under 0,5 s och de svåraste cirka 2 s.
 
 ## 4. App (PWA)
 
@@ -138,8 +146,8 @@ Samma ordning som i 0.3, med två tillägg:
 - [x] Alla 36 banor är vinnbara, och `par` stämmer med lösaren.
 - [x] Banorna 1–24 ger samma siffror från lösaren som i 0.3.
 - [x] Varje ny mekanik har tester och en introbana som inte går att förlora.
-- [ ] Dagens räd är samma för samma datum och går alltid att vinna.
-- [ ] Genereringen fryser inte sidan på mobil.
+- [x] Dagens räd är samma för samma datum och går alltid att vinna (testat i `modes.test.ts`).
+- [x] Genereringen fryser inte sidan (Web Worker, kontrollerat i produktionsbygget). Ska bekräftas på mobil.
 - [ ] Prestationer och skepp sparas, och 0.3-progress migreras.
 
 ## 8. Utanför scope för 0.4

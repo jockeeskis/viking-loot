@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
-import { levels, worlds } from './levels'
+import { levels, worlds, type Level } from './levels'
+import { mechanicsOf } from './intros'
 import {
   createGame, selectViking, isAvailable, mainSeats, SELECTABLE,
   type GameEvent, type GameState, type LootColor, type LossReason, type GameStatus, type Viking,
@@ -18,7 +19,6 @@ import { sfx } from './sfx'
 import { hint } from './solver'
 
 export type RaidUpdate = {
-  level: number
   busy: boolean // an animation is playing; undo and hints wait for it
   canUndo: boolean
   waits: number
@@ -72,7 +72,10 @@ const lookOf = (v: Viking): LootColor => v.color ?? 'yellow'
 
 export class RaidScene extends Phaser.Scene {
   private state!: GameState
-  private level = 0
+  private level = 0 // campaign index, only used before create() has run
+  private levelData!: Level
+  private titleText = ''
+  private pending?: { data: Level; title: string } // a level asked for before the assets were loaded
   private busy = false
   private generation = 0
   private lootSprites = new Map<string, Sprite>()
@@ -103,27 +106,41 @@ export class RaidScene extends Phaser.Scene {
     createFxTextures(this)
     this.drawEnvironment()
     this.ready = true
-    this.reset(this.level)
+    if (this.pending) { const p = this.pending; this.pending = undefined; this.play(p.data, p.title) } else this.reset(this.level)
   }
 
   setUpdate(fn: (u: RaidUpdate) => void) { this.onUpdate = fn }
 
+  /** Start a campaign level by index. */
   reset(index: number) {
+    const i = Phaser.Math.Clamp(index, 0, levels.length - 1)
+    this.level = i
+    this.play(levels[i], `${i + 1}. ${levels[i].name}`)
+  }
+
+  /** Start any level: a campaign level, Dagens räd or a round of the endless raid. */
+  play(data: Level, title: string) {
     // Before create() has run (assets still loading) just remember the level; create() will draw it.
-    if (!this.ready) { this.level = index; return }
-    this.level = Phaser.Math.Clamp(index, 0, levels.length - 1)
-    const data = levels[this.level]
+    if (!this.ready) { this.pending = { data, title }; return }
+    this.levelData = data
+    this.titleText = title
     this.history = []
-    this.title?.setText(`${this.level + 1}. ${data.name}`)
-    // Isriket is a winter island.
-    const snow = this.level >= (worlds[2]?.first ?? Infinity)
+    this.title?.setText(title)
+    // Isriket is a winter island – and so is any generated raid that uses its mechanics.
+    const isrikeMechanics = ['key', 'ice', 'ships', 'scout']
+    const index = levels.indexOf(data)
+    const snow = index >= 0 ? index >= (worlds[2]?.first ?? Infinity) : mechanicsOf(data).some(m => isrikeMechanics.includes(m))
     if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(snow))
     const state = createGame(data.loot, data.queue, data.ships)
     this.rebuild(state)
-    // Harald and Ylva are downloaded the first time a level needs them; refresh the cards when they arrive.
+    // Harald, Ylva and Sigrid are downloaded the first time a level needs them; refresh the cards when they arrive.
     const special = state.queue.filter(v => v.kind !== 'normal').map(assetFor).filter((a): a is VikingAsset => !!a)
-    const level = this.level
-    if (special.some(a => !hasSheet(this, a))) ensureVikings(this, special, () => { if (this.level === level && !this.busy) this.layout(false) })
+    if (special.some(a => !hasSheet(this, a))) ensureVikings(this, special, () => { if (this.levelData === data && !this.busy) this.layout(false) })
+  }
+
+  /** Play the current level again from the start. */
+  restart() {
+    if (this.ready && this.levelData) this.play(this.levelData, this.titleText)
   }
 
   /** Draw any state of the current level from scratch, without animation (restart and undo). */
@@ -362,7 +379,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private drawLootSprites() {
-    const placed = levels[this.level].loot
+    const placed = this.levelData.loot
     const rows = placed.map(p => p.at[1])
     // Centred a little above the island's middle so the longship's sail never reaches the front row.
     this.lootOffsetY = ISLAND_CY - 14 - (112 + ((Math.min(...rows) + Math.max(...rows)) / 2) * ROW_H)
@@ -404,12 +421,12 @@ export class RaidScene extends Phaser.Scene {
 
   /** On levels with keys every chest is a locked chest, so plain loot is drawn as barrels there. */
   private kindOf(id: string): LootKind {
-    return levels[this.level].loot.some(l => l.lockedBy?.length) ? 'barrel' : kindFor(id)
+    return this.levelData.loot.some(l => l.lockedBy?.length) ? 'barrel' : kindFor(id)
   }
 
   /** The colour of the key(s) that open a chest. */
   private keyColor(lockedBy: string[]): LootColor {
-    return levels[this.level].loot.find(l => l.id === lockedBy[0])?.color ?? 'yellow'
+    return this.levelData.loot.find(l => l.id === lockedBy[0])?.color ?? 'yellow'
   }
 
   /** A padlock in the colour of its key, drawn on top of the chest (same frame layout, so they line up). */
@@ -794,7 +811,7 @@ export class RaidScene extends Phaser.Scene {
         const pad = target?.getByName('padlock') as Phaser.GameObjects.Image | null
         if (target && pad) {
           // The key(s) fly from where they were plundered into the padlock, so it is clear which key opens which chest.
-          const keys = levels[this.level].loot.filter(l => levels[this.level].loot.find(c => c.id === e.lootId)?.lockedBy?.includes(l.id))
+          const keys = this.levelData.loot.filter(l => this.levelData.loot.find(c => c.id === e.lootId)?.lockedBy?.includes(l.id))
           await Promise.all(keys.map((k, i) => this.flyKey(k.at, k.color!, target, i * 90)))
           sfx.unlock()
           sparkle(this, target.x, target.y - 4)
@@ -925,7 +942,6 @@ export class RaidScene extends Phaser.Scene {
   private notify() {
     const s = this.state
     this.onUpdate?.({
-      level: this.level,
       busy: this.busy,
       canUndo: this.history.length > 0 && s.status !== 'won',
       waits: s.waits,

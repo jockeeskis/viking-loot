@@ -31,3 +31,15 @@ button:disabled{cursor:not-allowed;opacity:.4}
 @media (prefers-reduced-motion:reduce){.result-stars i.on{animation:none}}
 .update-banner{position:sticky;top:8px;z-index:10;display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px 8px 14px;border-radius:14px;background:linear-gradient(#2f6a82,#193a4b);border:3px solid #3b2414;box-shadow:0 8px 20px #0007;font-size:14px;font-weight:700}
 .update-banner span{flex:1}.update-banner button{padding:6px 12px;font-size:13px}.update-banner .close{padding:6px 9px;background:#ffffff22;color:#fff3dc;border-color:#ffffff33;box-shadow:none}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode-card{display:flex;align-items:center;gap:10px;text-align:left;padding:10px 10px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:linear-gradient(#2f6a82,#193a4b);color:#fff3dc;border-radius:16px}
+.mode-card.current{box-shadow:0 3px 0 #3b2414,0 0 0 3px #ffd45a}
+.mode-card.done .mode-icon{filter:drop-shadow(0 0 6px #ffd45a)}
+.mode-icon{font-size:30px;line-height:1}
+.mode-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mode-text strong{font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;font-size:14px;color:#ffd45a}
+.mode-text small{font-size:12px;color:#cfe3ee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.generating p{color:#ffe3a8;font-size:14px}
+.spin{display:inline-block;animation:spin 1.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
