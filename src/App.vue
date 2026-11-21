@@ -214,9 +214,17 @@ onMounted(() => {
     type: Phaser.AUTO, parent: 'game', width: 720, height: 1280, backgroundColor: '#193a4b',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     render: { pixelArt: false, antialias: true }, scene: [scene],
+    // Let the page scroll when a swipe starts on the game (taps are told apart in RaidScene).
+    input: { touch: { capture: false } },
   })
   if (import.meta.env.DEV) (window as unknown as { __game?: Phaser.Game }).__game = game // for debugging in the console
-  game.events.once(Phaser.Core.Events.READY, () => { scene?.setUpdate(update); scene?.reset(current.value) })
+  game.events.once(Phaser.Core.Events.READY, () => {
+    // After a tap the browser also sends mouse events; stop them so a tap never counts twice.
+    // (A touch that became a scroll ends with a non-cancelable touchend, so scrolling is not affected.)
+    game?.canvas.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault() }, { passive: false })
+    scene?.setUpdate(update)
+    scene?.reset(current.value)
+  })
   maybeIntro()
 })
 onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisible); game?.destroy(true) })

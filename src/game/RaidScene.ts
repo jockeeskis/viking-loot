@@ -46,6 +46,7 @@ const BOAT_W = 88
 const SHIP_SHIFT = 28 // the longship makes room for the colour ship
 const BOAT_SCALE = 0.48
 const SCOUT_COLOR = 0x3e7d6a
+const TAP_SLOP = 24 // game pixels a finger may move and still count as a tap
 const boatSeatPos = (i: number, seats: number) => ({ x: BOAT.x + (i - (seats - 1) / 2) * 28, y: BOAT.y - 10 })
 const PREVIEW_MAX = 6
 const CARD = { y: 584, w: 108, h: 100 }
@@ -634,7 +635,11 @@ export class RaidScene extends Phaser.Scene {
       const card = this.makeCard(v, i)
       if (playing) {
         card.setInteractive({ useHandCursor: true })
-        card.on('pointerdown', () => this.choose(v.id))
+        // Choose on release, and only for a tap: a swipe that starts on a card scrolls the page instead
+        // (the browser then cancels the touch) and must never send a viking.
+        card.on('pointerup', (p: Phaser.Input.Pointer) => {
+          if (!p.wasCanceled && p.getDistance() < TAP_SLOP && p.getDuration() < 900) this.choose(v.id)
+        })
         card.on('pointerover', () => { if (!this.busy) card.setScale(1.04) })
         card.on('pointerout', () => card.setScale(1))
       }
