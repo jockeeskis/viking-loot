@@ -35,6 +35,7 @@ P = {
     'hair_blonde': '#F2C23A', 'pants': '#6B4A35', 'boot': '#4A2E1A', 'white': '#FFFFFF',
     'black': '#1D1410', 'cheek': '#F59B9B', 'sail_red': '#D8342B', 'sail_cream': '#F4EAD8',
     'dragon': '#D9A441', 'window': '#FFD36B', 'mouth': '#7A1F12',
+    'beard_brown': '#7A4A2A', 'hair_dark': '#6B3A22', 'tarp': '#A89070', 'rope': '#D9B57A', 'stone': '#8E9196',
 }
 TEAM = {'ragnar': 'red', 'bjorn': 'blue', 'freja': 'yellow'}
 
@@ -298,8 +299,9 @@ def empty(name, loc=(0, 0, 0), parent=None):
 
 
 # ---------------------------------------------------------------- vikings (ui-settings.md §3)
-def build_viking(who):
-    team = P[TEAM[who]]
+def build_viking(who, color=None):
+    """who: ragnar, bjorn, freja, harald (the jarl, any team colour) or ylva (the wild viking)."""
+    team = P[color] if color else P['sail_cream'] if who == 'ylva' else P[TEAM[who]]
     sleeve = shade(team, -0.18)
     rig = {}
     root = rig['root'] = empty('root')
@@ -307,7 +309,14 @@ def build_viking(who):
 
     # torso
     part('tunic', sphere(1, scale=(0.30, 0.26, 0.27), loc=(0, 0, 0.16)), team, hips)
-    part('skirt', cyl(0.30, 0.25, 0.14, loc=(0, 0, 0.03)), shade(team, -0.1), hips)
+    part('skirt', cyl(0.30, 0.25, 0.14, loc=(0, 0, 0.03)), P['wood'] if who == 'ylva' else shade(team, -0.1), hips)
+    if who == 'ylva':  # rainbow stripes: she can become any colour
+        for z, c in ((0.07, 'red'), (0.17, 'blue'), (0.26, 'yellow')):
+            r = 0.3 * math.sqrt(max(0.0, 1 - ((z - 0.16) / 0.27) ** 2)) + 0.004
+            part('stripe', torus(r, 0.03, scale=(1, 0.88, 1), loc=(0, 0, z)), P[c], hips, outline=False)
+    if who == 'harald':  # the jarl's cape, behind the torso
+        part('cape', box(scale=(0.52, 0.05, 0.5), rot=(-0.12, 0, 0), loc=(0, 0.25, 0.08)), shade(team, -0.3), hips, smooth=False, bevel=0.03)
+        part('clasp', sphere(0.045, loc=(0, -0.2, 0.33)), P['gold'], hips)
     part('belt', torus(0.285, 0.035, scale=(1, 0.88, 1), loc=(0, 0, 0.09)), P['wood_dark'], hips)
     part('buckle', box(scale=(0.08, 0.03, 0.07), loc=(0, -0.255, 0.09)), P['gold'], hips, smooth=False, bevel=0.01)
 
@@ -331,23 +340,23 @@ def build_viking(who):
         part('eye', sphere(0.045, seg=16, rings=10, scale=(1, 1, 1.15), loc=(x, -0.235, 0.215)), P['black'], head, outline=False)
         part('glint', sphere(0.015, seg=10, rings=6, loc=(x + 0.015, -0.275, 0.235)), P['white'], head, outline=False, emission=True)
 
-    if who == 'freja':
-        hair = P['hair_blonde']
+    if who in ('freja', 'ylva'):
+        hair = P['hair_blonde'] if who == 'freja' else P['hair_dark']
         part('hair', sphere(0.285, loc=(0, 0.035, 0.19)), hair, head)
         for sx in (-1, 1):
             for k, (z, r) in enumerate(((0.06, 0.075), (-0.05, 0.068), (-0.15, 0.06))):
                 part('braid', sphere(r, loc=(sx * 0.245, -0.02, z)), shade(hair, -0.08 * k), head)
-            part('tie', sphere(0.035, loc=(sx * 0.245, -0.02, -0.21)), P['red'], head, outline=False)
+            part('tie', sphere(0.035, loc=(sx * 0.245, -0.02, -0.21)), P['red'] if who == 'freja' else P['blue'], head, outline=False)
             part('cheek', sphere(0.042, seg=12, rings=8, scale=(1, 0.4, 0.7), loc=(sx * 0.15, -0.235, 0.115)), P['cheek'], head, outline=False)
         part('smile', sphere(1, seg=16, rings=10, cut=('below', 0), scale=(0.075, 0.03, 0.06), loc=(0, -0.252, 0.085)), P['mouth'], head, outline=False)
         browc = shade(hair, -0.25)
     else:
-        beard = P['beard_red'] if who == 'ragnar' else P['beard_grey']
-        long = who == 'bjorn'
+        beard = {'ragnar': P['beard_red'], 'bjorn': P['beard_grey'], 'harald': P['beard_brown']}[who]
+        long = who in ('bjorn', 'harald')
         part('beard', sphere(1, scale=(0.25, 0.17, 0.25 if long else 0.2), loc=(0, -0.12, -0.06 if long else -0.04)), beard, head)
         for sx in (-1, 1):
             part('mustache', sphere(1, scale=(0.11, 0.07, 0.055), rot=(0, sx * 0.35, 0), loc=(sx * 0.075, -0.25, 0.105)), shade(beard, 0.08), head)
-        if who == 'ragnar':  # loud, open grin
+        if who in ('ragnar', 'harald'):  # loud, open grin
             part('mouth', sphere(1, seg=16, rings=10, scale=(0.075, 0.03, 0.05), loc=(0, -0.262, 0.035)), P['mouth'], head, outline=False)
         browc = shade(beard, -0.15)
     stern = who == 'bjorn'
@@ -359,14 +368,20 @@ def build_viking(who):
     hz = 0.3  # helmet rim height: just above the brows
     part('helmet', sphere(0.29, cut=('above', 0.0), scale=(1, 1, 0.8), loc=(0, 0, hz)), P['steel'], head)
     part('rim', torus(0.29, 0.03, loc=(0, 0, hz)), P['steel_dark'], head)
-    part('knob', sphere(0.045, loc=(0, 0, hz + 0.235)), P['steel_dark'], head)
+    if who == 'harald':  # a gold crown around the helmet marks the jarl
+        part('crown', cyl(0.305, 0.315, 0.07, loc=(0, 0, hz + 0.03)), P['gold'], head)
+        for k in range(6):
+            a = 2 * math.pi * k / 6 + math.pi / 6
+            part('point', cyl(0.035, 0.0, 0.09, seg=8, loc=(0.31 * math.cos(a), 0.31 * math.sin(a), hz + 0.1)), P['gold'], head, smooth=False)
+    else:
+        part('knob', sphere(0.045, loc=(0, 0, hz + 0.235)), P['steel_dark'], head)
     for sx in (-1, 1):
         part('horn', cyl(0.07, 0.035, 0.2, rot=(0, sx * 1.0, 0), loc=(sx * 0.32, 0, hz + 0.12)), P['horn'], head)
         part('horntip', cyl(0.038, 0.004, 0.16, rot=(0, sx * 0.25, 0), loc=(sx * 0.41, 0, hz + 0.26)), P['horn'], head)
 
     # props
-    if who in ('ragnar', 'freja'):
-        k = 1.0 if who == 'ragnar' else 0.72
+    if who in ('ragnar', 'freja', 'harald', 'ylva'):
+        k = {'ragnar': 1.0, 'freja': 0.72, 'harald': 1.15, 'ylva': 0.72}[who]
         arm = rig['armR']
         part('handle', cyl(0.022 * k, 0.022 * k, 0.55 * k, loc=(0, -0.06, -0.2 + 0.12 * k)), P['wood_dark'], arm)
         part('blade', sphere(1, seg=24, rings=12, cut=('above', 0.0), scale=(0.17 * k, 0.025, 0.15 * k), rot=(0, math.pi / 2, 0),
@@ -430,6 +445,28 @@ def pose_viking(rig, anim, t):
         hips.rotation_euler.x = 0.14 if 0.4 <= t < 0.7 else 0.0
         head.rotation_euler.x = 0.1 if 0.4 <= t < 0.7 else 0.0
         rig['armL'].rotation_euler.y = 0.12 + 0.5 * math.sin(math.pi * t)
+    elif anim == 'victory':
+        # Jump and cheer with both arms up to the sides.
+        hop = abs(math.sin(p))
+        hips.location.z = 0.30 + 0.1 * hop
+        lift = 2.8 + 0.15 * math.sin(2 * p)
+        rig['armL'].rotation_euler = (-0.35, lift, 0)
+        rig['armR'].rotation_euler = (-0.35, -lift, 0)
+        rig['legL'].rotation_euler.x = 0.3 * hop
+        rig['legR'].rotation_euler.x = -0.3 * hop
+        head.rotation_euler.x = -0.15
+        head.rotation_euler.y = 0.12 * math.sin(p)
+    elif anim == 'fail':
+        # Slump: head drops, arms hang, a slow sad shake. Played once; the last frame holds.
+        u = min(1.0, t / 0.5)
+        hips.location.z = 0.30 - 0.07 * u
+        hips.rotation_euler.x = 0.1 * u
+        head.rotation_euler.x = 0.32 * u
+        head.rotation_euler.z = 0.22 * math.sin(2 * p) * u
+        rig['armL'].rotation_euler = (0.35 * u, -0.15 * u, 0)
+        rig['armR'].rotation_euler = (0.35 * u, 0.15 * u, 0)
+        rig['legL'].rotation_euler.y = -0.12 * u
+        rig['legR'].rotation_euler.y = 0.12 * u
 
 
 # ---------------------------------------------------------------- loot (ui-settings.md §5)
@@ -462,13 +499,20 @@ def build_chest(color):
     return root
 
 
-def build_house(color):
+def build_house(color, opened=False):
+    """opened: after the first hit - door smashed, a roof slab knocked loose, planks on the ground."""
     team = P[color]
     root = empty('root')
     part('walls', box(scale=(0.56, 0.46, 0.36), loc=(0, 0, 0.18)), P['wood_light'], root, smooth=False, bevel=0.02)
     for z in (0.09, 0.18, 0.27):
         part('log', box(scale=(0.57, 0.47, 0.012), loc=(0, 0, z)), P['wood'], root, smooth=False, outline=False)
-    part('door', box(scale=(0.13, 0.02, 0.21), loc=(0, -0.235, 0.105)), P['wood_dark'], root, smooth=False, bevel=0.01)
+    if opened:
+        part('doorway', box(scale=(0.13, 0.02, 0.21), loc=(0, -0.236, 0.105)), P['black'], root, smooth=False, outline=False)
+        part('door', box(scale=(0.13, 0.21, 0.02), rot=(0, 0, 0.5), loc=(0.12, -0.42, 0.012)), P['wood_dark'], root, smooth=False, bevel=0.01)
+        for x, y, a in ((-0.22, -0.4, 0.9), (-0.1, -0.5, -0.4)):
+            part('plank', box(scale=(0.16, 0.035, 0.02), rot=(0, 0, a), loc=(x, y, 0.01)), P['wood'], root, smooth=False)
+    else:
+        part('door', box(scale=(0.13, 0.02, 0.21), loc=(0, -0.235, 0.105)), P['wood_dark'], root, smooth=False, bevel=0.01)
     for x in (-0.17, 0.17):
         part('window', box(scale=(0.09, 0.02, 0.09), loc=(x, -0.236, 0.2)), P['window'], root, smooth=False, outline=False, emission=True, )
         part('frame', box(scale=(0.11, 0.015, 0.11), loc=(x, -0.232, 0.2)), P['wood_dark'], root, smooth=False, outline=False)
@@ -482,12 +526,41 @@ def build_house(color):
         cy, cz = sy * hy / 2, (z0 + z1) / 2
         nrm = Vector((0, sy * math.sin(ang), math.cos(ang)))  # outward normal of this slope
         loc = Vector((0, cy, cz)) + nrm * 0.025 + Vector((0, sy * 0.025, -0.02))
-        part('roof', box(scale=(0.68, slab, 0.05), rot=(-sy * ang, 0, 0), loc=tuple(loc)), team, root, smooth=False, bevel=0.015)
+        loose = opened and sy < 0  # the front slab is torn off
+        if loose:
+            part('loft', box(scale=(0.54, slab - 0.06, 0.02), rot=(-sy * ang, 0, 0), loc=tuple(loc - nrm * 0.03)), P['black'], root,
+                 smooth=False, outline=False)
+            for x, y, a in ((0.24, -0.46, 0.5), (0.33, -0.36, -0.3), (-0.32, -0.3, 1.2)):
+                part('tile', box(scale=(0.12, 0.07, 0.02), rot=(0, 0, a), loc=(x, y, 0.012)), team, root, smooth=False, bevel=0.005)
+        else:
+            part('roof', box(scale=(0.68, slab, 0.05), rot=(-sy * ang, 0, 0), loc=tuple(loc)), team, root, smooth=False, bevel=0.015)
         for k in (0.3, 0.6):  # shingle rows
             l2 = Vector((0, sy * hy * (1 - k), z0 + (z1 - z0) * k)) + nrm * 0.052
+            if loose:
+                continue
             part('shingle', box(scale=(0.69, 0.02, 0.012), rot=(-sy * ang, 0, 0), loc=tuple(l2)), shade(team, -0.25), root, smooth=False, outline=False)
     for sx in (-1, 1):
         part('beam', box(scale=(0.035, 0.035, 0.22), rot=(0, sx * 0.55, 0), loc=(sx * 0.05, 0.0, 0.7)), P['wood_dark'], root, smooth=False, bevel=0.008)
+    return root
+
+
+def build_stone(_color=None):
+    """A chunky boulder with a smaller rock leaning on it."""
+    root = empty('root')
+    part('boulder', sphere(0.3, seg=10, rings=7, cut=('above', -0.02), scale=(1.15, 0.95, 0.95), loc=(0, 0, 0.02)), P['stone'], root, smooth=False)
+    part('rock', sphere(0.15, seg=8, rings=6, cut=('above', -0.01), scale=(1.1, 1, 0.85), loc=(0.27, -0.12, 0)), shade(P['stone'], 0.18), root, smooth=False)
+    part('moss', sphere(0.1, seg=10, rings=6, cut=('above', 0), scale=(1.4, 1, 0.35), loc=(-0.08, -0.02, 0.27)), '#6CBB48', root, outline=False)
+    return root
+
+
+def build_hidden(_color=None):
+    """Loot under a tarp tied with rope; the colour underneath is a secret."""
+    root = empty('root')
+    part('tarp', sphere(0.33, seg=20, rings=12, cut=('above', 0.0), scale=(1.1, 0.95, 1.05)), P['tarp'], root)
+    part('hem', torus(0.34, 0.035, scale=(1.08, 0.93, 1), loc=(0, 0, 0.03)), shade(P['tarp'], -0.15), root)
+    for a in (0.0, math.pi / 2):
+        part('rope', sphere(0.337, seg=24, rings=12, cut=('above', 0.0), scale=(1.1, 0.07, 1.06), rot=(0, 0, a)), P['rope'], root, outline=False)
+    part('knot', sphere(0.05, loc=(0, 0, 0.35)), P['rope'], root)
     return root
 
 
@@ -546,18 +619,18 @@ def anchor(cam, world_point):
 SHEET_QUALITY = 86  # lossy WebP keeps the download small (alpha included)
 
 
-def save_image(img, path):
+def save_image(img, path, quality=None):
     if path.endswith('.webp'):
         img.file_format = 'WEBP'
         img.filepath_raw = path
-        img.save(quality=SHEET_QUALITY)
+        img.save(quality=quality or SHEET_QUALITY)
     else:
         img.file_format = 'PNG'
         img.filepath_raw = path
         img.save()
 
 
-def pack(paths, fw, fh, cols, out_path):
+def pack(paths, fw, fh, cols, out_path, quality=None):
     n = len(paths)
     cols = min(cols, n)
     rows = math.ceil(n / cols)
@@ -574,47 +647,61 @@ def pack(paths, fw, fh, cols, out_path):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     out = bpy.data.images.new('sheet', W, H, alpha=True)
     out.pixels.foreach_set(sheet.ravel())
-    save_image(out, out_path)
+    save_image(out, out_path, quality)
     bpy.data.images.remove(out)
     return cols, rows
 
 
 
-VIKING_ANIMS = [('idle', 12, 8), ('run', 10, 16), ('attack', 10, 18), ('carry', 10, 14)]
+VIKING_ANIMS = [('idle', 12, 8), ('run', 10, 16), ('attack', 10, 18), ('carry', 10, 14), ('victory', 10, 12), ('fail', 10, 9)]
+# Every rendered character: (file name, builder name, team colour or None). Harald (the jarl) comes in all three colours.
+CHARACTERS = {
+    'ragnar': ('ragnar', 'red'), 'bjorn': ('bjorn', 'blue'), 'freja': ('freja', 'yellow'),
+    'harald-red': ('harald', 'red'), 'harald-blue': ('harald', 'blue'), 'harald-yellow': ('harald', 'yellow'),
+    'ylva': ('ylva', None),
+}
 VIKING_FRAME = 192  # shown at ~92 logical px = 184 px on the 2x canvas
+VIKING_QUALITY = 78  # character sheets are the bulk of the download
 
 
-def render_viking(who, manifest):
+def render_viking(key, manifest):
+    who, color = CHARACTERS[key]
     reset_scene()
     OUTLINE_W[0] = 0.013
-    rig = build_viking(who)
+    rig = build_viking(who, color)
     rig['root'].rotation_euler.z = math.radians(20)
     cam = camera((0, 0, 0.62), 1.7, (VIKING_FRAME, VIKING_FRAME), elev=22)
     frames, anims, idx = [], {}, 0
     for name, count, fps in VIKING_ANIMS:
         for f in range(count):
             pose_viking(rig, name, f / count)
-            path = os.path.join(TMP, who, f'{name}_{f:02d}.png')
+            path = os.path.join(TMP, key, f'{name}_{f:02d}.png')
             render_to(path)
             frames.append(path)
         anims[name] = {'start': idx, 'end': idx + count - 1, 'fps': fps}
         idx += count
-    rel = f'assets/characters/{who}/{who}.webp'
-    pack(frames, VIKING_FRAME, VIKING_FRAME, 8, os.path.join(PUBLIC, rel))
+    rel = f'assets/characters/{key}/{key}.webp'
+    pack(frames, VIKING_FRAME, VIKING_FRAME, 8, os.path.join(PUBLIC, rel), quality=VIKING_QUALITY)
     ox, oy = anchor(cam, (0, 0, 0))
     # portrait: head and shoulders, nearly frontal
     pose_viking(rig, 'idle', 0)
     rig['root'].rotation_euler.z = math.radians(12)
     bpy.data.objects.remove(cam)
     camera((0, 0, 0.92), 1.2, (208, 208), elev=8)
-    prel = f'assets/characters/{who}/portrait.webp'
-    tmp = os.path.join(TMP, who, 'portrait.png')
+    prel = f'assets/characters/{key}/portrait.webp'
+    tmp = os.path.join(TMP, key, 'portrait.png')
     render_to(tmp)
     pack([tmp], 208, 208, 1, os.path.join(PUBLIC, prel))
-    manifest['vikings'][TEAM[who]] = {
-        'name': who, 'sheet': rel, 'portrait': prel, 'frameWidth': VIKING_FRAME, 'frameHeight': VIKING_FRAME,
+    entry = {
+        'name': key, 'sheet': rel, 'portrait': prel, 'frameWidth': VIKING_FRAME, 'frameHeight': VIKING_FRAME,
         'originX': ox, 'originY': oy, 'anims': anims,
     }
+    if who == 'harald':
+        manifest.setdefault('jarls', {})[color] = entry
+    elif who == 'ylva':
+        manifest['wild'] = entry
+    else:
+        manifest['vikings'][color] = entry
 
 
 LOOT_FRAME = 160  # shown at ~81 logical px
@@ -622,18 +709,23 @@ LOOT_FRAME = 160  # shown at ~81 logical px
 
 def render_loot(manifest):
     frames, names = [], []
-    builders = {'barrel': build_barrel, 'chest': build_chest, 'house': build_house}
-    for kind, build in builders.items():
-        for color in ('red', 'blue', 'yellow'):
+    builders = {
+        'barrel': build_barrel, 'chest': build_chest, 'house': build_house,
+        'house-open': lambda c: build_house(c, opened=True),
+    }
+    jobs = [(kind, build, color) for kind, build in builders.items() for color in ('red', 'blue', 'yellow')]
+    jobs += [('stone', build_stone, None), ('hidden', build_hidden, None)]
+    for kind, build, color in jobs:
             reset_scene()
             OUTLINE_W[0] = 0.012
             root = build(color)
             root.rotation_euler.z = math.radians(-22)
             cam = camera((0, 0, 0.33), 1.0, (LOOT_FRAME, LOOT_FRAME), elev=28)
-            path = os.path.join(TMP, 'loot', f'{kind}_{color}.png')
+            name = f'{kind}-{color}' if color else kind
+            path = os.path.join(TMP, 'loot', f'{name}.png')
             render_to(path)
             frames.append(path)
-            names.append(f'{kind}-{color}')
+            names.append(name)
     ox, oy = anchor(cam, (0, 0, 0))
     rel = 'assets/loot/loot.webp'
     pack(frames, LOOT_FRAME, LOOT_FRAME, 3, os.path.join(PUBLIC, rel))
@@ -744,6 +836,13 @@ def build_island():
         build_tree(tx, ty, ts)
     for rx, ry, rs in ((22, 210, 0.8), (340, 350, 0.9), (300, 76, 0.7), (60, 368, 0.8)):
         build_rock(rx, ry, rs)
+    # a small dock reaching out towards the longship
+    for k in range(5):
+        part('dockplank', box(scale=(0.42, 0.075 / math.sin(math.radians(ISLAND_ELEV)), 0.025), loc=L(92, 366 + k * 9, 0.03)),
+             P['wood_light'] if k % 2 else P['wood'], root, smooth=False, bevel=0.006)
+    for px in (72, 112):
+        for py in (370, 404):
+            part('post', cyl(0.025, 0.025, 0.2, seg=8, loc=L(px, py, -0.05)), P['wood_dark'], root)
     for bx, by in ((18, 160), (342, 312), (24, 352)):
         part('bush', sphere(0.12, seg=12, rings=8, cut=('above', 0), loc=L(bx, by), scale=(1.2, 1, 0.8)), '#4FAE52', root)
         part('bush2', sphere(0.08, seg=12, rings=8, cut=('above', 0), loc=L(bx + 10, by + 4), scale=(1.2, 1, 0.8)), '#5FBF5A', root)
@@ -781,15 +880,17 @@ def write_manifest(manifest):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    want = set(argv) or {'ragnar', 'bjorn', 'freja', 'loot', 'ship', 'island'}
+    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'island'}
+    if 'harald' in want:
+        want |= {'harald-red', 'harald-blue', 'harald-yellow'}
     manifest = {'vikings': {}, 'loot': None, 'ship': None, 'island': None}
     if os.path.exists(MANIFEST_JSON):  # keep entries for subjects not re-rendered this run
         with open(MANIFEST_JSON, encoding='utf-8') as f:
             manifest.update(json.load(f))
-    for who in ('ragnar', 'bjorn', 'freja'):
-        if who in want:
-            render_viking(who, manifest)
-            print(f'[viking-loot] rendered {who}')
+    for key in CHARACTERS:
+        if key in want:
+            render_viking(key, manifest)
+            print(f'[viking-loot] rendered {key}')
     if 'loot' in want:
         render_loot(manifest)
         print('[viking-loot] rendered loot')

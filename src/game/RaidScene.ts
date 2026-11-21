@@ -9,8 +9,8 @@ import {
   drawTree, drawRock, drawShip, drawPanel, drawTab, type LootKind,
 } from './art'
 import {
-  preloadAssets, createAnims, hasViking, hasLoot, hasShip, hasIsland, vikingAsset, lootAsset, shipAsset, islandAsset, lootFrame,
-  vikingKey, vikingAnimKey, portraitKey, LOOT_KEY, SHIP_KEY, ISLAND_KEY, type VikingAnim,
+  preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, lootAsset, shipAsset, islandAsset,
+  lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, ISLAND_KEY, type VikingAnim, type VikingAsset,
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, CAMERA_ZOOM } from './fx'
 import { sfx } from './sfx'
@@ -42,6 +42,7 @@ const SLOT_SCALE = 0.62
 const PREVIEW_MAX = 6
 const CARD = { y: 584, w: 108, h: 100 }
 const cardX = (i: number) => 62 + i * 118
+const ROW_H = 80 // vertical distance between loot rows
 // Display scales for the rendered sprites (frame sizes come from the manifest).
 // On-screen widths in logical px; the scale follows from the rendered frame size.
 const VIKING_W = 92
@@ -103,7 +104,12 @@ export class RaidScene extends Phaser.Scene {
     const data = levels[this.level]
     this.history = []
     this.title?.setText(`${this.level + 1}. ${data.name}`)
-    this.rebuild(createGame(data.loot, data.queue))
+    const state = createGame(data.loot, data.queue)
+    this.rebuild(state)
+    // Harald and Ylva are downloaded the first time a level needs them; refresh the cards when they arrive.
+    const special = state.queue.filter(v => v.kind !== 'normal').map(assetFor).filter((a): a is VikingAsset => !!a)
+    const level = this.level
+    if (special.some(a => !hasSheet(this, a))) ensureVikings(this, special, () => { if (this.level === level && !this.busy) this.layout(false) })
   }
 
   /** Draw any state of the current level from scratch, without animation (restart and undo). */
@@ -236,7 +242,7 @@ export class RaidScene extends Phaser.Scene {
 
   // ---------- Loot ----------
 
-  private lootPos(at: [number, number]) { return { x: 54 + at[0] * 84, y: 112 + at[1] * 84 + this.lootOffsetY } }
+  private lootPos(at: [number, number]) { return { x: 54 + at[0] * 84, y: 112 + at[1] * ROW_H + this.lootOffsetY } }
 
   /** One loot object: a rendered sprite with a ground shadow, or the code-drawn fallback. */
   private makeLootGraphic(kind: LootKind, color: LootColor): Sprite {
@@ -254,6 +260,15 @@ export class RaidScene extends Phaser.Scene {
 
   /** Stones (no colour) and hidden loot (colour not yet known) use their own looks. */
   private makeItemGraphic(p: { kind?: LootKind; id: string; color?: LootColor; stone?: boolean }, hiddenNow: boolean): Sprite {
+    const named = p.stone ? namedLootFrame('stone') : hiddenNow ? namedLootFrame('hidden') : undefined
+    if (named !== undefined && hasLoot(this)) {
+      const a = lootAsset()!
+      const shadow = this.add.ellipse(0, 22, 58, 16, 0x000000, 0.22)
+      const img = this.add.image(0, 22, LOOT_KEY, named).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName('img')
+      const parts: Phaser.GameObjects.GameObject[] = [shadow, img]
+      if (hiddenNow) parts.push(this.add.text(0, -4, '?', cartoonText(22, '#f5c542')).setOrigin(0.5).setName('q'))
+      return this.add.container(0, 0, parts).setName('art')
+    }
     if (p.stone) {
       const g = this.add.graphics()
       g.fillStyle(0x000000, 0.22); g.fillEllipse(0, 20, 58, 16)
@@ -272,23 +287,27 @@ export class RaidScene extends Phaser.Scene {
     return this.makeLootGraphic(p.kind ?? kindFor(p.id), p.color!)
   }
 
-  /** A house that took its first hit: tilt it and add cracks. */
+  /** A house that took its first hit: show the broken-open model (or cracks on drawn art). */
   private markOpened(target: Sprite) {
+    const img = (target.getByName('art') as Sprite | null)?.getByName('img') as Phaser.GameObjects.Image | null
+    const frame = lootFrame('house-open', target.getData('color'))
+    this.tweens.add({ targets: target, angle: { from: -6, to: 0 }, duration: 260, ease: 'Back.easeOut' })
+    if (img && frame !== undefined) { img.setFrame(frame); return }
     const crack = this.add.graphics()
     crack.lineStyle(2.5, INK)
     crack.beginPath(); crack.moveTo(-10, -18); crack.lineTo(-3, -8); crack.lineTo(-8, 0); crack.lineTo(2, 10); crack.strokePath()
     crack.beginPath(); crack.moveTo(12, -12); crack.lineTo(6, -2); crack.lineTo(12, 6); crack.strokePath()
     target.add(crack)
-    this.tweens.add({ targets: target, angle: { from: -6, to: 0 }, duration: 260, ease: 'Back.easeOut' })
   }
 
   private drawLootSprites() {
     const placed = levels[this.level].loot
     const rows = placed.map(p => p.at[1])
-    this.lootOffsetY = ISLAND_CY - 6 - (112 + ((Math.min(...rows) + Math.max(...rows)) / 2) * 84)
+    // Centred a little above the island's middle so the longship's sail never reaches the front row.
+    this.lootOffsetY = ISLAND_CY - 14 - (112 + ((Math.min(...rows) + Math.max(...rows)) / 2) * ROW_H)
     let minGap = Infinity
     placed.forEach(a => placed.forEach(b => {
-      if (a !== b && a.at[0] === b.at[0]) minGap = Math.min(minGap, Math.abs(a.at[1] - b.at[1]) * 84)
+      if (a !== b && a.at[0] === b.at[0]) minGap = Math.min(minGap, Math.abs(a.at[1] - b.at[1]) * ROW_H)
     }))
     const scale = Phaser.Math.Clamp(minGap / 60, 0.68, 1)
     // Back rows first so blockers stand in front of what they block.
@@ -335,22 +354,23 @@ export class RaidScene extends Phaser.Scene {
   /** A chibi viking. The drawing sits in an inner "rig" so it can hop while the container moves. */
   private makeActor(v: Viking): Sprite {
     const color = lookOf(v)
+    const asset = assetFor(v)
     let parts: Phaser.GameObjects.GameObject[]
-    if (hasViking(this, color)) {
-      const v = vikingAsset(color)!
+    if (hasSheet(this, asset)) {
       const shadow = this.add.ellipse(0, 29, 34, 10, 0x000000, 0.22)
-      const body = this.add.sprite(0, 29, vikingKey(color)).setOrigin(v.originX, v.originY).setScale(VIKING_W / v.frameWidth).setName('body')
-      body.play(vikingAnimKey(color, 'idle'))
+      const body = this.add.sprite(0, 29, sheetKey(asset)).setOrigin(asset.originX, asset.originY).setScale(VIKING_W / asset.frameWidth).setName('body')
+      body.play(animKey(asset, 'idle'))
       parts = [shadow, body]
     } else {
       const g = this.add.graphics()
       drawChibi(g, color)
       parts = [g]
     }
-    if (v.kind === 'wild' && !v.color) parts.unshift(this.rainbowRing())
+    if (v.kind === 'wild') parts.unshift(v.color ? this.colorRing(v.color) : this.rainbowRing())
     const rig = this.add.container(0, 0, parts).setName('rig')
-    rig.setData('color', color)
-    if (v.kind === 'jarl') rig.setScale(1.15)
+    rig.setData('asset', hasSheet(this, asset) ? asset : null)
+    rig.setData('size', v.kind === 'jarl' ? 1.12 : 1) // the jarl stands a bit taller
+    rig.setScale(rig.getData('size'))
     const carry = this.add.container(0, -36).setName('carry')
     const badge = this.add.text(0, 34, '', { ...cartoonText(14), padding: { x: 4, y: 0 } }).setOrigin(0.5).setName('badge').setVisible(false)
     return this.add.container(0, 0, [rig, carry, badge]).setDepth(30)
@@ -361,7 +381,9 @@ export class RaidScene extends Phaser.Scene {
     const rig = actor.getByName('rig') as Sprite
     const body = rig.getByName('body') as Phaser.GameObjects.Sprite | null
     if (!body) return Promise.resolve()
-    const key = vikingAnimKey(rig.getData('color'), anim)
+    const asset = rig.getData('asset') as VikingAsset | null
+    if (!asset || !asset.anims[anim]) return Promise.resolve()
+    const key = animKey(asset, anim)
     if (anim !== 'attack') { body.play(key, true); return Promise.resolve() }
     return new Promise(res => { body.play(key); body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => res()) })
   }
@@ -375,14 +397,22 @@ export class RaidScene extends Phaser.Scene {
     return g
   }
 
-  /** A wild viking took its colour: swap the look and drop the rainbow ring. */
+  /** A ring on the ground in one colour: shows which colour the wild viking chose. */
+  private colorRing(color: LootColor) {
+    const g = this.add.graphics().setName('ring')
+    g.fillStyle(COLORS[color], 0.35); g.fillCircle(0, 29, 20)
+    g.lineStyle(4, COLORS[color]); g.strokeCircle(0, 29, 20)
+    g.setScale(1, 0.32)
+    return g
+  }
+
+  /** A wild viking took its colour: the rainbow ring becomes a ring in that colour. */
   private recolor(actor: Sprite, color: LootColor) {
     const rig = actor.getByName('rig') as Sprite
     rig.getByName('ring')?.destroy()
-    rig.setData('color', color)
-    const body = rig.getByName('body') as Phaser.GameObjects.Sprite | null
-    if (body && hasViking(this, color)) body.setTexture(vikingKey(color)).play(vikingAnimKey(color, 'idle'))
-    this.tweens.add({ targets: rig, scaleX: rig.scaleX * 1.2, scaleY: rig.scaleY * 1.2, yoyo: true, duration: 140 })
+    rig.addAt(this.colorRing(color), 0)
+    const s = rig.getData('size') as number
+    this.tweens.add({ targets: rig, scaleX: Math.sign(rig.scaleX) * s * 1.2, scaleY: s * 1.2, yoyo: true, duration: 140 })
     floatText(this, actor.x, actor.y - 40, '✦', color)
   }
 
@@ -394,6 +424,7 @@ export class RaidScene extends Phaser.Scene {
 
   private makeCard(v: Viking, index: number): Sprite {
     const color = lookOf(v)
+    const asset = assetFor(v)
     const c = v.kind === 'wild' && !v.color ? GOLD : COLORS[color]
     const { w, h } = CARD
     const g = this.add.graphics()
@@ -403,8 +434,8 @@ export class RaidScene extends Phaser.Scene {
     g.fillStyle(c); g.fillRoundedRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 26, 12)
     g.fillStyle(shade(c, 0.35), 0.5); g.fillEllipse(-14, -h / 2 + 22, 50, 22)
     let portrait: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image
-    if (this.textures.exists(portraitKey(color))) {
-      portrait = this.add.image(0, -2, portraitKey(color))
+    if (asset && this.textures.exists(portraitKey(asset))) {
+      portrait = this.add.image(0, -2, portraitKey(asset))
       portrait.setScale(104 / portrait.width)
     } else {
       portrait = this.add.graphics()
@@ -457,8 +488,9 @@ export class RaidScene extends Phaser.Scene {
       const x = QUEUE_PANEL.x + 24 + i * 29, y = PANEL_Y + 34
       g.fillStyle(0x2a190c); g.fillCircle(x, y, 13)
       g.lineStyle(v.kind === 'jarl' ? 3.5 : 2.5, v.color ? COLORS[v.color] : GOLD); g.strokeCircle(x, y, 13)
-      if (this.textures.exists(portraitKey(lookOf(v)))) {
-        const head = this.add.image(x, y + 1, portraitKey(lookOf(v))).setDepth(6)
+      const asset = assetFor(v)
+      if (asset && this.textures.exists(portraitKey(asset))) {
+        const head = this.add.image(x, y + 1, portraitKey(asset)).setDepth(6)
         head.setScale(34 / head.width)
         const m = this.make.graphics({}, false)
         m.fillStyle(0xffffff); m.fillCircle(x, y, 12)
@@ -471,7 +503,8 @@ export class RaidScene extends Phaser.Scene {
     if (rest.length === 0) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y + 34, this.state.queue.length ? 'Sista vikingarna!' : 'Kön är tom', cartoonText(11, '#e8d6bb')).setOrigin(0.5).setDepth(6))
 
     const seated = new Set(this.state.waiting.map(v => v.id))
-    this.actors.forEach((a, id) => { if (!seated.has(id)) { a.destroy(); this.actors.delete(id) } })
+    // Keep the victory crew on deck; everyone else not seated has left.
+    this.actors.forEach((a, id) => { if (!seated.has(id) && !id.startsWith('cheer-')) { a.destroy(); this.actors.delete(id) } })
     this.state.waiting.forEach((v, i) => {
       let a = this.actors.get(v.id)
       if (!a) { a = this.makeActor(v); this.actors.set(v.id, a) }
@@ -502,12 +535,34 @@ export class RaidScene extends Phaser.Scene {
     sfx.click()
     this.playEvents(before, after.events, gen).then(async () => {
       if (gen !== this.generation) return
-      if (after.status === 'won') { victory(this); sfx.win(); await this.delay(650) }
-      else if (after.status === 'lost') { sfx.lose(); await this.delay(350) }
+      if (after.status === 'won') {
+        victory(this); sfx.win(); this.celebrate()
+        await this.delay(1100)
+      } else if (after.status === 'lost') {
+        sfx.lose()
+        this.actors.forEach(a => this.animate(a, 'fail'))
+        await this.delay(900)
+      }
       if (gen !== this.generation) return
       this.busy = false
       this.layout(true)
       this.notify()
+    })
+  }
+
+  /** The three team vikings jump onto the longship and cheer; anyone still seated cheers too. */
+  private celebrate() {
+    this.actors.forEach(a => this.animate(a, 'victory'))
+    ;(['red', 'blue', 'yellow'] as LootColor[]).forEach((color, i) => {
+      const asset = teamAsset(color)
+      if (!hasSheet(this, asset)) return
+      const crew = this.makeActor({ id: `cheer-${i}`, kind: 'normal', color, capacity: 2, collectedCount: 0 })
+      crew.setPosition(BOARD.x - 40 + i * 40, BOARD.y + 30).setScale(0.3).setAlpha(0).setDepth(31)
+      this.actors.set(`cheer-${i}`, crew)
+      this.tweens.add({
+        targets: crew, y: BOARD.y - 4, scale: 0.85, alpha: 1, duration: 260, delay: i * 90, ease: 'Back.easeOut',
+        onComplete: () => this.animate(crew, 'victory'),
+      })
     })
   }
 
@@ -521,7 +576,8 @@ export class RaidScene extends Phaser.Scene {
     const rig = actor.getByName('rig') as Sprite
     const dist = Phaser.Math.Distance.Between(actor.x, actor.y, x, y)
     const duration = Phaser.Math.Clamp(dist * 1.1, 160, 520)
-    if (Math.abs(x - actor.x) > 4) rig.scaleX = x < actor.x ? -1 : 1
+    const size = (rig.getData('size') as number | undefined) ?? 1
+    if (Math.abs(x - actor.x) > 4) rig.scaleX = (x < actor.x ? -1 : 1) * size
     const sprite = !!rig.getByName('body')
     const carrying = (actor.getByName('carry') as Sprite).length > 0
     this.animate(actor, carrying ? 'carry' : 'run')
@@ -567,7 +623,15 @@ export class RaidScene extends Phaser.Scene {
         setLoot(e.lootId, { hidden: false })
         const target = this.lootSprites.get(e.lootId)
         if (target) {
-          target.getByName('art')?.destroy()
+          const old = target.getByName('art') as Sprite | null
+          const tarp = (old?.getByName('img') as Phaser.GameObjects.Image | null)
+          if (tarp) {
+            // Lift the tarp off as a separate image so the loot underneath appears right away.
+            const fly = this.add.image(target.x, target.y + 22 * target.scale, LOOT_KEY, tarp.frame.name)
+              .setOrigin(tarp.originX, tarp.originY).setScale(tarp.scaleX * target.scale).setDepth(35)
+            this.tweens.add({ targets: fly, y: fly.y - 46, x: fly.x + 26, angle: 35, alpha: 0, duration: 420, ease: 'Sine.easeOut', onComplete: () => fly.destroy() })
+          }
+          old?.destroy()
           target.addAt(this.makeLootGraphic(target.getData('kind'), target.getData('color')), 0)
           sfx.reveal()
           coinBurst(this, target.x, target.y - 6, target.getData('color'))
@@ -604,7 +668,7 @@ export class RaidScene extends Phaser.Scene {
         const target = this.lootSprites.get(e.lootId)!
         await this.runTo(actor, target.x - 20, target.y + 4)
         const rig = actor.getByName('rig') as Sprite
-        rig.scaleX = Math.abs(rig.scaleX)
+        rig.scaleX = Math.abs(rig.scaleX) // face the loot
         // plunder swing; the axe lands about 60% into the attack animation
         this.time.delayedCall(rig.getByName('body') ? 320 : 90, () => { sfx.chop(); woodChips(this, target.x, target.y + 4) })
         if (rig.getByName('body')) await this.animate(actor, 'attack')

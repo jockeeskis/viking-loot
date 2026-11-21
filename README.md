@@ -70,21 +70,21 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 
 ## 3D-grafik
 
-Vikingarna (Ragnar, Björn och Freja), tunnor, kistor, hus och långskeppet är 3D-modeller. De byggs helt med skript i Blender av rundade grundformer, så inga externa modeller eller licenser behövs. Renderingen är cel-shadad med kontur, och bilderna packas till sprite sheets i WebP (totalt cirka 0,75 MB):
+Vikingarna (Ragnar, Björn, Freja, jarlen Harald och Ylva), tunnor, kistor, hus, stenar, presenningar, långskeppet och ön är 3D-modeller. De byggs helt med skript i Blender av rundade grundformer, så inga externa modeller eller licenser behövs. Renderingen är cel-shadad med kontur, och bilderna packas till sprite sheets i WebP (totalt cirka 1,8 MB, varav cirka 1 MB laddas direkt – Harald och Ylva hämtas först när en bana behöver dem):
 
 | Figur/objekt | Animationer | Fil |
 |---|---|---|
-| Ragnar, Björn, Freja | `idle`, `run`, `attack`, `carry` + porträtt | `public/assets/characters/<namn>/` |
-| Tunna, kista, hus × 3 färger | – | `public/assets/loot/loot.webp` |
+| Ragnar, Björn, Freja, Harald (× 3 färger), Ylva | `idle`, `run`, `attack`, `carry`, `victory`, `fail` + porträtt | `public/assets/characters/<namn>/` |
+| Tunna, kista, hus, uppbrutet hus × 3 färger, sten, presenning | – | `public/assets/loot/loot.webp` |
 | Långskepp | `bob` | `public/assets/ships/longship.webp` |
-| Ön (bakgrund) | – | `public/assets/island/island.webp` |
+| Ön med brygga (bakgrund) | – | `public/assets/island/island.webp` |
 
-Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender automatiskt i standardmappen på Windows, eller via miljövariabeln `BLENDER`. Hela renderingen tar cirka 1,5 minut. Ändra modeller och poser i `render_assets.py`.
+Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender automatiskt i standardmappen på Windows, eller via miljövariabeln `BLENDER`. Hela renderingen tar cirka 5 minuter (`npm run render-art -- loot harald` renderar bara delar). Ändra modeller och poser i `render_assets.py`.
 
 ## Status och nästa steg
 
 - Version 0.2 är klar: alla acceptanskriterier är uppfyllda, inklusive touch på riktig mobil (testat via GitHub Pages).
 - Figurer, skatter, skepp och ön (med granar, stenar och buskar) är renderade i 3D. Havet och panelerna ritas i kod.
-- Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen.
+- Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen. En egen loopad melodi spelas i bakgrunden (🎵 slår av/på).
 - 12 banor; 7–12 är framtagna med `npm run generate-levels`.
-- Version 0.3 pågår (se `VIKING_LOOT_0.3.md`): regelmotorn stöder redan hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter. Stjärnor (efter banans par), karta, ångra, tips och introduktioner är klara. Nästa fas: 3D-grafik och ljud för de nya mekanikerna.
+- Version 0.3 pågår (se `VIKING_LOOT_0.3.md`): regelmotorn stöder redan hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter. Stjärnor (efter banans par), karta, ångra, tips, introduktioner samt 3D-grafik, animationer och musik för de nya mekanikerna är klara. Nästa fas: världen Fjordarna (bana 13–24).

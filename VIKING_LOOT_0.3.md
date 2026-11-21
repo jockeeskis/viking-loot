@@ -1,6 +1,6 @@
 # Viking Loot 0.3 – Fjordarna: nya mekaniker, stjärnor och hjälp
 
-> **Status (2026-11-21):** Fas 1–2 klara: regelmotorn stöder alla nya mekaniker, och stjärnor, karta, ångra, tips och introduktioner finns i spelet. Fas 3–4 återstår (se 7).
+> **Status (2026-11-21):** Fas 1–3 klara: regelmotor, stjärnor, karta, ångra, tips, introduktioner, ny 3D-grafik, animationer och musik. Fas 4 (Fjordarna) återstår (se 7).
 
 ## Syfte
 
@@ -84,10 +84,10 @@ Alla nya egenskaper är valfria i bandatan. Banorna 1–12 beter sig exakt som i
   - Jarl Harald (mantel och krona, i tre färger),
   - Ylva, den flerfärgade vikingen (randig tunika),
   - animationerna `victory` och `fail` för alla vikingar.
-- Ön får en brygga och några små hus som dekor. Seglet får inte skymma den främre mittskatten.
+- Ön får en brygga. Seglet får inte skymma den främre mittskatten. *(Små hus som dekor ströks: kanterna runt 4 × 4-ytan är för smala för att de ska få plats utan att skymma skatter.)*
 - Effekter: sten som rasar (damm och fragment), presenning som blåser av, ring i den valda färgen när Ylva väljer färg.
 - Bakgrundsmusiken syntetiseras som ljudeffekterna. Musik och effekter slås på och av var för sig.
-- Alla bildfiler är WebP och tillsammans högst cirka 1,5 MB.
+- Alla bildfiler är WebP. *(Utfall: 1,8 MB totalt men cirka 1 MB vid start, eftersom Harald och Ylva laddas först när en bana behöver dem.)*
 
 ## 6. Banor – Fjordarna (13–24)
 
@@ -107,7 +107,7 @@ Alla nya egenskaper är valfria i bandatan. Banorna 1–12 beter sig exakt som i
 
 1. **Regelmotor och tester** – klar. Nya fält, händelser, `minWaits` och `hint()`, enkel tillfällig grafik i scenen samt 10 nya tester (totalt 31).
 2. **Stjärnor, karta och hjälp** – klar. `par` i bandatan (testat mot lösaren), `src/game/progress.ts` (stjärnor, sparning, migrering från 0.2), `src/components/LevelMap.vue`, ångra via `RaidScene.rebuild(state)`, tips via `hint()` och introduktioner i `src/game/intros.ts`. 36 tester.
-3. **Grafik och ljud** – nya modeller och animationer, dekor på ön, musik.
+3. **Grafik och ljud** – klar. Harald (tre färger), Ylva, uppbrutet hus, sten, presenning, `victory`/`fail` för alla vikingar, brygga på ön, tätare rader så att seglet går fritt, syntetiserad musik med egen knapp, lat laddning av Harald och Ylva (`ensureVikings` i `assets.ts`).
 4. **Fjordarna** – generatorn utökas och bana 13–24 läggs till.
 
 Varje fas avslutas med `npm test`, `npm run build`, kontroll i webbläsaren och commit + push, som deployas till GitHub Pages.
@@ -123,9 +123,9 @@ Varje fas avslutas med `npm test`, `npm run build`, kontroll i webbläsaren och 
 - [x] Stjärnor delas ut enligt par och sparas.
 - [x] Kartan visar båda världarna, stjärnor och upplåsning. *(Fjordarna visas som "kommer snart" tills fas 4.)*
 - [ ] Ångra och tips fungerar på mobil. *(Verifierat i desktop-webbläsare.)*
-- [ ] Varje ny mekanik har en introduktion och en egen 3D-grafik.
+- [x] Varje ny mekanik har en introduktion och en egen 3D-grafik.
 - [ ] Banorna 13–24 är spelbara, och varje mekanik förekommer i minst en bana som går att förlora.
-- [ ] Bildfilerna är tillsammans högst cirka 1,5 MB.
+- [x] Bildfilerna är tillsammans högst cirka 1,5 MB vid start. *(1,8 MB totalt, cirka 1 MB laddas direkt.)*
 
 ## 9. Utanför scope för 0.3
 

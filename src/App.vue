@@ -4,7 +4,7 @@ import Phaser from 'phaser'
 import { RaidScene, type RaidUpdate } from './game/RaidScene'
 import { levels, worlds } from './game/levels'
 import { WAITING_SLOTS } from './game/engine'
-import { isMuted, setMuted, unlockAudio } from './game/sfx'
+import { isMuted, setMuted, unlockAudio, isMusicOn, setMusicOn } from './game/sfx'
 import { loadProgress, saveProgress, recordWin, starsFor } from './game/progress'
 import { INTROS, mechanicsOf, type Mechanic } from './game/intros'
 import LevelMap from './components/LevelMap.vue'
@@ -73,6 +73,8 @@ function next() { if (current.value < levels.length - 1) openLevel(current.value
 
 const muted = ref(isMuted())
 function toggleSound() { setMuted(!muted.value); muted.value = isMuted(); unlockAudio() }
+const music = ref(isMusicOn())
+function toggleMusic() { setMusicOn(!music.value); music.value = isMusicOn() }
 
 onMounted(() => {
   window.addEventListener('pointerdown', unlockAudio, { once: true })
@@ -134,10 +136,11 @@ onBeforeUnmount(() => game?.destroy(true))
       <button @click="restart">↻ Starta om</button>
       <button :disabled="!info.canUndo || info.busy" @click="undo">↶ Ångra</button>
       <button :disabled="info.busy || info.status !== 'playing'" @click="showHint">💡 Tips</button>
-      <button class="icon" :aria-label="muted ? 'Slå på ljud' : 'Stäng av ljud'" @click="toggleSound">{{ muted ? '🔇' : '🔊' }}</button>
+      <button class="icon" :class="{ off: !music }" :aria-label="music ? 'Stäng av musik' : 'Slå på musik'" :title="music ? 'Musik på' : 'Musik av'" @click="toggleMusic">🎵</button>
+      <button class="icon" :aria-label="muted ? 'Slå på ljudeffekter' : 'Stäng av ljudeffekter'" :title="muted ? 'Effekter av' : 'Effekter på'" @click="toggleSound">{{ muted ? '🔇' : '🔊' }}</button>
     </div>
     <h2 class="section-title">Karta</h2>
     <LevelMap :worlds="worlds" :names="levels.map(l => l.name)" :stars="progress.stars" :unlocked="unlocked" :current="current" @select="openLevel" />
-    <p class="foot">Vikingar, skatter, skepp och ö är 3D-renderade i Blender. Ljuden är syntetiserade i webbläsaren.</p>
+    <p class="foot">Vikingar, skatter, skepp och ö är 3D-renderade i Blender. Ljud och musik är syntetiserade i webbläsaren.</p>
   </main>
 </template>
