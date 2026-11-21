@@ -83,8 +83,8 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 
 ## Status och nästa steg
 
-- Spelmekaniken för 0.2 är klar och testad. Det som återstår av acceptanskriterierna är test med touch på en riktig mobil.
+- Version 0.2 är klar: alla acceptanskriterier är uppfyllda, inklusive touch på riktig mobil (testat via GitHub Pages).
 - Figurer, skatter, skepp och ön (med granar, stenar och buskar) är renderade i 3D. Havet och panelerna ritas i kod.
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen.
 - 12 banor; 7–12 är framtagna med `npm run generate-levels`.
-- Nästa steg: test på riktig mobil via GitHub Pages-länken.
+- Möjliga nästa steg: justera skepp/segel så att det inte skymmer främre skatter, fler banor eller nya mekaniker (version 0.3).

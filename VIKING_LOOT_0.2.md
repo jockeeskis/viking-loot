@@ -1,6 +1,6 @@
 # Viking Loot 0.2 – Riktiga pussel och förlustvillkor
 
-> **Status (2026-11-20):** Implementerad. Regelmotor, 12 banor, tester och gränssnitt finns i `src/game/`. Förlustregeln för väntplatser är ändrad jämfört med första utkastet (se 1.6). Visuell stil styrs av `ui-settings.md`.
+> **Status (2026-11-21):** Implementerad och samtliga acceptanskriterier uppfyllda. Regelmotor, 12 banor, tester och gränssnitt finns i `src/game/`. Förlustregeln för väntplatser är ändrad jämfört med första utkastet (se 1.6). Visuell stil styrs av `ui-settings.md`.
 
 ## Syfte
 
@@ -170,7 +170,7 @@ Varje bana ska ha minst en verifierad vinstsekvens, och minst en bana ska ha en 
 - [x] Omstart återställer hela banans tillstånd.
 - [x] Minst fem banor är spelbara, varav minst en har både vinst- och förlustväg.
 - [x] Tester täcker vinst, förlust, blockering, kö och väntplatser (`npm test`, 21 tester).
-- [ ] Spelet fungerar med mus och touch i mobilformat. *(Mus verifierad i desktop-webbläsare; touch på riktig mobil ej testad ännu.)*
+- [x] Spelet fungerar med mus och touch i mobilformat. *(Mus i desktop-webbläsare; touch testat på riktig mobil via GitHub Pages 2026-11-21.)*
 
 ## 10. Utanför scope för 0.2
 

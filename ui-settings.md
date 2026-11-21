@@ -141,7 +141,7 @@ Bygg **en** polerad och fullt spelbar bana med:
 - [ ] Färgade tunnor och skattkistor med plundringseffekter. *(Modellerna är klara; mynt- och flisseffekter saknas.)*
 - [x] Visuell skillnad mellan tillgängligt och blockerat byte.
 - [x] Tydliga tillstånd för vinst, förlust och omstart.
-- [ ] Responsiv och läsbar mobilvy i 9:16.
+- [x] Responsiv och läsbar mobilvy i 9:16. *(Testad på riktig mobil 2026-11-21.)*
 - [x] Dokumenterade källor och licenser för alla tredjepartsassets. *(Inga tredjepartsassets används – allt byggs med skript.)*
 
 ## 12. Gränsdragning och beroenden
