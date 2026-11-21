@@ -25,6 +25,11 @@ Alla nya egenskaper är valfria i bandatan. Ett regressionstest kontrollerar att
 - En nyckel (`key: true`) är en vanlig skatt i sin färg och kostar en bärplats.
 - En kista har `lockedBy: [nyckel-id…]` och går inte att nå förrän **alla** de nycklarna är plundrade, oavsett vilken hög de ligger i (händelsen `unlock`).
 - I `stacks()` skrivs nyckeln `!r` och kistan `#r`. En kista låses av banans nycklar i samma färg.
+- **Visning** (ändrat efter test på mobil, där det var otydligt vad som hörde ihop):
+  - Hänglåset har nyckelns färg.
+  - På banor med nycklar är alla vanliga skatter tunnor, så en kista är alltid en låst kista.
+  - De små "blockerad"-låsen visas inte på de banorna, bara den mörkare tonen.
+  - När nyckeln plundras flyger den i en båge till låset, som sedan springer upp.
 
 ### 1.2 Is
 

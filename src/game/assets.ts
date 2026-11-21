@@ -52,9 +52,9 @@ export const shipAsset = () => MANIFEST.ship
 export const islandAsset = (snow = false) => (snow ? MANIFEST.islandSnow ?? MANIFEST.island : MANIFEST.island) ?? null
 export const islandKey = (snow = false) => (snow && MANIFEST.islandSnow ? ISLAND_SNOW_KEY : ISLAND_KEY)
 export const boatsAsset = () => MANIFEST.boats ?? null
-export const lootFrame = (kind: LootKind | 'house-open', color: LootColor) => MANIFEST.loot?.frames[`${kind}-${color}`]
-/** Colourless loot frames: 'stone', 'hidden' (loot under a tarp) and the overlays 'padlock' and 'ice'. */
-export const namedLootFrame = (name: 'stone' | 'hidden' | 'padlock' | 'ice') => MANIFEST.loot?.frames[name]
+export const lootFrame = (kind: LootKind | 'house-open' | 'padlock', color: LootColor) => MANIFEST.loot?.frames[`${kind}-${color}`]
+/** Colourless loot frames: 'stone', 'hidden' (loot under a tarp) and the 'ice' overlay. */
+export const namedLootFrame = (name: 'stone' | 'hidden' | 'ice') => MANIFEST.loot?.frames[name]
 
 function queueViking(scene: Phaser.Scene, a: VikingAsset) {
   if (!scene.textures.exists(sheetKey(a))) scene.load.spritesheet(sheetKey(a), a.sheet, { frameWidth: a.frameWidth, frameHeight: a.frameHeight })

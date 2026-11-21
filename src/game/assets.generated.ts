@@ -151,8 +151,10 @@ export const MANIFEST: AssetManifest = {
       "key-red": 14,
       "key-blue": 15,
       "key-yellow": 16,
-      "padlock": 17,
-      "ice": 18
+      "padlock-red": 17,
+      "padlock-blue": 18,
+      "padlock-yellow": 19,
+      "ice": 20
     }
   },
   "ship": {

@@ -609,16 +609,18 @@ def build_key(color):
     return root
 
 
-def build_padlock(_color=None):
-    """A big gold padlock, placed where the chest's lock is so the two frames line up in the game."""
+def build_padlock(color):
+    """A big padlock in the colour of the key that opens it, placed where the chest's lock is so the
+    two frames line up in the game. A gold plate with a keyhole makes it read as a lock at small size."""
+    team = P[color]
     root = empty('root')
     lock = empty('lock', (0, -0.3, 0.2), root)
-    lock.scale = (1.35, 1.35, 1.35)
-    part('shackle', torus(0.09, 0.03, seg=24, ring=10, rot=(math.pi / 2, 0, 0), loc=(0, 0, 0.13)), P['steel'], lock)
-    part('body', box(scale=(0.28, 0.1, 0.22), loc=(0, 0, 0.02)), P['gold'], lock, smooth=False, bevel=0.03)
-    part('plate', box(scale=(0.2, 0.02, 0.15), loc=(0, -0.055, 0.02)), shade(P['gold'], -0.15), lock, smooth=False, outline=False)
-    part('hole', sphere(0.025, seg=12, rings=8, loc=(0, -0.068, 0.04)), P['ink'], lock, outline=False)
-    part('slot', box(scale=(0.016, 0.01, 0.05), loc=(0, -0.068, 0.0)), P['ink'], lock, smooth=False, outline=False)
+    lock.scale = (1.5, 1.5, 1.5)
+    part('shackle', torus(0.09, 0.032, seg=24, ring=10, rot=(math.pi / 2, 0, 0), loc=(0, 0, 0.13)), P['steel'], lock)
+    part('body', box(scale=(0.28, 0.1, 0.22), loc=(0, 0, 0.02)), team, lock, smooth=False, bevel=0.03)
+    part('plate', box(scale=(0.15, 0.02, 0.14), loc=(0, -0.055, 0.02)), P['gold'], lock, smooth=False, outline=False)
+    part('hole', sphere(0.03, seg=12, rings=8, loc=(0, -0.068, 0.045)), P['ink'], lock, outline=False)
+    part('slot', box(scale=(0.018, 0.01, 0.055), loc=(0, -0.068, 0.0)), P['ink'], lock, smooth=False, outline=False)
     return root
 
 
@@ -825,9 +827,10 @@ def render_loot(manifest):
     }
     jobs = [(kind, build, color) for kind, build in builders.items() for color in ('red', 'blue', 'yellow')]
     jobs += [('stone', build_stone, None), ('hidden', build_hidden, None)]
-    # 0.4 – Isriket: keys per colour, and two overlays drawn on top of other loot (padlock on chests, ice).
+    # 0.4 – Isriket: keys per colour, and overlays drawn on top of other loot (padlocks per key colour, ice).
     jobs += [('key', build_key, color) for color in ('red', 'blue', 'yellow')]
-    jobs += [('padlock', build_padlock, None), ('ice', build_ice, None)]
+    jobs += [('padlock', build_padlock, color) for color in ('red', 'blue', 'yellow')]
+    jobs += [('ice', build_ice, None)]
     for kind, build, color in jobs:
             reset_scene()
             OUTLINE_W[0] = 0.012

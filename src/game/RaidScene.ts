@@ -345,7 +345,7 @@ export class RaidScene extends Phaser.Scene {
       const q = this.add.text(0, 0, '?', cartoonText(24, '#f5c542')).setOrigin(0.5)
       return this.add.container(0, 0, [g, q]).setName('art')
     }
-    return this.makeLootGraphic(p.kind ?? kindFor(p.id), p.color!)
+    return this.makeLootGraphic(p.kind ?? this.kindOf(p.id), p.color!)
   }
 
   /** A house that took its first hit: show the broken-open model (or cracks on drawn art). */
@@ -371,25 +371,29 @@ export class RaidScene extends Phaser.Scene {
       if (a !== b && a.at[0] === b.at[0]) minGap = Math.min(minGap, Math.abs(a.at[1] - b.at[1]) * ROW_H)
     }))
     const scale = Phaser.Math.Clamp(minGap / 60, 0.68, 1)
+    const keyLevel = placed.some(l => l.lockedBy?.length)
     // Back rows first so blockers stand in front of what they block.
     ;[...placed].sort((a, b) => a.at[1] - b.at[1]).forEach((p, depth) => {
       const item = this.state.loot.find(l => l.id === p.id)!
       if (item.collected) return // already plundered (after undo)
       const { x, y } = this.lootPos(p.at)
-      const kind = p.kind ?? kindFor(p.id)
+      const kind = p.kind ?? this.kindOf(p.id)
       const art = this.makeItemGraphic(p, item.hidden)
       const shadeG = this.add.graphics().setName('shade')
       // Sprites are darkened with a tint instead (see refreshLocks); the box is only for drawn art.
       if (!art.getByName('img')) { shadeG.fillStyle(0x0b1a22, 0.55); shadeG.fillRoundedRect(-33, -36, 66, 62, 12) }
       const lock = this.add.graphics().setName('lock')
-      lock.lineStyle(3, GOLD); lock.beginPath(); lock.arc(22, -30, 5, Math.PI, 0); lock.strokePath()
-      lock.fillStyle(GOLD); lock.fillRoundedRect(14, -30, 16, 13, 3)
-      lock.fillStyle(INK); lock.fillRect(21, -26, 2, 5)
+      // The small "blocked" lock would be mistaken for a key padlock, so levels with keys only darken.
+      if (!keyLevel) {
+        lock.lineStyle(3, GOLD); lock.beginPath(); lock.arc(22, -30, 5, Math.PI, 0); lock.strokePath()
+        lock.fillStyle(GOLD); lock.fillRoundedRect(14, -30, 16, 13, 3)
+        lock.fillStyle(INK); lock.fillRect(21, -26, 2, 5)
+      }
       const overlays: Phaser.GameObjects.GameObject[] = []
       // A chest whose keys are not all taken carries a big padlock.
-      if (item.lockedBy.some(k => !this.state.loot.find(l => l.id === k)?.collected)) overlays.push(this.makeOverlay('padlock'))
+      if (item.lockedBy.some(k => !this.state.loot.find(l => l.id === k)?.collected)) overlays.push(this.makePadlock(this.keyColor(item.lockedBy)))
       // Frozen loot sits in a block of ice with the number of moves until it thaws.
-      if (item.frozenLeft > 0) overlays.push(this.makeOverlay('ice'), this.makeIceCounter(item.frozenLeft))
+      if (item.frozenLeft > 0) overlays.push(this.makeIce(), this.makeIceCounter(item.frozenLeft))
       const c = this.add.container(x, y, [art, shadeG, lock, ...overlays]).setScale(scale).setDepth(2 + depth * 0.01)
       c.setData('kind', kind).setData('color', p.color).setData('stone', !!p.stone)
       if (item.hitsLeft < (p.hits ?? 1)) this.markOpened(c)
@@ -398,16 +402,70 @@ export class RaidScene extends Phaser.Scene {
     this.refreshLocks(this.state, false)
   }
 
-  /** A padlock or ice block drawn on top of a loot object (same frame layout, so they line up). */
-  private makeOverlay(name: 'padlock' | 'ice'): Phaser.GameObjects.GameObject {
-    const frame = namedLootFrame(name)
+  /** On levels with keys every chest is a locked chest, so plain loot is drawn as barrels there. */
+  private kindOf(id: string): LootKind {
+    return levels[this.level].loot.some(l => l.lockedBy?.length) ? 'barrel' : kindFor(id)
+  }
+
+  /** The colour of the key(s) that open a chest. */
+  private keyColor(lockedBy: string[]): LootColor {
+    return levels[this.level].loot.find(l => l.id === lockedBy[0])?.color ?? 'yellow'
+  }
+
+  /** A padlock in the colour of its key, drawn on top of the chest (same frame layout, so they line up). */
+  private makePadlock(color: LootColor): Phaser.GameObjects.GameObject {
+    const frame = lootFrame('padlock', color)
     if (hasLoot(this) && frame !== undefined) {
       const a = lootAsset()!
-      return this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName(name)
+      return this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName('padlock')
     }
-    const g = this.add.graphics().setName(name)
-    if (name === 'ice') { g.fillStyle(0xbfe8f7, 0.55); g.fillRoundedRect(-30, -34, 60, 58, 10); g.lineStyle(2, 0xffffff, 0.8); g.strokeRoundedRect(-30, -34, 60, 58, 10) }
-    else { g.fillStyle(GOLD); g.fillRoundedRect(-9, 0, 18, 15, 3); g.lineStyle(3, 0xa9b3bd); g.beginPath(); g.arc(0, 0, 6, Math.PI, 0); g.strokePath() }
+    const g = this.add.graphics().setName('padlock')
+    g.lineStyle(4, 0xa9b3bd); g.beginPath(); g.arc(0, 0, 7, Math.PI, 0); g.strokePath()
+    g.fillStyle(COLORS[color]); g.fillRoundedRect(-11, 0, 22, 18, 3)
+    g.lineStyle(2, INK); g.strokeRoundedRect(-11, 0, 22, 18, 3)
+    g.fillStyle(GOLD); g.fillRoundedRect(-6, 3, 12, 12, 2)
+    g.fillStyle(INK); g.fillCircle(0, 8, 2); g.fillRect(-1, 8, 2, 5)
+    return g
+  }
+
+  /** A key flies in an arc from its spot on the island into a chest's padlock. */
+  private async flyKey(at: [number, number], color: LootColor, chest: Sprite, delay: number) {
+    const from = this.lootPos(at)
+    const frame = lootFrame('key', color)
+    let key: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics
+    if (hasLoot(this) && frame !== undefined) {
+      const a = lootAsset()!
+      key = this.add.image(from.x, from.y, LOOT_KEY, frame).setOrigin(0.5, 0.6).setScale((LOOT_W / a.frameWidth) * 0.8)
+    } else {
+      const g = this.add.graphics({ x: from.x, y: from.y })
+      drawLoot(g, 'key', color)
+      key = g.setScale(0.8)
+    }
+    key.setDepth(40)
+    await this.delay(delay)
+    const to = { x: chest.x, y: chest.y + 6 * chest.scale }
+    const midY = Math.min(from.y, to.y) - 70
+    await this.tween({
+      targets: key, duration: 520, ease: 'Sine.easeInOut',
+      x: to.x, angle: 360,
+      onUpdate: (tw: Phaser.Tweens.Tween) => {
+        const t = tw.progress
+        key.y = (1 - t) * (1 - t) * from.y + 2 * (1 - t) * t * midY + t * t * to.y
+      },
+    })
+    await this.tween({ targets: key, scale: key.scale * 0.5, alpha: 0, duration: 140 })
+    key.destroy()
+  }
+
+  /** An ice block drawn on top of a loot object (same frame layout, so they line up). */
+  private makeIce(): Phaser.GameObjects.GameObject {
+    const frame = namedLootFrame('ice')
+    if (hasLoot(this) && frame !== undefined) {
+      const a = lootAsset()!
+      return this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName('ice')
+    }
+    const g = this.add.graphics().setName('ice')
+    g.fillStyle(0xbfe8f7, 0.55); g.fillRoundedRect(-30, -34, 60, 58, 10); g.lineStyle(2, 0xffffff, 0.8); g.strokeRoundedRect(-30, -34, 60, 58, 10)
     return g
   }
 
@@ -424,7 +482,7 @@ export class RaidScene extends Phaser.Scene {
       // show for themselves, so only blockers in front grey an item out.
       const open = item.kind === 'stone' || isAvailable(state, { ...item, frozenLeft: 0, lockedBy: [] })
       const img = (c.getByName('art') as Sprite | null)?.getByName('img') as Phaser.GameObjects.Image | null
-      if (img) { if (open) img.clearTint(); else img.setTint(0x6d7488) }
+      if (img) { if (open) img.clearTint(); else img.setTint(0xaeb4c4) }
       const parts = [c.getByName('shade'), c.getByName('lock')] as unknown as Phaser.GameObjects.Components.Alpha[]
       const target = open ? 0 : 1
       if (parts[0].alpha === target) continue
@@ -735,6 +793,9 @@ export class RaidScene extends Phaser.Scene {
         const target = this.lootSprites.get(e.lootId)
         const pad = target?.getByName('padlock') as Phaser.GameObjects.Image | null
         if (target && pad) {
+          // The key(s) fly from where they were plundered into the padlock, so it is clear which key opens which chest.
+          const keys = levels[this.level].loot.filter(l => levels[this.level].loot.find(c => c.id === e.lootId)?.lockedBy?.includes(l.id))
+          await Promise.all(keys.map((k, i) => this.flyKey(k.at, k.color!, target, i * 90)))
           sfx.unlock()
           sparkle(this, target.x, target.y - 4)
           await this.tween({ targets: pad, y: pad.y - 8, angle: -18, duration: 140, ease: 'Back.easeOut' })

@@ -301,7 +301,7 @@ export const levels: Level[] = [
   {
     name: 'Nyckelviken',
     par: 0,
-    hint: 'Kistan med hänglås öppnas först när nyckeln i samma färg är plundrad – var den än ligger på ön.',
+    hint: 'Den röda kistan har ett rött hänglås. Plundra den röda nyckeln, så flyger den dit och låser upp kistan.',
     queue: [Y, B, R, R],
     loot: stacks(['ryy', '#rb', 'br!r']),
   },
