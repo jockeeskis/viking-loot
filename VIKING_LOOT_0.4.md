@@ -1,6 +1,6 @@
 # Viking Loot 0.4 – Isriket: nycklar, is, två skepp, dagens räd och app
 
-> **Status (2026-11-21):** Fas 1 (PWA) och fas 2 (regelmotorn för nycklar, is, färgskepp och spejare, med tester) är klara. Nästa: fas 3 (Isriket – banor och grafik). Appen är installerad och testad på Android.
+> **Status (2026-11-21):** Fas 1–3 är klara: PWA (testad på Android), regelmotorn och Isriket med bana 25–36, ny grafik och introduktioner. Nästa: fas 4 (Dagens räd och oändlig räd).
 
 ## Syfte
 
@@ -58,16 +58,37 @@ Samma ordning som i 0.3, med två tillägg:
 
 ## 2. Isriket (bana 25–36)
 
-| Banor | Innehåll |
-|---|---|
-| 25–26 | Nycklar och kistor (25 går inte att förlora) |
-| 27–28 | Is (27 går inte att förlora) |
-| 29–30 | Två skepp (29 går inte att förlora) |
-| 31–32 | Spejare och dolda skatter (31 går inte att förlora) |
-| 33–35 | Blandningar |
-| 36 | Final |
+| # | Namn | Innehåll | Vinstchans | Par |
+|---|---|---|---|---|
+| 25 | Nyckelviken | Nyckel och kista (intro) | 100 % | 0 |
+| 26 | Skattkammaren | Två nycklar, två kistor | ca 49 % | 2 |
+| 27 | Isbryggan | Is (intro) | 100 % | 0 |
+| 28 | Frusna fjärden | Is | ca 38 % | 2 |
+| 29 | Snäckans hamn | Blått färgskepp (intro) | 100 % | 1 |
+| 30 | Seglarnas sund | Gult färgskepp, två platser | ca 50 % | 2 |
+| 31 | Spejarklippan | Sigrid och dolda skatter (intro) | 100 % | 0 |
+| 32 | Snöstormen | Sigrid, dolda skatter och hus | ca 38 % | 1 |
+| 33 | Glaciären | Nyckel och is | ca 31 % | 2 |
+| 34 | Norrskenet | Färgskepp, sten och hus | ca 23 % | 2 |
+| 35 | Ishallen | Nyckel, is, färgskepp, Sigrid och jarl | ca 21 % | 2 |
+| 36 | Ymers hjärta | Allt (final) | ca 12 % | 3 |
 
-Pusselbanorna har en vinstandel som går från cirka 45 % ner till 12 %. Banorna söks fram med `npm run generate-levels`.
+- Banorna söks fram med `npm run generate-levels`.
+- På banor med färgskepp kräver generatorn att skeppet gör banan klart lättare. Ett test kontrollerar samma sak.
+- Första versionen av bana 30 hade ett blått skepp som ingen viking någonsin satte sig i, och det var så felet upptäcktes.
+
+**Grafik (Blender):**
+- nyckel på kudde i tre färger
+- hänglås och isblock som läggs ovanpå andra föremål
+- färgskepp i tre färger
+- spejaren Sigrid med kikare och animationen `look`
+- snöig ö för Isriket
+
+**I spelet:**
+- Hänglåset springer upp och faller.
+- Isen visar ❄N, droppar för varje drag och spricker i isflisor när den smälter.
+- Sigrid går ut på ön och spanar innan presenningarna flyger av.
+- Långskeppet flyttar åt sidan på banor med färgskepp, och vikingar som väntar på färgskeppet sitter på dess däck.
 
 ## 3. Dagens räd och oändlig räd
 
@@ -109,9 +130,9 @@ Pusselbanorna har en vinstandel som går från cirka 45 % ner till 12 %. Banorna
 ## 7. Acceptanskriterier
 
 - [x] Spelet går att installera och fungerar offline (kontrollerat i Chrome DevTools och på Android).
-- [ ] Alla 36 banor är vinnbara, och `par` stämmer med lösaren.
+- [x] Alla 36 banor är vinnbara, och `par` stämmer med lösaren.
 - [x] Banorna 1–24 ger samma siffror från lösaren som i 0.3.
-- [ ] Varje ny mekanik har tester (klart i fas 2) och en introbana som inte går att förlora.
+- [x] Varje ny mekanik har tester och en introbana som inte går att förlora.
 - [ ] Dagens räd är samma för samma datum och går alltid att vinna.
 - [ ] Genereringen fryser inte sidan på mobil.
 - [ ] Prestationer och skepp sparas, och 0.3-progress migreras.

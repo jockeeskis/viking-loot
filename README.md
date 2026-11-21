@@ -77,6 +77,18 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 | 22 | Dimfjorden | Dolda skatter | ca 33 % |
 | 23 | Stormnäset | Blandat | ca 28 % |
 | 24 | Valhalls port | Final | ca 12 % |
+| 25 | Nyckelviken | Nyckel och kista | 100 % |
+| 26 | Skattkammaren | Två nycklar | ca 49 % |
+| 27 | Isbryggan | Is | 100 % |
+| 28 | Frusna fjärden | Is | ca 38 % |
+| 29 | Snäckans hamn | Färgskepp | 100 % |
+| 30 | Seglarnas sund | Färgskepp | ca 50 % |
+| 31 | Spejarklippan | Spejaren Sigrid | 100 % |
+| 32 | Snöstormen | Sigrid + dolda skatter | ca 38 % |
+| 33 | Glaciären | Nyckel + is | ca 31 % |
+| 34 | Norrskenet | Färgskepp, sten, hus | ca 23 % |
+| 35 | Ishallen | Blandat | ca 21 % |
+| 36 | Ymers hjärta | Final | ca 12 % |
 
 \* Andel av alla möjliga valordningar som leder till vinst, enligt `npm run check-levels`.
 
@@ -86,10 +98,10 @@ Vikingarna (Ragnar, Björn, Freja, jarlen Harald och Ylva), tunnor, kistor, hus,
 
 | Figur/objekt | Animationer | Fil |
 |---|---|---|
-| Ragnar, Björn, Freja, Harald (× 3 färger), Ylva | `idle`, `run`, `attack`, `carry`, `victory`, `fail` + porträtt | `public/assets/characters/<namn>/` |
-| Tunna, kista, hus, uppbrutet hus × 3 färger, sten, presenning | – | `public/assets/loot/loot.webp` |
-| Långskepp | `bob` | `public/assets/ships/longship.webp` |
-| Ön med brygga (bakgrund) | – | `public/assets/island/island.webp` |
+| Ragnar, Björn, Freja, Harald (× 3 färger), Ylva, Sigrid | `idle`, `run`, `attack`, `carry`, `victory`, `fail` (+ `look` för Sigrid) + porträtt | `public/assets/characters/<namn>/` |
+| Tunna, kista, hus, uppbrutet hus, nyckel × 3 färger, sten, presenning, hänglås, isblock | – | `public/assets/loot/loot.webp` |
+| Långskepp, färgskepp × 3 färger | `bob` | `public/assets/ships/longship.webp`, `boats.webp` |
+| Ön med brygga, snöig ö för Isriket (bakgrund) | – | `public/assets/island/island.webp`, `island-snow.webp` |
 
 Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender automatiskt i standardmappen på Windows, eller via miljövariabeln `BLENDER`. Hela renderingen tar cirka 5 minuter (`npm run render-art -- loot harald` renderar bara delar, `-- icons` renderar app-ikonerna i `public/icons`). Ändra modeller och poser i `render_assets.py`.
 
@@ -98,6 +110,6 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Version 0.2 är klar: alla acceptanskriterier är uppfyllda, inklusive touch på riktig mobil (testat via GitHub Pages).
 - Figurer, skatter, skepp och ön (med granar, stenar och buskar) är renderade i 3D. Havet och panelerna ritas i kod.
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen. En egen loopad melodi spelas i bakgrunden (🎵 slår av/på).
-- 24 banor i två världar, Kusten (1–12) och Fjordarna (13–24); 7–24 är framtagna med `npm run generate-levels`.
+- 36 banor i tre världar, Kusten (1–12), Fjordarna (13–24) och Isriket (25–36); 7–36 är framtagna med `npm run generate-levels`.
 - Version 0.3 är klar (se `VIKING_LOOT_0.3.md`): hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter, stjärnor efter banans par, karta, ångra, tips, introduktioner, ny 3D-grafik och musik. Allt är testat, även på Android.
-- Version 0.4 pågår (se `VIKING_LOOT_0.4.md`). Fas 1–2 är klara: regelmotorn har nycklar/kistor (`!r`, `#r`), is (`~3r`), färgskepp (`ships` på banan) och spejaren (`SCOUT`), och spelet är en installerbar app (PWA via `vite-plugin-pwa`) som fungerar offline och visar "Ny version finns" när en uppdatering väntar. Service workern registreras bara i produktionsbygget (`npm run build` + `npx vite preview`).
+- Version 0.4 pågår (se `VIKING_LOOT_0.4.md`). Fas 1–3 är klara (Isriket med bana 25–36): regelmotorn har nycklar/kistor (`!r`, `#r`), is (`~3r`), färgskepp (`ships` på banan) och spejaren (`SCOUT`), och spelet är en installerbar app (PWA via `vite-plugin-pwa`) som fungerar offline och visar "Ny version finns" när en uppdatering väntar. Service workern registreras bara i produktionsbygget (`npm run build` + `npx vite preview`).

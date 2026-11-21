@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
-import { levels } from './levels'
+import { levels, worlds } from './levels'
 import {
-  createGame, selectViking, isAvailable, SELECTABLE, WAITING_SLOTS,
+  createGame, selectViking, isAvailable, mainSeats, SELECTABLE,
   type GameEvent, type GameState, type LootColor, type LossReason, type GameStatus, type Viking,
 } from './engine'
 import {
@@ -9,10 +9,11 @@ import {
   drawTree, drawRock, drawShip, drawPanel, drawTab, type LootKind,
 } from './art'
 import {
-  preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, lootAsset, shipAsset, islandAsset,
-  lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, ISLAND_KEY, type VikingAnim, type VikingAsset,
+  preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, hasBoats, lootAsset, shipAsset,
+  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY,
+  type VikingAnim, type VikingAsset,
 } from './assets'
-import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, CAMERA_ZOOM } from './fx'
+import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, CAMERA_ZOOM } from './fx'
 import { sfx } from './sfx'
 import { hint } from './solver'
 
@@ -39,6 +40,13 @@ const WAIT_PANEL = { x: 6, w: 150 }
 const QUEUE_PANEL = { x: 160, w: 194 }
 const slotPos = (i: number) => ({ x: WAIT_PANEL.x + 30 + i * 45, y: PANEL_Y + 32 })
 const SLOT_SCALE = 0.62
+// The small colour ship (0.4) sails beside the longship; its seats are on its deck.
+const BOAT = { x: 314, y: 436 }
+const BOAT_W = 88
+const SHIP_SHIFT = 28 // the longship makes room for the colour ship
+const BOAT_SCALE = 0.48
+const SCOUT_COLOR = 0x3e7d6a
+const boatSeatPos = (i: number, seats: number) => ({ x: BOAT.x + (i - (seats - 1) / 2) * 28, y: BOAT.y - 10 })
 const PREVIEW_MAX = 6
 const CARD = { y: 584, w: 108, h: 100 }
 const cardX = (i: number) => 62 + i * 118
@@ -80,6 +88,9 @@ export class RaidScene extends Phaser.Scene {
   private history: GameState[] = [] // states before each move, for undo
   private hintGfx?: Phaser.GameObjects.Graphics
   private onUpdate?: (u: RaidUpdate) => void
+  private islandImg?: Phaser.GameObjects.Image
+  private boat?: Phaser.GameObjects.GameObject
+  private longship?: Phaser.GameObjects.Sprite
 
   constructor() { super('Raid') }
 
@@ -104,6 +115,9 @@ export class RaidScene extends Phaser.Scene {
     const data = levels[this.level]
     this.history = []
     this.title?.setText(`${this.level + 1}. ${data.name}`)
+    // Isriket is a winter island.
+    const snow = this.level >= (worlds[2]?.first ?? Infinity)
+    if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(snow))
     const state = createGame(data.loot, data.queue, data.ships)
     this.rebuild(state)
     // Harald and Ylva are downloaded the first time a level needs them; refresh the cards when they arrive.
@@ -123,6 +137,7 @@ export class RaidScene extends Phaser.Scene {
     this.lootSprites.forEach(s => s.destroy()); this.lootSprites.clear()
     this.actors.forEach(s => s.destroy()); this.actors.clear()
     this.drawLootSprites()
+    this.drawBoat()
     this.layout(false)
     this.notify()
   }
@@ -173,11 +188,11 @@ export class RaidScene extends Phaser.Scene {
     if (hasIsland(this)) {
       // rendered 3D island (trees, rocks and cobbles included)
       const is = islandAsset()!
-      this.add.image(is.x, is.y, ISLAND_KEY).setOrigin(0, 0).setDisplaySize(is.width, is.height)
+      this.islandImg = this.add.image(is.x, is.y, islandKey(false)).setOrigin(0, 0).setDisplaySize(is.width, is.height)
     } else this.drawIsland(g)
     if (hasShip(this)) {
       const sh = shipAsset()!
-      this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_W / sh.frameWidth).play('ship-bob')
+      this.longship = this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_W / sh.frameWidth).play('ship-bob')
     } else drawShip(this.add.graphics(), SHIP.x, SHIP.y)
     this.drawHud()
   }
@@ -217,27 +232,73 @@ export class RaidScene extends Phaser.Scene {
     this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y - 1, 'VIKINGAKÖ', cartoonText(10)).setOrigin(0.5)
     this.waitTab = this.add.graphics()
     this.add.text(WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 1, 'VÄNTPLATSER', cartoonText(10)).setOrigin(0.5).setDepth(1)
-    this.slotsGfx = this.add.graphics()
+    this.slotsGfx = this.add.graphics().setDepth(2)
     this.warning = this.add.text(180, 436, '', { ...cartoonText(11), padding: { x: 8, y: 3 } }).setOrigin(0.5).setDepth(40)
   }
 
-  private drawSlots(used = this.state.waiting.length) {
-    // Filling the last slot loses: one seated viking is a caution, two is the danger zone.
-    const risk = used >= WAITING_SLOTS - 1 ? 0xe0392b : used >= 1 ? 0xe8a21b : null
+  private drawSlots(waiting: Viking[] = this.state.waiting) {
+    // Only the main ship can sink the raid: one seated viking is a caution, the second-to-last seat the danger zone.
+    const slots = this.state.ships[0].slots
+    const used = waiting.filter(v => v.ship === 0).length
+    const risk = used >= slots - 1 ? 0xe0392b : used >= 1 ? 0xe8a21b : null
     const g = this.slotsGfx!
     g.clear()
-    for (let i = 0; i < WAITING_SLOTS; i++) {
+    for (let i = 0; i < slots; i++) {
       const { x, y } = slotPos(i)
       g.fillStyle(0x2a190c); g.fillCircle(x, y, 19)
       g.lineStyle(3, i < used && risk ? risk : 0xc9925a, i < used ? 1 : 0.7); g.strokeCircle(x, y, 19)
     }
+    // Seats on the colour ship: safe, so they are drawn in its colour and never turn red.
+    const boat = this.state.ships[1]
+    if (boat?.color) {
+      const onBoat = waiting.filter(v => v.ship === 1).length
+      for (let i = 0; i < boat.slots; i++) {
+        const { x, y } = boatSeatPos(i, boat.slots)
+        g.fillStyle(0x2a190c, 0.55); g.fillEllipse(x, y + 10, 20, 8)
+        g.lineStyle(2.5, COLORS[boat.color], i < onBoat ? 1 : 0.8); g.strokeEllipse(x, y + 10, 20, 8)
+      }
+    }
     const t = this.waitTab!
     t.clear(); drawTab(t, WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 10, 104, risk ?? 0x8a5a33)
     const w = this.warning!
-    if (used >= WAITING_SLOTS) w.setText('💀 Skeppet är fullt!').setBackgroundColor('#a3261bee')
-    else if (used === WAITING_SLOTS - 1) w.setText('🔥 Sista platsen – nästa viking utan byte förlorar!').setBackgroundColor('#a3261bee')
+    if (used >= slots) w.setText('💀 Skeppet är fullt!').setBackgroundColor('#a3261bee')
+    else if (used === slots - 1) w.setText('🔥 Sista platsen – nästa viking utan byte förlorar!').setBackgroundColor('#a3261bee')
     else if (used >= 1) w.setText('⚠️ En viking väntar – en säker plats kvar').setBackgroundColor('#9a6a10ee')
     else w.setText('').setBackgroundColor('#00000000')
+  }
+
+  /** Where a seated viking sits: on the longship panel or on the colour ship's deck. */
+  private seatFor(waiting: Viking[], id: string): { x: number; y: number; s: number } | null {
+    const v = waiting.find(w => w.id === id)
+    if (!v) return null
+    const index = waiting.filter(w => w.ship === v.ship).indexOf(v)
+    return this.seatPos(v.ship, index)
+  }
+  private seatPos(ship: number, index: number) {
+    if (ship === 0) return { ...slotPos(index), s: SLOT_SCALE }
+    return { ...boatSeatPos(index, this.state.ships[ship].slots), s: BOAT_SCALE }
+  }
+
+  /** The colour ship (only on levels that have one). */
+  private drawBoat() {
+    this.boat?.destroy(); this.boat = undefined
+    const color = this.state.ships[1]?.color
+    this.longship?.setX(color ? SHIP.x - SHIP_SHIFT : SHIP.x)
+    if (!color) return
+    let boat: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics
+    if (hasBoats(this)) {
+      const a = boatsAsset()!
+      boat = this.add.image(BOAT.x, BOAT.y, BOATS_KEY, a.frames[color]).setOrigin(a.originX, a.originY).setScale(BOAT_W / a.frameWidth)
+    } else {
+      const g = this.add.graphics()
+      g.fillStyle(0x8c624a); g.fillEllipse(0, 0, 64, 18)
+      g.fillStyle(COLORS[color]); g.fillRect(-14, -36, 28, 22)
+      g.lineStyle(3, 0x5b3a20); g.lineBetween(0, -40, 0, -4)
+      boat = g.setPosition(BOAT.x, BOAT.y)
+    }
+    boat.setDepth(1)
+    this.tweens.add({ targets: boat, y: BOAT.y + 2, angle: 1.5, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    this.boat = boat
   }
 
   // ---------- Loot ----------
@@ -324,7 +385,12 @@ export class RaidScene extends Phaser.Scene {
       lock.lineStyle(3, GOLD); lock.beginPath(); lock.arc(22, -30, 5, Math.PI, 0); lock.strokePath()
       lock.fillStyle(GOLD); lock.fillRoundedRect(14, -30, 16, 13, 3)
       lock.fillStyle(INK); lock.fillRect(21, -26, 2, 5)
-      const c = this.add.container(x, y, [art, shadeG, lock]).setScale(scale).setDepth(2 + depth * 0.01)
+      const overlays: Phaser.GameObjects.GameObject[] = []
+      // A chest whose keys are not all taken carries a big padlock.
+      if (item.lockedBy.some(k => !this.state.loot.find(l => l.id === k)?.collected)) overlays.push(this.makeOverlay('padlock'))
+      // Frozen loot sits in a block of ice with the number of moves until it thaws.
+      if (item.frozenLeft > 0) overlays.push(this.makeOverlay('ice'), this.makeIceCounter(item.frozenLeft))
+      const c = this.add.container(x, y, [art, shadeG, lock, ...overlays]).setScale(scale).setDepth(2 + depth * 0.01)
       c.setData('kind', kind).setData('color', p.color).setData('stone', !!p.stone)
       if (item.hitsLeft < (p.hits ?? 1)) this.markOpened(c)
       this.lootSprites.set(p.id, c)
@@ -332,12 +398,31 @@ export class RaidScene extends Phaser.Scene {
     this.refreshLocks(this.state, false)
   }
 
+  /** A padlock or ice block drawn on top of a loot object (same frame layout, so they line up). */
+  private makeOverlay(name: 'padlock' | 'ice'): Phaser.GameObjects.GameObject {
+    const frame = namedLootFrame(name)
+    if (hasLoot(this) && frame !== undefined) {
+      const a = lootAsset()!
+      return this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName(name)
+    }
+    const g = this.add.graphics().setName(name)
+    if (name === 'ice') { g.fillStyle(0xbfe8f7, 0.55); g.fillRoundedRect(-30, -34, 60, 58, 10); g.lineStyle(2, 0xffffff, 0.8); g.strokeRoundedRect(-30, -34, 60, 58, 10) }
+    else { g.fillStyle(GOLD); g.fillRoundedRect(-9, 0, 18, 15, 3); g.lineStyle(3, 0xa9b3bd); g.beginPath(); g.arc(0, 0, 6, Math.PI, 0); g.strokePath() }
+    return g
+  }
+
+  private makeIceCounter(n: number) {
+    return this.add.text(0, -40, `❄${n}`, { ...cartoonText(13, '#ffffff'), backgroundColor: '#3b86b4dd', padding: { x: 5, y: 1 } })
+      .setOrigin(0.5).setName('iceText')
+  }
+
   private refreshLocks(state: GameState, animate: boolean) {
     for (const item of state.loot) {
       const c = this.lootSprites.get(item.id)
       if (!c || item.collected) continue
-      // Stones are never plundered, so they never look locked; they simply crumble.
-      const open = item.kind === 'stone' || isAvailable(state, item)
+      // Stones are never plundered, so they never look locked; they simply crumble. Ice and padlocks
+      // show for themselves, so only blockers in front grey an item out.
+      const open = item.kind === 'stone' || isAvailable(state, { ...item, frozenLeft: 0, lockedBy: [] })
       const img = (c.getByName('art') as Sprite | null)?.getByName('img') as Phaser.GameObjects.Image | null
       if (img) { if (open) img.clearTint(); else img.setTint(0x6d7488) }
       const parts = [c.getByName('shade'), c.getByName('lock')] as unknown as Phaser.GameObjects.Components.Alpha[]
@@ -426,7 +511,7 @@ export class RaidScene extends Phaser.Scene {
   private makeCard(v: Viking, index: number): Sprite {
     const color = lookOf(v)
     const asset = assetFor(v)
-    const c = v.kind === 'wild' && !v.color ? GOLD : COLORS[color]
+    const c = v.kind === 'scout' ? SCOUT_COLOR : v.kind === 'wild' && !v.color ? GOLD : COLORS[color]
     const { w, h } = CARD
     const g = this.add.graphics()
     g.fillStyle(0x000000, 0.3); g.fillRoundedRect(-w / 2 + 2, -h / 2 + 5, w, h, 16)
@@ -450,6 +535,10 @@ export class RaidScene extends Phaser.Scene {
     const extras: Phaser.GameObjects.GameObject[] = []
     if (v.kind === 'jarl') extras.push(this.add.text(w / 2 - 14, -h / 2 + 14, '👑', { fontSize: '18px', resolution: 2 }).setOrigin(0.5))
     if (v.kind === 'jarl') extras.push(this.add.text(0, h / 2 - 12, 'BÄR 3', cartoonText(10)).setOrigin(0.5))
+    if (v.kind === 'scout') {
+      extras.push(this.add.text(w / 2 - 14, -h / 2 + 14, '🔭', { fontSize: '16px', resolution: 2 }).setOrigin(0.5))
+      extras.push(this.add.text(0, h / 2 - 12, 'SPEJAR', cartoonText(10)).setOrigin(0.5))
+    }
     if (v.kind === 'wild') {
       const stripes = this.add.graphics()
       ;[COLORS.red, COLORS.blue, COLORS.yellow].forEach((col, i) => { stripes.fillStyle(col); stripes.fillRect(-w / 2 + 8 + i * ((w - 16) / 3), h / 2 - 18, (w - 16) / 3, 8) })
@@ -488,7 +577,7 @@ export class RaidScene extends Phaser.Scene {
     rest.slice(0, PREVIEW_MAX).forEach((v, i) => {
       const x = QUEUE_PANEL.x + 24 + i * 29, y = PANEL_Y + 34
       g.fillStyle(0x2a190c); g.fillCircle(x, y, 13)
-      g.lineStyle(v.kind === 'jarl' ? 3.5 : 2.5, v.color ? COLORS[v.color] : GOLD); g.strokeCircle(x, y, 13)
+      g.lineStyle(v.kind === 'jarl' ? 3.5 : 2.5, v.kind === 'scout' ? SCOUT_COLOR : v.color ? COLORS[v.color] : GOLD); g.strokeCircle(x, y, 13)
       const asset = assetFor(v)
       if (asset && this.textures.exists(portraitKey(asset))) {
         const head = this.add.image(x, y + 1, portraitKey(asset)).setDepth(6)
@@ -506,13 +595,13 @@ export class RaidScene extends Phaser.Scene {
     const seated = new Set(this.state.waiting.map(v => v.id))
     // Keep the victory crew on deck; everyone else not seated has left.
     this.actors.forEach((a, id) => { if (!seated.has(id) && !id.startsWith('cheer-')) { a.destroy(); this.actors.delete(id) } })
-    this.state.waiting.forEach((v, i) => {
+    this.state.waiting.forEach(v => {
       let a = this.actors.get(v.id)
       if (!a) { a = this.makeActor(v); this.actors.set(v.id, a) }
-      const { x, y } = slotPos(i)
+      const { x, y, s: scale } = this.seatFor(this.state.waiting, v.id)!
       this.tweens.killTweensOf(a)
-      if (animate) this.tweens.add({ targets: a, x, y: y - 6, scale: SLOT_SCALE, duration: 240 })
-      else a.setPosition(x, y - 6).setScale(SLOT_SCALE)
+      if (animate) this.tweens.add({ targets: a, x, y: y - 6, scale, duration: 240 })
+      else a.setPosition(x, y - 6).setScale(scale)
       this.setBadge(a, v.collectedCount, v.capacity)
     })
     this.drawSlots()
@@ -641,16 +730,33 @@ export class RaidScene extends Phaser.Scene {
         this.refreshLocks(view, false)
         continue
       }
-      if (e.type === 'unlock' || e.type === 'thaw') {
-        // 0.4 phase 2: simple feedback; the padlock and ice art arrive in phase 3.
-        if (e.type === 'thaw') setLoot(e.lootId, { frozenLeft: 0 })
+      if (e.type === 'unlock') {
+        // The padlock springs open and drops off the chest.
         const target = this.lootSprites.get(e.lootId)
-        if (target) {
-          sfx.reveal()
-          coinBurst(this, target.x, target.y - 6, target.getData('color'))
+        const pad = target?.getByName('padlock') as Phaser.GameObjects.Image | null
+        if (target && pad) {
+          sfx.unlock()
+          sparkle(this, target.x, target.y - 4)
+          await this.tween({ targets: pad, y: pad.y - 8, angle: -18, duration: 140, ease: 'Back.easeOut' })
+          this.tweens.add({ targets: pad, y: pad.y + 30, alpha: 0, angle: 40, duration: 320, ease: 'Sine.easeIn', onComplete: () => pad.destroy() })
         }
         this.refreshLocks(view, true)
         await this.delay(120)
+        continue
+      }
+      if (e.type === 'thaw') {
+        setLoot(e.lootId, { frozenLeft: 0 })
+        const target = this.lootSprites.get(e.lootId)
+        if (target) {
+          sfx.thaw()
+          iceShards(this, target.x, target.y - 4)
+          const ice = target.getByName('ice') as Phaser.GameObjects.Image | null
+          ;(target.getByName('iceText') as Phaser.GameObjects.Text | null)?.destroy()
+          if (ice) this.tweens.add({ targets: ice, alpha: 0, scaleX: ice.scaleX * 1.15, scaleY: ice.scaleY * 0.7, duration: 300, onComplete: () => ice.destroy() })
+          this.tweens.add({ targets: target, scale: target.scale * 1.1, yoyo: true, duration: 150 })
+        }
+        this.refreshLocks(view, true)
+        await this.delay(160)
         continue
       }
 
@@ -660,6 +766,14 @@ export class RaidScene extends Phaser.Scene {
         (nextOwn.type === 'collect' || nextOwn.type === 'hit' || nextOwn.type === 'return' || nextOwn.type === 'color')
 
       if (e.type === 'dispatch') {
+        let dripped = false
+        view = { ...view, loot: view.loot.map(l => {
+          if (l.frozenLeft <= 1) return l
+          const t = this.lootSprites.get(l.id)?.getByName('iceText') as Phaser.GameObjects.Text | null
+          if (t) { t.setText(`❄${l.frozenLeft - 1}`); this.tweens.add({ targets: t, scale: { from: 1.4, to: 1 }, duration: 220 }); dripped = true }
+          return { ...l, frozenLeft: l.frozenLeft - 1 }
+        }) }
+        if (dripped) sfx.drip()
         const index = view.queue.findIndex(v => v.id === e.vikingId)
         const card = this.cards[index]
         if (card) this.tweens.add({ targets: card, scale: 0.88, alpha: 0.3, duration: 160 })
@@ -673,7 +787,13 @@ export class RaidScene extends Phaser.Scene {
       const actor = this.actors.get(e.vikingId)
       if (!actor) continue
 
-      if (e.type === 'color') {
+      if (e.type === 'scout') {
+        await this.runTo(actor, 180, ISLAND_CY + 40)
+        sfx.scout()
+        this.animate(actor, 'look')
+        await this.tween({ targets: actor, y: actor.y - 6, duration: 260, yoyo: true })
+        await this.delay(260)
+      } else if (e.type === 'color') {
         view = { ...view, waiting: view.waiting.map(v => (v.id === e.vikingId ? { ...v, color: e.color } : v)) }
         this.recolor(actor, e.color)
         await this.delay(120)
@@ -708,14 +828,13 @@ export class RaidScene extends Phaser.Scene {
         bumpWaiter(actor, e.vikingId)
         await this.delay(80)
         if (!continues) {
-          const seat = seatOf(e.vikingId)
-          const home = seat >= 0 ? { ...slotPos(seat), s: SLOT_SCALE } : { x: BOARD.x, y: BOARD.y + 6, s: 0.9 }
+          const home = this.seatFor(view.waiting, e.vikingId) ?? { x: BOARD.x, y: BOARD.y + 6, s: 0.9 }
           await this.runTo(actor, home.x, home.y - 6, home.s)
         }
       } else if (e.type === 'return') {
         if (e.fromWaiting) {
           view = { ...view, waiting: view.waiting.filter(v => v.id !== e.vikingId) }
-          this.drawSlots(view.waiting.length)
+          this.drawSlots(view.waiting)
         }
         this.setBadge(actor, null)
         await this.runTo(actor, BOARD.x, BOARD.y, 0.9)
@@ -723,12 +842,15 @@ export class RaidScene extends Phaser.Scene {
         actor.destroy()
         this.actors.delete(e.vikingId)
       } else if (e.type === 'wait') {
-        const { x, y } = slotPos(e.slot)
-        await this.runTo(actor, x, y - 6, SLOT_SCALE)
+        const { x, y, s: scale } = this.seatPos(e.ship, e.slot)
+        await this.runTo(actor, x, y - 6, scale)
         sfx.wait()
         const seated = this.state.waiting.find(v => v.id === e.vikingId)
-        if (seated) this.setBadge(actor, seated.collectedCount, seated.capacity)
-        this.drawSlots()
+        if (seated) {
+          this.setBadge(actor, seated.collectedCount, seated.capacity)
+          view = { ...view, waiting: [...view.waiting, seated] }
+        }
+        this.drawSlots(view.waiting)
       } else if (e.type === 'overflow') {
         // The viking has just taken the last seat (the preceding `wait` event put it there).
         sfx.overflow()
@@ -750,7 +872,7 @@ export class RaidScene extends Phaser.Scene {
       lossReason: s.lossReason,
       remaining: s.loot.filter(l => l.kind === 'loot' && !l.collected).length,
       queue: s.queue.length,
-      waiting: s.waiting.length,
+      waiting: mainSeats(s),
       moves: s.moves,
     })
   }

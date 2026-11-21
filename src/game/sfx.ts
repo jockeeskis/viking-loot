@@ -214,4 +214,23 @@ export const sfx = {
     ;[880, 1109, 1319].forEach((f, i) => tone(f, 0.14, { type: 'sine', vol: 0.07, at: i * 0.05 }))
   },
   click() { tone(880, 0.05, { type: 'square', vol: 0.03, lowpass: 2500 }) },
+  /** A padlock springs open. */
+  unlock() {
+    tone(1568, 0.05, { type: 'square', vol: 0.05, lowpass: 3000 })
+    tone(988, 0.08, { type: 'square', vol: 0.05, lowpass: 2500, at: 0.06 })
+    ;[1319, 1760].forEach((f, i) => tone(f, 0.18, { type: 'triangle', vol: 0.08, at: 0.14 + i * 0.07 }))
+  },
+  /** Ice cracks and melts away. */
+  thaw() {
+    noise(0.12, 3200, 0.35)
+    noise(0.25, 1800, 0.25, 0.08)
+    ;[2093, 1568, 1319].forEach((f, i) => tone(f, 0.12, { type: 'sine', vol: 0.05, at: 0.05 + i * 0.06 }))
+  },
+  /** The ice melts a little (one move closer to thawing). */
+  drip() { tone(1760, 0.08, { type: 'sine', vol: 0.05, slide: 1200 }) },
+  /** The scout looks over the island. */
+  scout() {
+    tone(659, 0.25, { type: 'triangle', vol: 0.08 })
+    tone(988, 0.35, { type: 'triangle', vol: 0.07, at: 0.18 })
+  },
 }

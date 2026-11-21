@@ -147,7 +147,12 @@ export const MANIFEST: AssetManifest = {
       "house-open-blue": 10,
       "house-open-yellow": 11,
       "stone": 12,
-      "hidden": 13
+      "hidden": 13,
+      "key-red": 14,
+      "key-blue": 15,
+      "key-yellow": 16,
+      "padlock": 17,
+      "ice": 18
     }
   },
   "ship": {
@@ -336,5 +341,70 @@ export const MANIFEST: AssetManifest = {
         "fps": 9
       }
     }
+  },
+  "scout": {
+    "name": "sigrid",
+    "sheet": "assets/characters/sigrid/sigrid.webp",
+    "portrait": "assets/characters/sigrid/portrait.webp",
+    "frameWidth": 192,
+    "frameHeight": 192,
+    "originX": 0.5,
+    "originY": 0.8382,
+    "anims": {
+      "idle": {
+        "start": 0,
+        "end": 11,
+        "fps": 8
+      },
+      "run": {
+        "start": 12,
+        "end": 21,
+        "fps": 16
+      },
+      "attack": {
+        "start": 22,
+        "end": 31,
+        "fps": 18
+      },
+      "carry": {
+        "start": 32,
+        "end": 41,
+        "fps": 14
+      },
+      "victory": {
+        "start": 42,
+        "end": 51,
+        "fps": 12
+      },
+      "fail": {
+        "start": 52,
+        "end": 61,
+        "fps": 9
+      },
+      "look": {
+        "start": 62,
+        "end": 71,
+        "fps": 10
+      }
+    }
+  },
+  "boats": {
+    "sheet": "assets/ships/boats.webp",
+    "frameWidth": 200,
+    "frameHeight": 176,
+    "originX": 0.5,
+    "originY": 0.6706,
+    "frames": {
+      "red": 0,
+      "blue": 1,
+      "yellow": 2
+    }
+  },
+  "islandSnow": {
+    "image": "assets/island/island-snow.webp",
+    "x": 0,
+    "y": 36,
+    "width": 360,
+    "height": 372
   }
 }

@@ -99,7 +99,7 @@ export function stacks(columns: string[]): LevelLootPlaced[] {
     let l = ch === ch.toUpperCase() ? house(id, color, at, ...blockedBy) : item(id, color, at, ...blockedBy)
     if (hidden) l = { ...l, hidden: true }
     if (frozen) l = { ...l, frozen }
-    if (key) l = { ...l, key: true, kind: 'barrel' }
+    if (key) l = { ...l, key: true, kind: 'key' }
     if (chest) {
       const lockedBy = keysOf(color)
       if (!lockedBy.length) throw new Error(`Chest ${id} has no ${color} key in the level`)
@@ -297,10 +297,101 @@ export const levels: Level[] = [
     queue: [Y, Y, B, R, B, WILD, R, Y, jarl(R)],
     loot: stacks(['?y?r?ysR', '?B?b?yy', '?ys?rr', '?B?r?r?by']),
   },
+  // ---------- Isriket (0.4): keys, ice, colour ships and the scout – introduced one at a time, then mixed ----------
+  {
+    name: 'Nyckelviken',
+    par: 0,
+    hint: 'Kistan med hänglås öppnas först när nyckeln i samma färg är plundrad – var den än ligger på ön.',
+    queue: [Y, B, R, R],
+    loot: stacks(['ryy', '#rb', 'br!r']),
+  },
+  {
+    name: 'Skattkammaren',
+    par: 2,
+    hint: 'Två kistor, två nycklar. Vilken nyckel behöver du först?',
+    queue: [R, B, B, Y, B, Y],
+    loot: stacks(['yybb', '!brb!y', '#b#ybr']),
+  },
+  {
+    name: 'Isbryggan',
+    par: 0,
+    hint: 'Isen smälter lite för varje viking du skickar. Siffran visar hur många drag som är kvar.',
+    queue: [R, R, B, Y],
+    loot: stacks(['yyb', 'rb', 'rr~2r']),
+  },
+  {
+    name: 'Frusna fjärden',
+    par: 2,
+    hint: 'Skicka inte en viking till isen för tidigt – då får den sitta och vänta på skeppet.',
+    queue: [Y, B, R, R, Y, B],
+    loot: stacks(['brbr', 'yyb~4r', 'yyr~4b']),
+  },
+  {
+    name: 'Snäckans hamn',
+    par: 1,
+    hint: 'Det lilla skeppet tar bara blå vikingar. Där kan de vänta tryggt.',
+    queue: [B, Y, B, R],
+    ships: [{ slots: 3 }, { slots: 2, color: B }],
+    loot: stacks(['bby', 'rb', 'bry']),
+  },
+  {
+    name: 'Seglarnas sund',
+    par: 2,
+    hint: 'Två trygga platser för gula vikingar – alla andra måste rymmas på det stora skeppet.',
+    queue: [R, B, B, B, R, B, Y, Y],
+    ships: [{ slots: 3 }, { slots: 2, color: Y }],
+    loot: stacks(['bybr', 'bbyr', 'bbyr', 'bryb']),
+  },
+  {
+    name: 'Spejarklippan',
+    par: 0,
+    hint: 'Sigrid bär ingenting, men när du skickar henne visar hon alla dolda skatter.',
+    queue: [SCOUT, R, B, Y, B],
+    loot: stacks(['?r?ry', '?by', '?b?bb']),
+  },
+  {
+    name: 'Snöstormen',
+    par: 1,
+    hint: 'Allt är dolt i snön. Skicka Sigrid när du behöver se – men hon tar en plats i kön tills dess.',
+    queue: [Y, Y, R, Y, SCOUT, B, B, Y, R, B],
+    loot: stacks(['?r?y?by', '?b?b?by', '?r?y?bY', '?r?r?bY']),
+  },
+  {
+    name: 'Glaciären',
+    par: 2,
+    hint: 'Nyckel, kista och is på samma ö. Tänk på i vilket drag isen släpper.',
+    queue: [Y, R, R, Y, Y, R, B, B],
+    loot: stacks(['rbyb', 'b!ry~3y', '#r~2ryb', 'ryyr']),
+  },
+  {
+    name: 'Norrskenet',
+    par: 2,
+    hint: 'Hus, sten och ett litet rött skepp med en enda plats. Vem behöver den mest?',
+    queue: [R, R, B, R, B, Y, Y, Y],
+    ships: [{ slots: 3 }, { slots: 1, color: R }],
+    loot: stacks(['yyrb', 'yybs', 'rryb', 'Rrby']),
+  },
+  {
+    name: 'Ishallen',
+    par: 2,
+    hint: 'Dold kista, frusen skatt och Harald i slutet av kön. Sigrid hjälper dig att planera.',
+    queue: [R, SCOUT, Y, R, R, B, Y, Y, jarl(B)],
+    ships: [{ slots: 3 }, { slots: 1, color: B }],
+    loot: stacks(['?r?~2y?by', '?r?r?#r?bb', '?!r?y?by', '?r?b?yy']),
+  },
+  {
+    name: 'Ymers hjärta',
+    par: 3,
+    hint: 'Den sista räden i isen: allt du har lärt dig, på en och samma ö.',
+    queue: [Y, Y, Y, Y, B, WILD, B, jarl(R), Y, SCOUT],
+    ships: [{ slots: 3 }, { slots: 1, color: Y }],
+    loot: stacks(['?y?#b?y?yr', '?~6y?Y?rb', '?~8B?y?rs', '?y?b?!b?yy']),
+  },
 ]
 
 /** Worlds on the map. */
 export const worlds = [
   { name: 'Kusten', first: 0, last: 11 },
   { name: 'Fjordarna', first: 12, last: 23 },
+  { name: 'Isriket', first: 24, last: 35 },
 ]

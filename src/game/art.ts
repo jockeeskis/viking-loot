@@ -4,7 +4,7 @@
 import Phaser from 'phaser'
 import type { LootColor } from './engine'
 
-export type LootKind = 'barrel' | 'house' | 'chest'
+export type LootKind = 'barrel' | 'house' | 'chest' | 'key'
 type G = Phaser.GameObjects.Graphics
 
 // Tokens from ui-settings.md §2 (color.red / color.blue / color.yellow)
@@ -30,7 +30,16 @@ export function drawLoot(g: G, kind: LootKind, color: LootColor) {
   g.fillStyle(0x000000, 0.22); g.fillEllipse(0, 24, kind === 'house' ? 64 : 52, 14)
   if (kind === 'barrel') drawBarrel(g, COLORS[color])
   else if (kind === 'house') drawHouse(g, COLORS[color])
+  else if (kind === 'key') drawKey(g, COLORS[color])
   else drawChest(g, COLORS[color])
+}
+
+/** Fallback key: a cushion in the team colour with an iron key on it. */
+function drawKey(g: G, c: number) {
+  g.fillStyle(shade(c, -0.25)); g.fillRoundedRect(-24, 4, 48, 18, 8)
+  g.fillStyle(c); g.fillRoundedRect(-24, 0, 48, 16, 8)
+  g.lineStyle(6, 0x4f5863); g.strokeCircle(-10, -10, 8)
+  g.fillStyle(0x4f5863); g.fillRect(-3, -13, 26, 6); g.fillRect(14, -7, 5, 8); g.fillRect(20, -7, 4, 6)
 }
 
 function drawBarrel(g: G, c: number) {

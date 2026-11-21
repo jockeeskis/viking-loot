@@ -185,10 +185,10 @@ test('level graphs are valid and acyclic; cycles are rejected', () => {
 test('there are at least five levels and every one is winnable', () => {
   assert.ok(levels.length >= 5)
   for (const l of levels) {
-    const report = solve(createGame(l.loot, l.queue))
+    const report = solve(createGame(l.loot, l.queue, l.ships))
     assert.ok(report.winnable, `${l.name} must be winnable`)
     // Replay the found sequence to verify it independently.
-    const end = report.winPath!.reduce(selectViking, createGame(l.loot, l.queue))
+    const end = report.winPath!.reduce(selectViking, createGame(l.loot, l.queue, l.ships))
     assert.equal(end.status, 'won', `${l.name}: win path replays to a win`)
   }
 })
@@ -205,12 +205,12 @@ test('the first levels follow the planned progression', () => {
 })
 
 test('puzzle levels have verified win and loss sequences', () => {
-  const puzzles = levels.filter(l => solve(createGame(l.loot, l.queue)).lossPath)
+  const puzzles = levels.filter(l => solve(createGame(l.loot, l.queue, l.ships)).lossPath)
   assert.ok(puzzles.length >= 1)
   for (const l of puzzles) {
-    const r = solve(createGame(l.loot, l.queue))
-    assert.equal(r.winPath!.reduce(selectViking, createGame(l.loot, l.queue)).status, 'won', `${l.name} win`)
-    assert.equal(r.lossPath!.reduce(selectViking, createGame(l.loot, l.queue)).status, 'lost', `${l.name} loss`)
+    const r = solve(createGame(l.loot, l.queue, l.ships))
+    assert.equal(r.winPath!.reduce(selectViking, createGame(l.loot, l.queue, l.ships)).status, 'won', `${l.name} win`)
+    assert.equal(r.lossPath!.reduce(selectViking, createGame(l.loot, l.queue, l.ships)).status, 'lost', `${l.name} loss`)
   }
   // Hand-checked Fästet lines.
   const f = levels.find(x => x.name === 'Fästet')!
@@ -467,4 +467,15 @@ test('validateLevelGraph catches broken keys, ice and ships', () => {
   assert.throws(() => validateLevelGraph([{ id: 'r', color: R }], [{ slots: 3 }, { slots: 2 }]), /needs a colour/)
   assert.throws(() => validateLevelGraph([{ id: 'r', color: R }], [{ slots: 3 }, { slots: 2, color: B }], [R, R]), /No viking/)
   validateLevelGraph([{ id: 'c', color: R, lockedBy: ['k'] }, { id: 'k', color: B, key: true }], [{ slots: 3 }, { slots: 2, color: B }], [R, B])
+})
+
+test('every colour ship in the levels matters: without it the level is clearly harder', () => {
+  const withShips = levels.filter(l => (l.ships?.length ?? 1) > 1)
+  assert.ok(withShips.length >= 4)
+  const rate = (r: ReturnType<typeof solve>) => r.winningLines / (r.winningLines + r.losingLines)
+  for (const l of withShips) {
+    const a = rate(solve(createGame(l.loot, l.queue, l.ships)))
+    const b = rate(solve(createGame(l.loot, l.queue)))
+    assert.ok(b < a - 0.05, `${l.name}: ${Math.round(a * 100)} % with the colour ship vs ${Math.round(b * 100)} % without`)
+  }
 })

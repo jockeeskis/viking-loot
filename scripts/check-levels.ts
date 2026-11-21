@@ -6,7 +6,7 @@ for (const [i, l] of levels.entries()) {
   const g = createGame(l.loot, l.queue, l.ships)
   const label = (id: string) => {
     const v = g.queue.find(x => x.id === id)!
-    return id + (v.kind === 'wild' ? '*' : v.color![0].toUpperCase() + (v.kind === 'jarl' ? '+' : ''))
+    return id + (v.kind === 'wild' ? '*' : v.kind === 'scout' ? '@' : v.color![0].toUpperCase() + (v.kind === 'jarl' ? '+' : ''))
   }
   const r = solve(g)
   console.log(`${i + 1}. ${l.name}: winnable=${r.winnable} wins=${r.winningLines} losses=${r.losingLines} (${Math.round((100 * r.winningLines) / (r.winningLines + r.losingLines))} % win, par ${r.minWaits} waits)`)

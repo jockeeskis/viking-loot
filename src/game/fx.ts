@@ -69,6 +69,23 @@ export function rockBits(scene: Phaser.Scene, x: number, y: number) {
   })
 }
 
+/** Ice shards when a frozen item thaws. */
+export function iceShards(scene: Phaser.Scene, x: number, y: number) {
+  burst(scene, x, y, CHIP, 12, {
+    speed: { min: 70, max: 160 }, angle: { min: 190, max: 350 }, gravityY: 520,
+    lifespan: 700, scale: { start: 0.55, end: 0.25 }, rotate: { min: 0, max: 360 },
+    tint: [0xbfe8f7, 0xffffff, 0x78bcdd], alpha: { start: 1, end: 0, ease: 'Expo.easeIn' },
+  })
+}
+
+/** Gold sparkles when a padlock springs open. */
+export function sparkle(scene: Phaser.Scene, x: number, y: number) {
+  burst(scene, x, y, DOT, 10, {
+    speed: { min: 40, max: 120 }, angle: { min: 0, max: 360 }, lifespan: 520,
+    scale: { start: 0.45, end: 0 }, tint: [0xf5c542, 0xfff1b0], alpha: { start: 1, end: 0 },
+  })
+}
+
 /** A soft puff of dust where a viking lands. */
 export function dustPuff(scene: Phaser.Scene, x: number, y: number) {
   burst(scene, x, y, DOT, 6, {
