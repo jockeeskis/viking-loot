@@ -70,20 +70,21 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 
 ## 3D-grafik
 
-Vikingarna (Ragnar, Björn och Freja), tunnor, kistor, hus och långskeppet är 3D-modeller. De byggs helt med skript i Blender av rundade grundformer, så inga externa modeller eller licenser behövs. Renderingen är cel-shadad med kontur, och bilderna packas till sprite sheets i WebP (totalt cirka 0,7 MB):
+Vikingarna (Ragnar, Björn och Freja), tunnor, kistor, hus och långskeppet är 3D-modeller. De byggs helt med skript i Blender av rundade grundformer, så inga externa modeller eller licenser behövs. Renderingen är cel-shadad med kontur, och bilderna packas till sprite sheets i WebP (totalt cirka 0,75 MB):
 
 | Figur/objekt | Animationer | Fil |
 |---|---|---|
 | Ragnar, Björn, Freja | `idle`, `run`, `attack`, `carry` + porträtt | `public/assets/characters/<namn>/` |
 | Tunna, kista, hus × 3 färger | – | `public/assets/loot/loot.webp` |
 | Långskepp | `bob` | `public/assets/ships/longship.webp` |
+| Ön (bakgrund) | – | `public/assets/island/island.webp` |
 
 Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender automatiskt i standardmappen på Windows, eller via miljövariabeln `BLENDER`. Hela renderingen tar cirka 1,5 minut. Ändra modeller och poser i `render_assets.py`.
 
 ## Status och nästa steg
 
 - Spelmekaniken för 0.2 är klar och testad. Det som återstår av acceptanskriterierna är test med touch på en riktig mobil.
-- Figurer, skatter och skepp är renderade 3D-sprites. Miljön (ön, träd, paneler) ritas fortfarande i kod.
+- Figurer, skatter, skepp och ön (med granar, stenar och buskar) är renderade i 3D. Havet och panelerna ritas i kod.
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen.
 - 12 banor; 7–12 är framtagna med `npm run generate-levels`.
-- Nästa steg: en renderad 3D-ö.
+- Nästa steg: test på riktig mobil via GitHub Pages-länken.

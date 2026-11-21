@@ -9,8 +9,8 @@ import {
   drawTree, drawRock, drawShip, drawPanel, drawTab, type LootKind,
 } from './art'
 import {
-  preloadAssets, createAnims, hasViking, hasLoot, hasShip, vikingAsset, lootAsset, shipAsset, lootFrame,
-  vikingKey, vikingAnimKey, portraitKey, LOOT_KEY, SHIP_KEY, type VikingAnim,
+  preloadAssets, createAnims, hasViking, hasLoot, hasShip, hasIsland, vikingAsset, lootAsset, shipAsset, islandAsset, lootFrame,
+  vikingKey, vikingAnimKey, portraitKey, LOOT_KEY, SHIP_KEY, ISLAND_KEY, type VikingAnim,
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, floatText, victory } from './fx'
 import { sfx } from './sfx'
@@ -116,6 +116,22 @@ export class RaidScene extends Phaser.Scene {
       const x = (i * 83) % 360, y = 392 + (i * 29) % 60
       g.beginPath(); g.arc(x, y, 7, Math.PI * 1.15, Math.PI * 1.85); g.strokePath()
     }
+    // foam around the island
+    g.fillStyle(0xbfe6f7, 0.35); g.fillRoundedRect(ISLAND.x - 6, ISLAND.y + 2, ISLAND.w + 12, ISLAND.h + 14, 36)
+    if (hasIsland(this)) {
+      // rendered 3D island (trees, rocks and cobbles included)
+      const is = islandAsset()!
+      this.add.image(is.x, is.y, ISLAND_KEY).setOrigin(0, 0).setDisplaySize(is.width, is.height)
+    } else this.drawIsland(g)
+    if (hasShip(this)) {
+      const sh = shipAsset()!
+      this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_W / sh.frameWidth).play('ship-bob')
+    } else drawShip(this.add.graphics(), SHIP.x, SHIP.y)
+    this.drawHud()
+  }
+
+  /** Code-drawn island, used when the rendered image is missing. */
+  private drawIsland(g: Phaser.GameObjects.Graphics) {
     // island: rocky rim, sand, grass, cobbles
     const { x, y, w, h } = ISLAND
     g.fillStyle(0x7d8086); g.fillRoundedRect(x, y + 6, w, h, 30)
@@ -129,10 +145,9 @@ export class RaidScene extends Phaser.Scene {
     // decorations along the edges
     drawTree(g, 26, 120, 0.8); drawTree(g, 334, 104, 0.9); drawTree(g, 30, 300, 0.75); drawTree(g, 336, 260, 0.8)
     drawRock(g, 22, 210, 0.8); drawRock(g, 340, 350, 0.9); drawRock(g, 300, 76, 0.7); drawRock(g, 60, 368, 0.8)
-    if (hasShip(this)) {
-      const sh = shipAsset()!
-      this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_W / sh.frameWidth).play('ship-bob')
-    } else drawShip(g, SHIP.x, SHIP.y)
+  }
+
+  private drawHud() {
     // HUD sign
     const s = this.add.graphics()
     s.fillStyle(0x000000, 0.25); s.fillRoundedRect(72, 10, 220, 40, 12)

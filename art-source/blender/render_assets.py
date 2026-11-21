@@ -664,6 +664,109 @@ def render_ship(manifest):
                         'anims': {'bob': {'start': 0, 'end': SHIP_FRAMES - 1, 'fps': 8}}}
 
 
+# ---------------------------------------------------------------- island (background)
+# The island is laid out in the game's logical 360x640 coordinates: the image covers
+# x 0..360, y ISLAND_TOP..ISLAND_TOP+ISLAND_H and is drawn at 2x for the zoomed camera.
+ISLAND_TOP, ISLAND_H, ISLAND_ELEV, PX = 36, 372, 50.0, 0.01
+ISLAND_CY = ISLAND_TOP + ISLAND_H / 2
+
+
+def L(lx, ly, z=0.0):
+    """Game (logical) coordinates on the ground → world, so the render lines up with the loot layout."""
+    return Vector(((lx - 180) * PX, (ISLAND_CY - ly) * PX / math.sin(math.radians(ISLAND_ELEV)), z))
+
+
+def rrect(x, y, w, h, r, seg=8):
+    pts = []
+    for cx, cy, a0 in ((x + w - r, y + r, -90), (x + w - r, y + h - r, 0), (x + r, y + h - r, 90), (x + r, y + r, 180)):
+        for i in range(seg + 1):
+            a = math.radians(a0 + 90 * i / seg)
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+
+def slab(top, bottom, z_top, z_bottom):
+    """A prism between two outlines (same point count) given in logical coordinates."""
+    def b(bm):
+        t = [bm.verts.new(L(x, y, z_top)) for x, y in top]
+        u = [bm.verts.new(L(x, y, z_bottom)) for x, y in bottom]
+        n = len(t)
+        for i in range(n):
+            j = (i + 1) % n
+            bm.faces.new((u[i], u[j], t[j], t[i]))
+        bm.faces.new(t)
+        bm.faces.new(list(reversed(u)))
+    return b
+
+
+def ground_disc(lx, ly, w, h, z, thick=0.01, seg=20):
+    """A flat ellipse lying on the ground, w x h in logical px as seen in the game."""
+    def b(bm):
+        bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=seg, radius1=0.5, radius2=0.42, depth=thick)
+        sy = h * PX / math.sin(math.radians(ISLAND_ELEV))
+        bmesh.ops.transform(bm, matrix=M(loc=L(lx, ly, z + thick / 2), scale=(w * PX, sy, 1)), verts=bm.verts[:])
+    return b
+
+
+def build_tree(lx, ly, s):
+    root = empty('tree', L(lx, ly))
+    part('trunk', cyl(0.04 * s, 0.035 * s, 0.24 * s, seg=10, loc=(0, 0, 0.12 * s)), P['wood_dark'], root)
+    for i, col in enumerate(('#2F7D3A', '#3C9445', '#4FAE52')):
+        r = (0.21 - i * 0.05) * s
+        part('crown', cyl(r, 0.0, 0.42 * s, seg=14, loc=(0, 0, (0.36 + i * 0.22) * s)), col, root, smooth=False)
+    return root
+
+
+def build_rock(lx, ly, s):
+    root = empty('rock', L(lx, ly))
+    part('rock', sphere(0.2 * s, seg=9, rings=6, cut=('above', -0.02), scale=(1.15, 0.9, 0.62)), '#8E9196', root, smooth=False)
+    part('rock2', sphere(0.11 * s, seg=8, rings=5, cut=('above', -0.01), loc=(0.19 * s, -0.08 * s, 0), scale=(1, 0.9, 0.7)),
+         '#A7A9AD', root, smooth=False)
+    return root
+
+
+def build_island():
+    root = empty('island')
+    x, y, w, h = 8, 58, 344, 326  # ISLAND in RaidScene.ts
+    part('cliff', slab(rrect(x, y, w, h - 4, 30), rrect(x - 4, y + 4, w + 8, h + 4, 34), -0.03, -0.4),
+         '#7D8086', root, smooth=False, bevel=0.015)
+    part('sand', slab(rrect(x, y, w, h - 4, 30), rrect(x, y, w, h - 4, 30), 0.0, -0.03), '#E6CF98', root, smooth=False)
+    part('grass', slab(rrect(x + 11, y + 8, w - 22, h - 28, 22), rrect(x + 8, y + 8, w - 16, h - 22, 25), 0.035, 0.0),
+         '#6CBB48', root, smooth=False, bevel=0.012)
+    for px, py, pw, ph in ((70, 110, 70, 26), (260, 150, 80, 30), (120, 330, 90, 24), (300, 300, 50, 22), (190, 230, 110, 34)):
+        part('patch', ground_disc(px, py, pw, ph, 0.035, 0.004), '#86CC5B', root, outline=False)
+    for r in range(7):
+        for c in range(9):
+            if (r * 7 + c * 3) % 4 != 0:
+                part('cobble', ground_disc(48 + c * 33 + (r % 2) * 15, 92 + r * 42, 20, 11, 0.035, 0.012),
+                     '#D3CBB8', root, outline=False)
+    for tx, ty, ts in ((26, 120, 1.0), (334, 104, 1.1), (30, 300, 0.95), (336, 260, 1.0), (346, 180, 0.8)):
+        build_tree(tx, ty, ts)
+    for rx, ry, rs in ((22, 210, 0.8), (340, 350, 0.9), (300, 76, 0.7), (60, 368, 0.8)):
+        build_rock(rx, ry, rs)
+    for bx, by in ((18, 160), (342, 312), (24, 352)):
+        part('bush', sphere(0.12, seg=12, rings=8, cut=('above', 0), loc=L(bx, by), scale=(1.2, 1, 0.8)), '#4FAE52', root)
+        part('bush2', sphere(0.08, seg=12, rings=8, cut=('above', 0), loc=L(bx + 10, by + 4), scale=(1.2, 1, 0.8)), '#5FBF5A', root)
+    # flowers and tufts scattered along the edges, away from the loot grid
+    for i, (fx, fy) in enumerate(((40, 80), (200, 66), (320, 140), (28, 250), (338, 220), (150, 372), (250, 370), (90, 70))):
+        part('flower', sphere(0.022, seg=8, rings=6, loc=L(fx, fy, 0.05)), ('#FFFFFF', '#F5C542', '#F59B9B')[i % 3], root)
+        part('tuft', cyl(0.03, 0.0, 0.06, seg=5, loc=L(fx + 9, fy + 3, 0.065)), '#4E9E3A', root, smooth=False, outline=False)
+    return root
+
+
+def render_island(manifest):
+    reset_scene()
+    OUTLINE_W[0] = 0.012
+    build_island()
+    res = (720, ISLAND_H * 2)
+    camera((0, 0, 0), 3.6, res, elev=ISLAND_ELEV)
+    tmp = os.path.join(TMP, 'island', 'island.png')
+    render_to(tmp)
+    rel = 'assets/island/island.webp'
+    pack([tmp], res[0], res[1], 1, os.path.join(PUBLIC, rel))
+    manifest['island'] = {'image': rel, 'x': 0, 'y': ISLAND_TOP, 'width': 360, 'height': ISLAND_H}
+
+
 def write_manifest(manifest):
     os.makedirs(os.path.dirname(MANIFEST_JSON), exist_ok=True)
     with open(MANIFEST_JSON, 'w', encoding='utf-8') as f:
@@ -678,8 +781,8 @@ def write_manifest(manifest):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    want = set(argv) or {'ragnar', 'bjorn', 'freja', 'loot', 'ship'}
-    manifest = {'vikings': {}, 'loot': None, 'ship': None}
+    want = set(argv) or {'ragnar', 'bjorn', 'freja', 'loot', 'ship', 'island'}
+    manifest = {'vikings': {}, 'loot': None, 'ship': None, 'island': None}
     if os.path.exists(MANIFEST_JSON):  # keep entries for subjects not re-rendered this run
         with open(MANIFEST_JSON, encoding='utf-8') as f:
             manifest.update(json.load(f))
@@ -693,6 +796,9 @@ def main():
     if 'ship' in want:
         render_ship(manifest)
         print('[viking-loot] rendered ship')
+    if 'island' in want:
+        render_island(manifest)
+        print('[viking-loot] rendered island')
     write_manifest(manifest)
     print('[viking-loot] done')
 

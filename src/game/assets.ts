@@ -13,6 +13,8 @@ export type AssetManifest = {
   vikings: Partial<Record<LootColor, VikingAsset>>
   loot: (SheetInfo & { frames: Record<string, number> }) | null
   ship: (SheetInfo & { anims: { bob: AnimRange } }) | null
+  /** Background island, placed at x/y in logical (360x640) coordinates. */
+  island?: { image: string; x: number; y: number; width: number; height: number } | null
 }
 
 export const vikingKey = (c: LootColor) => `viking-${c}`
@@ -20,10 +22,12 @@ export const portraitKey = (c: LootColor) => `portrait-${c}`
 export const vikingAnimKey = (c: LootColor, a: VikingAnim) => `${vikingKey(c)}-${a}`
 export const LOOT_KEY = 'loot'
 export const SHIP_KEY = 'longship'
+export const ISLAND_KEY = 'island'
 
 export const vikingAsset = (c: LootColor) => MANIFEST.vikings[c]
 export const lootAsset = () => MANIFEST.loot
 export const shipAsset = () => MANIFEST.ship
+export const islandAsset = () => MANIFEST.island ?? null
 export const lootFrame = (kind: LootKind, color: LootColor) => MANIFEST.loot?.frames[`${kind}-${color}`]
 
 export function preloadAssets(scene: Phaser.Scene) {
@@ -35,6 +39,8 @@ export function preloadAssets(scene: Phaser.Scene) {
   if (loot) scene.load.spritesheet(LOOT_KEY, loot.sheet, { frameWidth: loot.frameWidth, frameHeight: loot.frameHeight })
   const ship = MANIFEST.ship
   if (ship) scene.load.spritesheet(SHIP_KEY, ship.sheet, { frameWidth: ship.frameWidth, frameHeight: ship.frameHeight })
+  const island = MANIFEST.island
+  if (island) scene.load.image(ISLAND_KEY, island.image)
 }
 
 export function createAnims(scene: Phaser.Scene) {
@@ -61,3 +67,4 @@ export function createAnims(scene: Phaser.Scene) {
 export const hasViking = (scene: Phaser.Scene, c: LootColor) => !!MANIFEST.vikings[c] && scene.textures.exists(vikingKey(c))
 export const hasLoot = (scene: Phaser.Scene) => !!MANIFEST.loot && scene.textures.exists(LOOT_KEY)
 export const hasShip = (scene: Phaser.Scene) => !!MANIFEST.ship && scene.textures.exists(SHIP_KEY)
+export const hasIsland = (scene: Phaser.Scene) => !!MANIFEST.island && scene.textures.exists(ISLAND_KEY)

@@ -128,5 +128,12 @@ export const MANIFEST: AssetManifest = {
         "fps": 8
       }
     }
+  },
+  "island": {
+    "image": "assets/island/island.webp",
+    "x": 0,
+    "y": 36,
+    "width": 360,
+    "height": 372
   }
 }
