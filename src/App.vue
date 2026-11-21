@@ -114,6 +114,8 @@ function closeIntro() {
 // ---------- starting raids ----------
 function show(level: Level, title: string) {
   active.value = level
+  hintFor = title
+  hintsLeft.value = hintsUsed.has(title) ? 0 : HINTS_PER_LEVEL
   info.value = { ...info.value, status: 'playing', busy: false }
   scene?.play(level, title)
   maybeIntro()
@@ -188,11 +190,18 @@ function nextRound() {
 
 // ---------- actions ----------
 const hintMsg = ref('')
+/** One hint per level, so the puzzles cannot be solved by following hints. Kept when restarting. */
+const HINTS_PER_LEVEL = 1
+const hintsLeft = ref(HINTS_PER_LEVEL)
+let hintFor = `${current.value + 1}. ${levels[current.value].name}` // the level being played (the first one shown at start)
+const hintsUsed = new Set<string>() // levels whose hint is spent – restarting or reopening them gives no new one
 function restart() { if (!isEndless.value) scene?.restart() }
 function undo() { if (!isEndless.value) scene?.undo() }
 function showHint() {
-  if (!scene || isEndless.value) return
-  hintMsg.value = scene.showHint() ? '' : 'Inget drag räddar räden längre – ångra eller börja om.'
+  if (!scene || isEndless.value || hintsLeft.value <= 0) return
+  // A hint is only used up when there is a winning move to point at.
+  if (scene.showHint()) { hintsLeft.value--; hintsUsed.add(hintFor); hintMsg.value = '' }
+  else hintMsg.value = 'Inget drag räddar räden längre – ångra eller börja om.'
 }
 function next() { if (current.value < levels.length - 1) openLevel(current.value + 1) }
 
@@ -308,7 +317,7 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
     <div class="actions">
       <button :disabled="isEndless" @click="restart">↻ Starta om</button>
       <button :disabled="isEndless || !info.canUndo || info.busy" @click="undo">↶ Ångra</button>
-      <button :disabled="isEndless || info.busy || info.status !== 'playing'" @click="showHint">💡 Tips</button>
+      <button :disabled="isEndless || hintsLeft <= 0 || info.busy || info.status !== 'playing'" :title="hintsLeft > 0 ? 'Ett tips per bana' : 'Tipset för den här banan är använt'" @click="showHint">💡 Tips ({{ isEndless ? 0 : hintsLeft }})</button>
       <button class="icon" :class="{ off: !music }" :aria-label="music ? 'Stäng av musik' : 'Slå på musik'" :title="music ? 'Musik på' : 'Musik av'" @click="toggleMusic">🎵</button>
       <button class="icon" :aria-label="muted ? 'Slå på ljudeffekter' : 'Stäng av ljudeffekter'" :title="muted ? 'Effekter av' : 'Effekter på'" @click="toggleSound">{{ muted ? '🔇' : '🔊' }}</button>
     </div>
