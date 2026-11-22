@@ -1,6 +1,6 @@
 # Viking Loot 0.4 – Isriket: nycklar, is, två skepp, dagens räd och app
 
-> **Status (2026-11-21):** Fas 1–4 är klara: PWA (testad på Android), regelmotorn, Isriket med bana 25–36 och Dagens räd / oändlig räd. Nästa: fas 5 (prestationer, statistik och skepp).
+> **Status (2026-11-22):** Version 0.4.0 – alla fem faser är klara: PWA (testad på Android), regelmotorn, Isriket med bana 25–36, Dagens räd / oändlig räd och prestationer, statistik och Skeppsvarvet. Kvar: bekräfta på mobil att genereringen inte hackar.
 
 ## Syfte
 
@@ -129,14 +129,26 @@ Samma ordning som i 0.3, med två tillägg:
 
 ## 5. Mål och samlande
 
-- Statistik:
-  - räder vunna
-  - skatter plundrade
-  - perfekta räder
-  - dagar i rad
-  - bästa oändliga räd
-- Cirka 15 prestationer med ikon. När en låses upp visas en toast.
-- Tre skeppsvarianter låses upp av totalt antal stjärnor och väljs i *Skeppsvarvet*.
+Logiken finns i `src/game/achievements.ts` (testad i `achievements.test.ts`) och sparas under `viking-loot-0.4-meta`.
+
+- **Statistik** (panelen 📊 Statistik): räder vunna (kampanj, Dagens räd och rundor i oändliga räden), skatter plundrade, perfekta räder, kistor öppnade, stjärnor på kartan, Dagens räd vunnen, dagar i rad (nu och bästa) och bästa oändliga räd.
+- **15 prestationer** (panelen 🏆 Prestationer). När en låses upp visas en notis längst ner. Låsta prestationer som räknas visar hur långt man har kommit, till exempel 291/500.
+
+  | Ikon | Prestation | Villkor |
+  |---|---|---|
+  | 🪓 | Första räden | Vinn en räd |
+  | 🏖️ 🌊 ❄️ | Kustens / Fjordarnas / Isrikets herre | Vinn alla banor i världen |
+  | ⭐ | Guldkusten | Tre stjärnor på alla banor i Kusten |
+  | 👑 | Hela Norden i guld | Tre stjärnor på alla 36 banor |
+  | 🪙 💰 | Hundra skatter / Drakens skatt | Plundra 100 / 500 skatter |
+  | ✨ | Perfektionist | 10 räder med tre stjärnor |
+  | 🧠 | Utan ånger | Vinn en bana med par ≥ 2 utan ångra eller tips |
+  | 🗝️ | Nyckelbärare | Öppna 10 låsta kistor |
+  | 📅 🔥 | Dagens hjälte / En vecka i rad | Vinn Dagens räd / sju dagar i rad |
+  | ♾️ 🐉 | Uthållig / Oändlig | Klara 5 / 10 rundor i oändliga räden |
+
+- **Skeppsvarvet:** fyra långskepp, renderade i Blender (`SHIP_STYLES` i `render_assets.py`). Ormen finns från början. Havsörnen (blått, ★ 30), Nordstjärnan (nattblått med guldstjärna, ★ 60) och Ymers drake (svart och guld med röd drake, ★ 100) låses upp av stjärnorna på kartan. Det valda skeppet sparas och laddas först när det behövs. Ett nytt skepp ger en notis.
+- **Migrering från 0.3:** första gången 0.4 startar räknas varje vunnen bana som en vunnen räd med alla sina skatter, och varje trestjärnig bana som en perfekt räd. Prestationer som redan är förtjänta låses upp tyst, så att man inte får en hel hög notiser på en gång.
 
 ## 6. Faser
 
@@ -154,7 +166,7 @@ Samma ordning som i 0.3, med två tillägg:
 - [x] Varje ny mekanik har tester och en introbana som inte går att förlora.
 - [x] Dagens räd är samma för samma datum och går alltid att vinna (testat i `modes.test.ts`).
 - [x] Genereringen fryser inte sidan (Web Worker, kontrollerat i produktionsbygget). Ska bekräftas på mobil.
-- [ ] Prestationer och skepp sparas, och 0.3-progress migreras.
+- [x] Prestationer och skepp sparas, och 0.3-progress migreras (testat i `achievements.test.ts` och i webbläsaren).
 
 ## 8. Utanför scope för 0.4
 

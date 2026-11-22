@@ -44,6 +44,7 @@ npm run render-art     # rendera om 3D-grafiken med Blender (valfritt: -- ragnar
 - `src/game/levels.ts` — 6 handdesignade banor med stabila ID:n och `blockedBy`. Hjälpfunktionen `stacks()` bygger högar där varje föremål blockeras av föremålet framför.
 - `src/game/solver.ts` — söker igenom alla tillåtna val. Hittar vinst- och förlustsekvenser för en bana.
 - `src/game/generator.ts` — seedad generator för högbanor som kontrolleras av lösaren (används av `generate-levels` och i spelet).
+- `src/game/achievements.ts` — statistik, prestationer och skeppen i Skeppsvarvet (`viking-loot-0.4-meta`), med migrering från 0.3.
 - `src/game/modes.ts` — Dagens räd och den oändliga räden: vilken bana som genereras och vad som sparas (`viking-loot-0.4-modes`). `generator.worker.ts` och `levelGen.ts` kör genereringen i en Web Worker.
 - `src/game/engine.test.ts`, `progress.test.ts`, `modes.test.ts` — tester för regelmotorn, banornas lösbarhet, progression och de genererade räderna (`node --test`).
 - `src/game/art.ts` — grafik ritad i kod: miljö och paneler, plus reserv om en renderad bild saknas.
@@ -115,6 +116,7 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Plundring ger träflisor, mynt och "+1", vinst ger konfetti. Ljuden syntetiseras med WebAudio (`src/game/sfx.ts`) och kan stängas av med 🔊-knappen. En egen loopad melodi spelas i bakgrunden (🎵 slår av/på).
 - 36 banor i tre världar, Kusten (1–12), Fjordarna (13–24) och Isriket (25–36); 7–36 är framtagna med `npm run generate-levels`.
 - Version 0.3 är klar (se `VIKING_LOOT_0.3.md`): hus (två hugg), stenhinder, jarl, flerfärgad viking och dolda skatter, stjärnor efter banans par, karta, ångra, tips, introduktioner, ny 3D-grafik och musik. Allt är testat, även på Android.
-- Version 0.4 pågår (se `VIKING_LOOT_0.4.md`). Fas 1–3 är klara (Isriket med bana 25–36): regelmotorn har nycklar/kistor (`!r`, `#r`), is (`~3r`), färgskepp (`ships` på banan) och spejaren (`SCOUT`), och spelet är en installerbar app (PWA via `vite-plugin-pwa`) som fungerar offline och visar "Ny version finns" när en uppdatering väntar. Service workern registreras bara i produktionsbygget (`npm run build` + `npx vite preview`).
+- Version 0.4.0 är klar (se `VIKING_LOOT_0.4.md`). Fas 1–3 (Isriket med bana 25–36): regelmotorn har nycklar/kistor (`!r`, `#r`), is (`~3r`), färgskepp (`ships` på banan) och spejaren (`SCOUT`), och spelet är en installerbar app (PWA via `vite-plugin-pwa`) som fungerar offline och visar "Ny version finns" när en uppdatering väntar. Service workern registreras bara i produktionsbygget (`npm run build` + `npx vite preview`).
 - Fas 4 är klar: **Dagens räd** (samma ö för alla med samma klarade världar, sparas för dagen, svit med dagar i rad) och **oändlig räd** (svårare för varje runda, ingen ångra eller tips, rekord sparas). Banorna genereras i en Web Worker och kontrolleras av lösaren.
+- Fas 5 är klar: statistik, 15 prestationer med notiser och Skeppsvarvet med fyra långskepp som låses upp av stjärnor.
 - Ångra tar bara tillbaka det senaste draget; efter en ångring måste man göra ett nytt drag innan man kan ångra igen. Man får ett tips per bana (det kommer inte tillbaka vid omstart).

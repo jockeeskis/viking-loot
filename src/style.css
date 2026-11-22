@@ -43,3 +43,32 @@ button:disabled{cursor:not-allowed;opacity:.4}
 .spin{display:inline-block;animation:spin 1.6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.section-title small{font-size:13px;color:#ffd45a;margin-left:6px}
+.shipyard{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ship-card{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px 10px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:linear-gradient(#2f6a82,#193a4b);color:#fff3dc;border-radius:16px}
+.ship-card strong{font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;font-size:13px;color:#ffd45a}
+.ship-card small{font-size:12px;color:#cfe3ee}
+.ship-card.chosen{box-shadow:0 3px 0 #3b2414,0 0 0 3px #ffd45a}
+.ship-card.locked{opacity:1}.ship-card.locked .ship-pic{filter:grayscale(1) brightness(.55)}
+.ship-pic{width:100%;aspect-ratio:424/272;background-size:400% 300%;background-position:0 0;background-repeat:no-repeat}
+.panel{margin-top:14px;border-radius:16px;background:linear-gradient(#6b4423,#4a2c16);border:3px solid #3b2414;box-shadow:inset 0 1px 0 #c9925a}
+.panel summary{cursor:pointer;padding:11px 14px;font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;font-size:15px;color:#ffd45a;list-style:none;display:flex;justify-content:space-between}
+.panel summary::-webkit-details-marker{display:none}
+.panel summary::after{content:"▾";color:#fff3dc}.panel[open] summary::after{content:"▴"}
+.panel summary span{margin-left:auto;margin-right:8px;color:#fff3dc;font-size:13px}
+.badges{list-style:none;margin:0;padding:0 10px 10px;display:grid;gap:6px}
+.badges li{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:12px;background:#00000030;opacity:.6}
+.badges li.earned{opacity:1;background:#ffd45a22;box-shadow:inset 0 0 0 1px #ffd45a66}
+.badges li:not(.earned) .badge-icon{filter:grayscale(1)}
+.badge-icon{font-size:24px;width:30px;text-align:center}
+.badge-text{display:flex;flex-direction:column;min-width:0;flex:1}
+.badge-text strong{font-size:14px;color:#ffe3a8}.badge-text small{font-size:12px;color:#e6d6bd}
+.badge-progress{font-size:12px;font-weight:700;color:#ffd45a;white-space:nowrap}
+.stat-list{display:grid;grid-template-columns:1fr auto;gap:6px 12px;margin:0;padding:0 14px 12px;font-size:14px}
+.stat-list dt{color:#fff3dc}.stat-list dd{margin:0;color:#ffd45a;font-weight:800;text-align:right}
+.toasts{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:20;display:flex;flex-direction:column;gap:8px;width:min(92vw,420px);pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:16px;background:linear-gradient(#8a5a33,#5b3a20);border:3px solid #3b2414;box-shadow:inset 0 2px 0 #c9925a,0 10px 24px #0009;animation:toast-in .35s cubic-bezier(.3,1.5,.5,1) both}
+.toast strong{display:block;color:#ffd45a;font-size:14px}.toast small{display:block;color:#fff3dc;font-size:12px}
+.toast-icon{font-size:28px}
+@keyframes toast-in{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}

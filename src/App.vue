@@ -11,6 +11,11 @@ import {
   dateKey, dayLabel, tierFor, loadModes, saveModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound,
 } from './game/modes'
 import { requestLevel } from './game/levelGen'
+import {
+  ACHIEVEMENTS, SHIPS, loadMeta, saveMeta, migrate, newlyEarned, unlock, recordRaid, lootOf, totalStars, shipUnlocked, unlockedShips,
+  type ShipId,
+} from './game/achievements'
+import { shipSheet } from './game/assets'
 import LevelMap from './components/LevelMap.vue'
 import { registerSW } from 'virtual:pwa-register'
 
@@ -41,6 +46,14 @@ const progress = ref(loadProgress())
 const modes = ref(loadModes())
 const unlocked = computed(() => Math.min(progress.value.unlocked, levels.length - 1))
 const current = ref(Math.min(unlocked.value, levels.length - 1))
+// Statistics and achievements (0.4). 0.3 progress is counted in once; what it already earned is
+// unlocked quietly, so the first start of 0.4 does not flood the screen with toasts.
+const savedMeta = loadMeta()
+const meta = ref(migrate(savedMeta, progress.value, modes.value))
+if (!savedMeta.migrated) {
+  meta.value = unlock(meta.value, newlyEarned(meta.value, { stats: meta.value.stats, progress: progress.value, modes: modes.value }), dateKey(new Date()))
+  saveMeta(meta.value)
+}
 /** Generated raids only use mechanics from worlds the player has completed. */
 const tier = computed(() => tierFor(worlds.map(w => (progress.value.stars[w.last] ?? 0) > 0)))
 
@@ -84,6 +97,7 @@ function update(d: RaidUpdate) {
   hintMsg.value = ''
   if (justWon) {
     lastStars.value = starsFor(d.waits, active.value.par)
+    const shipsBefore = unlockedShips(progress.value)
     if (mode.value === 'campaign') {
       progress.value = recordWin(progress.value, current.value, lastStars.value, levels.length)
       saveProgress(progress.value)
@@ -94,6 +108,17 @@ function update(d: RaidUpdate) {
     } else {
       modes.value = recordEndlessRound(modes.value, endless.value.round)
       saveModes(modes.value)
+    }
+    const { loot, chests } = lootOf(active.value)
+    meta.value = {
+      ...meta.value,
+      stats: recordRaid(meta.value.stats, {
+        mode: mode.value, stars: lastStars.value, par: active.value.par, loot, chests, usedUndo, usedHint,
+      }),
+    }
+    checkAchievements()
+    for (const id of unlockedShips(progress.value)) {
+      if (!shipsBefore.includes(id)) toast('⛵', `Nytt skepp: ${SHIPS.find(x => x.id === id)!.name}`, 'Välj det i Skeppsvarvet.')
     }
   }
   if (justLost && mode.value === 'endless') endless.value = { ...endless.value, over: true }
@@ -114,6 +139,7 @@ function closeIntro() {
 // ---------- starting raids ----------
 function show(level: Level, title: string) {
   active.value = level
+  usedUndo = usedHint = false
   hintFor = title
   hintsLeft.value = hintsUsed.has(title) ? 0 : HINTS_PER_LEVEL
   info.value = { ...info.value, status: 'playing', busy: false }
@@ -195,12 +221,13 @@ const HINTS_PER_LEVEL = 1
 const hintsLeft = ref(HINTS_PER_LEVEL)
 let hintFor = `${current.value + 1}. ${levels[current.value].name}` // the level being played (the first one shown at start)
 const hintsUsed = new Set<string>() // levels whose hint is spent – restarting or reopening them gives no new one
-function restart() { if (!isEndless.value) scene?.restart() }
-function undo() { if (!isEndless.value) scene?.undo() }
+let usedUndo = false, usedHint = false // in this attempt (for the "Utan ånger" achievement)
+function restart() { if (!isEndless.value) { usedUndo = usedHint = false; scene?.restart() } }
+function undo() { if (!isEndless.value && info.value.canUndo) { usedUndo = true; scene?.undo() } }
 function showHint() {
   if (!scene || isEndless.value || hintsLeft.value <= 0) return
   // A hint is only used up when there is a winning move to point at.
-  if (scene.showHint()) { hintsLeft.value--; hintsUsed.add(hintFor); hintMsg.value = '' }
+  if (scene.showHint()) { hintsLeft.value--; hintsUsed.add(hintFor); usedHint = true; hintMsg.value = '' }
   else hintMsg.value = 'Inget drag räddar räden längre – ångra eller börja om.'
 }
 function next() { if (current.value < levels.length - 1) openLevel(current.value + 1) }
@@ -209,6 +236,57 @@ const muted = ref(isMuted())
 function toggleSound() { setMuted(!muted.value); muted.value = isMuted(); unlockAudio() }
 const music = ref(isMusicOn())
 function toggleMusic() { setMusicOn(!music.value); music.value = isMusicOn() }
+
+// ---------- achievements, toasts and Skeppsvarvet ----------
+type Toast = { id: number; icon: string; title: string; text: string }
+const toasts = ref<Toast[]>([])
+let toastId = 0
+function toast(icon: string, title: string, text: string) {
+  const t = { id: ++toastId, icon, title, text }
+  toasts.value = [...toasts.value, t]
+  setTimeout(() => { toasts.value = toasts.value.filter(x => x.id !== t.id) }, 4200 + 600 * (toasts.value.length - 1))
+}
+function checkAchievements() {
+  const ids = newlyEarned(meta.value, { stats: meta.value.stats, progress: progress.value, modes: modes.value })
+  meta.value = unlock(meta.value, ids, dateKey(new Date()))
+  saveMeta(meta.value)
+  for (const id of ids) {
+    const a = ACHIEVEMENTS.find(x => x.id === id)!
+    toast(a.icon, `Prestation: ${a.title}`, a.text)
+  }
+}
+const achievementView = computed(() => {
+  const c = { stats: meta.value.stats, progress: progress.value, modes: modes.value }
+  return ACHIEVEMENTS.map(a => {
+    const p = a.progress?.(c)
+    return { ...a, earned: !!meta.value.unlocked[a.id], progressText: p ? `${p[0]}/${p[1]}` : '' }
+  })
+})
+const earnedCount = computed(() => achievementView.value.filter(a => a.earned).length)
+const stars = computed(() => totalStars(progress.value))
+function chooseShip(id: ShipId) {
+  if (!shipUnlocked(id, progress.value)) return
+  meta.value = { ...meta.value, ship: id }
+  saveMeta(meta.value)
+  scene?.setShip(id)
+}
+const shipPreview = (id: string) => {
+  const sheet = shipSheet(id)
+  return sheet ? { backgroundImage: `url(${import.meta.env.BASE_URL}${sheet})` } : {}
+}
+const statRows = computed(() => {
+  const s = meta.value.stats
+  return [
+    ['🏆', 'Räder vunna', s.raidsWon],
+    ['🪙', 'Skatter plundrade', s.lootTaken],
+    ['✨', 'Perfekta räder', s.perfectRaids],
+    ['🗝️', 'Kistor öppnade', s.chestsOpened],
+    ['⭐', 'Stjärnor på kartan', `${stars.value}/${levels.length * 3}`],
+    ['📅', 'Dagens räd vunnen', s.dailyWins],
+    ['🔥', 'Dagar i rad (bästa)', `${streak.value} (${modes.value.daily.bestStreak})`],
+    ['♾️', 'Bästa oändliga räd', roundsText(modes.value.endless.best)],
+  ] as [string, string, string | number][]
+})
 
 // ---------- the raid cards ----------
 const streak = computed(() => currentStreak(modes.value, today.value))
@@ -232,6 +310,7 @@ onMounted(() => {
     // (A touch that became a scroll ends with a non-cancelable touchend, so scrolling is not affected.)
     game?.canvas.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault() }, { passive: false })
     scene?.setUpdate(update)
+    scene?.setShip(meta.value.ship)
     scene?.reset(current.value)
   })
   maybeIntro()
@@ -247,7 +326,7 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
       <button class="close" aria-label="Senare" @click="updateReady = false">✕</button>
     </div>
     <header>
-      <div class="logo"><h1>VIKING LOOT</h1><div class="eyebrow">The First Raid · 0.3</div></div>
+      <div class="logo"><h1>VIKING LOOT</h1><div class="eyebrow">The First Raid · 0.4</div></div>
       <p>Välj en av de tre främsta vikingarna. Plundra framifrån – och fyll aldrig skeppets tre väntplatser!</p>
     </header>
     <div class="stats">
@@ -342,6 +421,44 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
     </div>
     <h2 class="section-title">Karta</h2>
     <LevelMap :worlds="worlds" :names="levels.map(l => l.name)" :stars="progress.stars" :unlocked="unlocked" :current="mode === 'campaign' ? current : -1" @select="openLevel" />
+    <h2 class="section-title">Skeppsvarvet <small>★ {{ stars }}</small></h2>
+    <div class="shipyard">
+      <button
+        v-for="sh in SHIPS" :key="sh.id" class="ship-card"
+        :class="{ chosen: meta.ship === sh.id, locked: stars < sh.stars }"
+        :disabled="stars < sh.stars" @click="chooseShip(sh.id)"
+      >
+        <span class="ship-pic" :style="shipPreview(sh.id)"></span>
+        <strong>{{ sh.name }}</strong>
+        <small v-if="stars < sh.stars">🔒 ★ {{ sh.stars }}</small>
+        <small v-else-if="meta.ship === sh.id">⚓ Seglar nu</small>
+        <small v-else>Välj</small>
+      </button>
+    </div>
+    <details class="panel">
+      <summary>🏆 Prestationer <span>{{ earnedCount }}/{{ ACHIEVEMENTS.length }}</span></summary>
+      <ul class="badges">
+        <li v-for="a in achievementView" :key="a.id" :class="{ earned: a.earned }">
+          <span class="badge-icon">{{ a.icon }}</span>
+          <span class="badge-text"><strong>{{ a.title }}</strong><small>{{ a.text }}</small></span>
+          <span v-if="!a.earned && a.progressText" class="badge-progress">{{ a.progressText }}</span>
+        </li>
+      </ul>
+    </details>
+    <details class="panel">
+      <summary>📊 Statistik</summary>
+      <dl class="stat-list">
+        <template v-for="[icon, label, value] in statRows" :key="label">
+          <dt>{{ icon }} {{ label }}</dt><dd>{{ value }}</dd>
+        </template>
+      </dl>
+    </details>
+    <div class="toasts" aria-live="polite">
+      <div v-for="t in toasts" :key="t.id" class="toast">
+        <span class="toast-icon">{{ t.icon }}</span>
+        <span><strong>{{ t.title }}</strong><small>{{ t.text }}</small></span>
+      </div>
+    </div>
     <p class="foot">Vikingar, skatter, skepp och ö är 3D-renderade i Blender. Ljud och musik är syntetiserade i webbläsaren.</p>
   </main>
 </template>

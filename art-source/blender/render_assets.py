@@ -635,7 +635,18 @@ def build_ice(_color=None):
 
 
 # ---------------------------------------------------------------- longship (ui-settings.md §4)
-def build_ship():
+# Longship looks: the default one plus three unlocked by stars in Skeppsvarvet (0.4).
+SHIP_STYLES = {
+    'ormen': {'sail': ('#D8342B', '#F4EAD8'), 'dragon': '#D9A441', 'shields': ('#D8342B', '#F4EAD8'), 'horn': '#F4E6C8'},
+    'havsorn': {'sail': ('#2F6FA8', '#F4EAD8'), 'dragon': '#E8EEF2', 'shields': ('#2F6FA8', '#F4EAD8'), 'horn': '#F5C542'},
+    'nordstjarnan': {'sail': ('#22365F', '#22365F'), 'dragon': '#A9B3BD', 'shields': ('#22365F', '#F5C542'), 'horn': '#F4E6C8',
+                     'star': True},
+    'ymer': {'sail': ('#2A1D17', '#F5C542'), 'dragon': '#B8322A', 'shields': ('#2A1D17', '#F5C542'), 'horn': '#F5C542'},
+}
+
+
+def build_ship(style='ormen'):
+    st = SHIP_STYLES[style]
     root = empty('root')
     part('hull', sphere(1, seg=40, rings=20, cut=('below', 0.0), scale=(1.25, 0.36, 0.32), loc=(0, 0, 0.27)), P['wood'], root)
     part('strake', sphere(1, seg=40, rings=20, cut=('below', 0.0), scale=(1.27, 0.37, 0.1), loc=(0, 0, 0.2)), P['wood_dark'], root)
@@ -643,16 +654,16 @@ def build_ship():
     # dragon prow (+x) and curled stern (-x)
     for k in range(7):
         u = k / 6
-        part('neck', sphere(0.12 - 0.04 * u, loc=(1.1 + 0.4 * u, 0, 0.25 + 0.55 * u * u ** 0.2)), P['dragon'], root)
-    part('dragonhead', sphere(1, scale=(0.17, 0.1, 0.11), loc=(1.56, 0, 0.86)), P['dragon'], root)
-    part('snout', sphere(1, scale=(0.1, 0.07, 0.06), loc=(1.7, 0, 0.83)), P['dragon'], root)
+        part('neck', sphere(0.12 - 0.04 * u, loc=(1.1 + 0.4 * u, 0, 0.25 + 0.55 * u * u ** 0.2)), st['dragon'], root)
+    part('dragonhead', sphere(1, scale=(0.17, 0.1, 0.11), loc=(1.56, 0, 0.86)), st['dragon'], root)
+    part('snout', sphere(1, scale=(0.1, 0.07, 0.06), loc=(1.7, 0, 0.83)), st['dragon'], root)
     for sy in (-1, 1):
         part('dragoneye', sphere(0.025, seg=10, rings=6, loc=(1.6, sy * 0.09, 0.9)), P['black'], root, outline=False)
-        part('dragonhorn', cyl(0.03, 0.004, 0.14, rot=(sy * 0.4, -0.9, 0), loc=(1.48, sy * 0.05, 0.98)), P['horn'], root)
+        part('dragonhorn', cyl(0.03, 0.004, 0.14, rot=(sy * 0.4, -0.9, 0), loc=(1.48, sy * 0.05, 0.98)), st['horn'], root)
     for k in range(7):
         u = k / 6
         ang = u * math.pi * 1.1
-        part('tail', sphere(0.11 - 0.05 * u, loc=(-1.1 - 0.25 * math.sin(ang), 0, 0.25 + 0.25 * (1 - math.cos(ang)) + 0.15 * u)), P['dragon'], root)
+        part('tail', sphere(0.11 - 0.05 * u, loc=(-1.1 - 0.25 * math.sin(ang), 0, 0.25 + 0.25 * (1 - math.cos(ang)) + 0.15 * u)), st['dragon'], root)
     # mast, yard, striped sail
     part('mast', cyl(0.035, 0.03, 1.35, loc=(0, 0.02, 0.9)), P['wood_dark'], root)
     part('yard', cyl(0.025, 0.025, 1.1, rot=(0, math.pi / 2, 0), loc=(0, -0.02, 1.48)), P['wood_dark'], root)
@@ -661,12 +672,16 @@ def build_ship():
         x = -0.5 + (i + 0.5) / n
         bulge = -0.07 * math.cos(x * math.pi)
         part('sail', box(scale=(1.0 / n + 0.002, 0.025, 0.82), loc=(x, -0.05 + bulge, 1.05)),
-             P['sail_red'] if i % 2 == 0 else P['sail_cream'], root, smooth=False, outline=False)
+             st['sail'][i % 2], root, smooth=False, outline=False)
     part('sailedge', box(scale=(1.02, 0.03, 0.03), loc=(0, -0.06, 0.64)), P['wood_dark'], root, smooth=False, outline=False)
+    if st.get('star'):  # a gold compass star on the sail
+        for sx, sz, a in ((0.05, 0.5, 0), (0.5, 0.05, 0), (0.035, 0.3, 45), (0.035, 0.3, -45)):
+            part('star', box(scale=(sx, 0.012, sz), rot=(0, math.radians(a), 0), loc=(0, -0.145, 1.05)), P['gold'], root, smooth=False, outline=False)
+        part('starcore', sphere(0.05, seg=12, rings=8, loc=(0, -0.15, 1.05)), P['gold'], root, outline=False)
     # shields along the side facing the camera
     for i in range(7):
         x = -0.84 + i * 0.28
-        part('shield', cyl(0.1, 0.1, 0.03, rot=(math.pi / 2, 0, 0), loc=(x, -0.335, 0.25)), P['sail_red'] if i % 2 == 0 else P['sail_cream'], root)
+        part('shield', cyl(0.1, 0.1, 0.03, rot=(math.pi / 2, 0, 0), loc=(x, -0.335, 0.25)), st['shields'][i % 2], root)
         part('shieldrim', torus(0.1, 0.014, seg=24, ring=8, rot=(math.pi / 2, 0, 0), loc=(x, -0.35, 0.25)), P['gold'], root, outline=False)
         part('boss', sphere(0.028, seg=12, rings=8, loc=(x, -0.36, 0.25)), P['gold'], root, outline=False)
     return root
@@ -853,23 +868,31 @@ SHIP_W, SHIP_H, SHIP_FRAMES = 424, 272, 12
 
 
 def render_ship(manifest):
-    reset_scene()
-    OUTLINE_W[0] = 0.02
-    root = build_ship()
-    cam = camera((0.1, 0, 0.7), 3.6, (SHIP_W, SHIP_H), elev=18)
-    frames = []
-    for f in range(SHIP_FRAMES):
-        p = 2 * math.pi * f / SHIP_FRAMES
-        root.location.z = 0.02 * math.sin(p)
-        root.rotation_euler = (0.025 * math.sin(p + 0.6), 0.035 * math.sin(p), 0)
-        path = os.path.join(TMP, 'ship', f'bob_{f:02d}.png')
-        render_to(path)
-        frames.append(path)
-    rel = 'assets/ships/longship.webp'
-    pack(frames, SHIP_W, SHIP_H, 4, os.path.join(PUBLIC, rel))
-    ox, oy = anchor(cam, (0, 0, 0.22))
-    manifest['ship'] = {'sheet': rel, 'frameWidth': SHIP_W, 'frameHeight': SHIP_H, 'originX': ox, 'originY': oy,
-                        'anims': {'bob': {'start': 0, 'end': SHIP_FRAMES - 1, 'fps': 8}}}
+    """The longship in every style. 'ormen' is the default ship (manifest['ship']); the others are
+    the ships unlocked in Skeppsvarvet (manifest['shipVariants'])."""
+    manifest['shipVariants'] = {}
+    for style in SHIP_STYLES:
+        reset_scene()
+        OUTLINE_W[0] = 0.02
+        root = build_ship(style)
+        cam = camera((0.1, 0, 0.7), 3.6, (SHIP_W, SHIP_H), elev=18)
+        frames = []
+        for f in range(SHIP_FRAMES):
+            p = 2 * math.pi * f / SHIP_FRAMES
+            root.location.z = 0.02 * math.sin(p)
+            root.rotation_euler = (0.025 * math.sin(p + 0.6), 0.035 * math.sin(p), 0)
+            path = os.path.join(TMP, 'ship', f'{style}_{f:02d}.png')
+            render_to(path)
+            frames.append(path)
+        rel = 'assets/ships/longship.webp' if style == 'ormen' else f'assets/ships/longship-{style}.webp'
+        pack(frames, SHIP_W, SHIP_H, 4, os.path.join(PUBLIC, rel))
+        ox, oy = anchor(cam, (0, 0, 0.22))
+        info = {'sheet': rel, 'frameWidth': SHIP_W, 'frameHeight': SHIP_H, 'originX': ox, 'originY': oy,
+                'anims': {'bob': {'start': 0, 'end': SHIP_FRAMES - 1, 'fps': 8}}}
+        manifest['shipVariants'][style] = info
+        if style == 'ormen':
+            manifest['ship'] = info
+        print(f'[viking-loot] rendered ship {style}')
 
 
 BOAT_W, BOAT_H = 200, 176

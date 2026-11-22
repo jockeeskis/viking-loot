@@ -17,7 +17,9 @@ export type AssetManifest = {
   wild?: VikingAsset | null
   scout?: VikingAsset | null
   loot: (SheetInfo & { frames: Record<string, number> }) | null
-  ship: (SheetInfo & { anims: { bob: AnimRange } }) | null
+  ship: ShipAsset | null
+  /** Every longship style by id ('ormen' is the default ship); the others are unlocked in Skeppsvarvet. */
+  shipVariants?: Record<string, ShipAsset>
   /** Background island, placed at x/y in logical (360x640) coordinates. */
   island?: IslandInfo | null
   /** The winter island used in Isriket. */
@@ -25,6 +27,7 @@ export type AssetManifest = {
   /** Small colour ships, one frame per colour. */
   boats?: (SheetInfo & { frames: Record<LootColor, number> }) | null
 }
+export type ShipAsset = SheetInfo & { anims: { bob: AnimRange } }
 export type IslandInfo = { image: string; x: number; y: number; width: number; height: number }
 
 export const sheetKey = (a: VikingAsset) => `viking-${a.name}`
@@ -48,7 +51,21 @@ export function assetFor(v: { kind: VikingKind; color: LootColor | null }): Viki
 }
 export const teamAsset = (c: LootColor) => MANIFEST.vikings[c]
 export const lootAsset = () => MANIFEST.loot
-export const shipAsset = () => MANIFEST.ship
+export const shipAsset = (id = 'ormen') => (id === 'ormen' ? MANIFEST.ship : MANIFEST.shipVariants?.[id] ?? MANIFEST.ship)
+export const shipKey = (id = 'ormen') => (id === 'ormen' || !MANIFEST.shipVariants?.[id] ? SHIP_KEY : `${SHIP_KEY}-${id}`)
+export const shipAnimKey = (id = 'ormen') => (shipKey(id) === SHIP_KEY ? 'ship-bob' : `ship-bob-${id}`)
+/** The sheet of a ship style, for previews outside the game (Skeppsvarvet). */
+export const shipSheet = (id: string) => (id === 'ormen' ? MANIFEST.ship : MANIFEST.shipVariants?.[id])?.sheet ?? null
+
+/** Load a ship style the first time it is chosen. Calls `done` once it can be shown. */
+export function ensureShip(scene: Phaser.Scene, id: string, done: () => void) {
+  const key = shipKey(id)
+  const a = shipAsset(id)
+  if (!a || scene.textures.exists(key)) { createAnims(scene); done(); return }
+  scene.load.spritesheet(key, a.sheet, { frameWidth: a.frameWidth, frameHeight: a.frameHeight })
+  scene.load.once(Phaser.Loader.Events.COMPLETE, () => { createAnims(scene); done() })
+  scene.load.start()
+}
 export const islandAsset = (snow = false) => (snow ? MANIFEST.islandSnow ?? MANIFEST.island : MANIFEST.island) ?? null
 export const islandKey = (snow = false) => (snow && MANIFEST.islandSnow ? ISLAND_SNOW_KEY : ISLAND_KEY)
 export const boatsAsset = () => MANIFEST.boats ?? null
@@ -102,11 +119,12 @@ export function createAnims(scene: Phaser.Scene) {
       })
     }
   }
-  const ship = MANIFEST.ship
-  if (ship && scene.textures.exists(SHIP_KEY) && !scene.anims.exists('ship-bob')) {
+  for (const id of ['ormen', ...Object.keys(MANIFEST.shipVariants ?? {})]) {
+    const ship = shipAsset(id), key = shipKey(id), anim = shipAnimKey(id)
+    if (!ship || !scene.textures.exists(key) || scene.anims.exists(anim)) continue
     scene.anims.create({
-      key: 'ship-bob', frameRate: ship.anims.bob.fps, repeat: -1,
-      frames: scene.anims.generateFrameNumbers(SHIP_KEY, { start: ship.anims.bob.start, end: ship.anims.bob.end }),
+      key: anim, frameRate: ship.anims.bob.fps, repeat: -1,
+      frames: scene.anims.generateFrameNumbers(key, { start: ship.anims.bob.start, end: ship.anims.bob.end }),
     })
   }
 }

@@ -11,7 +11,7 @@ import {
 } from './art'
 import {
   preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, hasBoats, lootAsset, shipAsset,
-  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY,
+  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, shipKey, shipAnimKey,
   type VikingAnim, type VikingAsset,
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, CAMERA_ZOOM } from './fx'
@@ -96,6 +96,7 @@ export class RaidScene extends Phaser.Scene {
   private islandImg?: Phaser.GameObjects.Image
   private boat?: Phaser.GameObjects.GameObject
   private longship?: Phaser.GameObjects.Sprite
+  private shipId = 'ormen'
 
   constructor() { super('Raid') }
 
@@ -108,10 +109,21 @@ export class RaidScene extends Phaser.Scene {
     createFxTextures(this)
     this.drawEnvironment()
     this.ready = true
+    if (this.shipId !== 'ormen') this.setShip(this.shipId)
     if (this.pending) { const p = this.pending; this.pending = undefined; this.play(p.data, p.title) } else this.reset(this.level)
   }
 
   setUpdate(fn: (u: RaidUpdate) => void) { this.onUpdate = fn }
+
+  /** Sail with another longship style (Skeppsvarvet). Loaded the first time it is chosen. */
+  setShip(id: string) {
+    this.shipId = id
+    if (!this.ready || !this.longship) return
+    ensureShip(this, id, () => {
+      if (this.shipId !== id || !this.longship) return
+      this.longship.setTexture(shipKey(id), 0).play(shipAnimKey(id))
+    })
+  }
 
   /** Start a campaign level by index. */
   reset(index: number) {

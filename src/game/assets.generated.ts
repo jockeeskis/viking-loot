@@ -408,5 +408,63 @@ export const MANIFEST: AssetManifest = {
     "y": 36,
     "width": 360,
     "height": 372
+  },
+  "shipVariants": {
+    "ormen": {
+      "sheet": "assets/ships/longship.webp",
+      "frameWidth": 424,
+      "frameHeight": 272,
+      "originX": 0.4722,
+      "originY": 0.6977,
+      "anims": {
+        "bob": {
+          "start": 0,
+          "end": 11,
+          "fps": 8
+        }
+      }
+    },
+    "havsorn": {
+      "sheet": "assets/ships/longship-havsorn.webp",
+      "frameWidth": 424,
+      "frameHeight": 272,
+      "originX": 0.4722,
+      "originY": 0.6977,
+      "anims": {
+        "bob": {
+          "start": 0,
+          "end": 11,
+          "fps": 8
+        }
+      }
+    },
+    "nordstjarnan": {
+      "sheet": "assets/ships/longship-nordstjarnan.webp",
+      "frameWidth": 424,
+      "frameHeight": 272,
+      "originX": 0.4722,
+      "originY": 0.6977,
+      "anims": {
+        "bob": {
+          "start": 0,
+          "end": 11,
+          "fps": 8
+        }
+      }
+    },
+    "ymer": {
+      "sheet": "assets/ships/longship-ymer.webp",
+      "frameWidth": 424,
+      "frameHeight": 272,
+      "originX": 0.4722,
+      "originY": 0.6977,
+      "anims": {
+        "bob": {
+          "start": 0,
+          "end": 11,
+          "fps": 8
+        }
+      }
+    }
   }
 }
