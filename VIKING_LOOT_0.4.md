@@ -1,6 +1,6 @@
 # Viking Loot 0.4 – Isriket: nycklar, is, två skepp, dagens räd och app
 
-> **Status (2026-11-22):** Version 0.4.0 – alla fem faser är klara: PWA (testad på Android), regelmotorn, Isriket med bana 25–36, Dagens räd / oändlig räd och prestationer, statistik och Skeppsvarvet. Kvar: bekräfta på mobil att genereringen inte hackar.
+> **Status (2026-11-22):** Version 0.4.0 – alla fem faser är klara: PWA (testad på Android), regelmotorn, Isriket med bana 25–36, Dagens räd / oändlig räd och prestationer, statistik och Skeppsvarvet. Allt är testat, även på Android.
 
 ## Syfte
 
@@ -165,7 +165,7 @@ Logiken finns i `src/game/achievements.ts` (testad i `achievements.test.ts`) och
 - [x] Banorna 1–24 ger samma siffror från lösaren som i 0.3.
 - [x] Varje ny mekanik har tester och en introbana som inte går att förlora.
 - [x] Dagens räd är samma för samma datum och går alltid att vinna (testat i `modes.test.ts`).
-- [x] Genereringen fryser inte sidan (Web Worker, kontrollerat i produktionsbygget). Ska bekräftas på mobil.
+- [x] Genereringen fryser inte sidan (Web Worker, kontrollerat i produktionsbygget och på Android).
 - [x] Prestationer och skepp sparas, och 0.3-progress migreras (testat i `achievements.test.ts` och i webbläsaren).
 
 ## 8. Utanför scope för 0.4
