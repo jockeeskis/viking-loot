@@ -109,6 +109,7 @@ export const SV: Dict = {
   'stat.daily': 'Dagens räd vunnen',
   'stat.streak': 'Dagar i rad (bästa)',
   'stat.endless': 'Bästa oändliga räd',
+  'stat.kegs': 'Krutfat sprängda',
   'toast.achievement': 'Prestation: {t}',
   'toast.ship': 'Nytt skepp: {name}',
   'toast.shipText': 'Välj det i Skeppsvarvet.',
@@ -215,6 +216,7 @@ export const EN: Dict = {
   'stat.daily': 'Daily raids won',
   'stat.streak': 'Days in a row (best)',
   'stat.endless': 'Best endless raid',
+  'stat.kegs': 'Powder kegs blown',
   'toast.achievement': 'Achievement: {t}',
   'toast.ship': 'New ship: {name}',
   'toast.shipText': 'Choose it in the Shipyard.',
@@ -273,6 +275,10 @@ export const DATA_EN: Dict = {
   'ach.fjordarna.text': 'Win every level in the Fjords.',
   'ach.isriket.title': 'Lord of the Ice Realm',
   'ach.isriket.text': 'Win every level in the Ice Realm.',
+  'ach.muspelheim.title': 'Lord of Muspelheim',
+  'ach.muspelheim.text': 'Win every level in Muspelheim.',
+  'ach.kegs-25.title': 'Powder monkey',
+  'ach.kegs-25.text': 'Blow up 25 powder kegs.',
   'ach.gold-coast.title': 'Golden Coast',
   'ach.gold-coast.text': 'Three stars on every level on the Coast.',
   'ach.all-gold.title': 'The whole North in gold',
@@ -304,6 +310,8 @@ export const DATA_EN: Dict = {
   'ship.nordstjarnan.text': 'A night-blue sail with a golden star.',
   'ship.ymer.name': 'Ymir\'s Dragon',
   'ship.ymer.text': 'Black and gold, with a red dragon woken from the ice.',
+  'ship.surt.name': 'Surtr\'s Glow',
+  'ship.surt.text': 'A sail that glows like lava and a dragon black as soot.',
 }
 
 const DICTS: Record<Lang, Dict> = { sv: SV, en: EN }

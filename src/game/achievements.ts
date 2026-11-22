@@ -10,6 +10,7 @@ export type Stats = {
   chestsOpened: number
   cleanWins: number // puzzles (par ≥ 2) won without undo or hint
   dailyWins: number
+  kegsBlown: number // 0.5
 }
 export type Meta = {
   stats: Stats
@@ -22,12 +23,13 @@ export type Ctx = { stats: Stats; progress: Progress; modes: ModeProgress }
 
 // ---------------------------------------------------------------- ships
 
-export type ShipId = 'ormen' | 'havsorn' | 'nordstjarnan' | 'ymer'
+export type ShipId = 'ormen' | 'havsorn' | 'nordstjarnan' | 'ymer' | 'surt'
 export const SHIPS: { id: ShipId; name: string; stars: number; text: string }[] = [
   { id: 'ormen', name: 'Ormen', stars: 0, text: 'Det gamla trotjänarskeppet med rött och vitt segel.' },
   { id: 'havsorn', name: 'Havsörnen', stars: 30, text: 'Blått segel och en vit örn i fören.' },
   { id: 'nordstjarnan', name: 'Nordstjärnan', stars: 60, text: 'Nattblått segel med en gyllene stjärna.' },
   { id: 'ymer', name: 'Ymers drake', stars: 100, text: 'Svart och guld, med en röd drake som vaknat ur isen.' },
+  { id: 'surt', name: 'Surtsglöd', stars: 130, text: 'Ett segel som glöder som lava och en drake svart som sot.' },
 ]
 export const totalStars = (p: Progress) => p.stars.reduce((a, b) => a + (b ?? 0), 0)
 export const shipUnlocked = (id: ShipId, p: Progress) => totalStars(p) >= (SHIPS.find(s => s.id === id)?.stars ?? Infinity)
@@ -41,7 +43,7 @@ const wonAll = (p: Progress, first: number, last: number, stars = 1) => {
 }
 const countIn = (p: Progress, first: number, last: number, stars = 1) =>
   p.stars.slice(first, last + 1).filter(s => (s ?? 0) >= stars).length
-const [KUSTEN, FJORDARNA, ISRIKET] = worlds
+const [KUSTEN, FJORDARNA, ISRIKET, MUSPELHEIM] = worlds
 const LAST = levels.length - 1
 
 export type Achievement = {
@@ -64,6 +66,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'isriket', icon: '❄️', title: 'Isrikets herre', text: 'Vinn alla banor i Isriket.',
     done: c => wonAll(c.progress, ISRIKET.first, ISRIKET.last), progress: c => [countIn(c.progress, ISRIKET.first, ISRIKET.last), 12],
+  },
+  {
+    id: 'muspelheim', icon: '🌋', title: 'Muspelheims herre', text: 'Vinn alla banor i Muspelheim.',
+    done: c => wonAll(c.progress, MUSPELHEIM.first, MUSPELHEIM.last), progress: c => [countIn(c.progress, MUSPELHEIM.first, MUSPELHEIM.last), 12],
   },
   {
     id: 'gold-coast', icon: '⭐', title: 'Guldkusten', text: 'Tre stjärnor på alla banor i Kusten.',
@@ -92,6 +98,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'chests-10', icon: '🗝️', title: 'Nyckelbärare', text: 'Öppna 10 låsta kistor.',
     done: c => c.stats.chestsOpened >= 10, progress: c => [Math.min(c.stats.chestsOpened, 10), 10],
+  },
+  {
+    id: 'kegs-25', icon: '💥', title: 'Krutgubbe', text: 'Spräng 25 krutfat.',
+    done: c => c.stats.kegsBlown >= 25, progress: c => [Math.min(c.stats.kegsBlown, 25), 25],
   },
   { id: 'daily-1', icon: '📅', title: 'Dagens hjälte', text: 'Vinn en Dagens räd.', done: c => c.stats.dailyWins >= 1 || c.modes.daily.lastWon !== null },
   {
@@ -126,6 +136,7 @@ export type RaidResult = {
   par: number
   loot: number // items plundered (every item is taken on a win)
   chests: number // locked chests opened
+  kegs: number // powder kegs blown up
   usedUndo: boolean
   usedHint: boolean
 }
@@ -138,15 +149,20 @@ export function recordRaid(s: Stats, r: RaidResult): Stats {
     chestsOpened: s.chestsOpened + r.chests,
     cleanWins: s.cleanWins + (r.par >= 2 && !r.usedUndo && !r.usedHint ? 1 : 0),
     dailyWins: s.dailyWins + (r.mode === 'daily' ? 1 : 0),
+    kegsBlown: s.kegsBlown + r.kegs,
   }
 }
 
 /** The loot and chests a won level counts for. */
-export function lootOf(level: { loot: { stone?: boolean; lockedBy?: string[] }[] }) {
-  return { loot: level.loot.filter(l => !l.stone).length, chests: level.loot.filter(l => l.lockedBy?.length).length }
+export function lootOf(level: { loot: { stone?: boolean; lockedBy?: string[]; keg?: boolean }[] }) {
+  return {
+    loot: level.loot.filter(l => !l.stone).length,
+    chests: level.loot.filter(l => l.lockedBy?.length).length,
+    kegs: level.loot.filter(l => l.keg).length,
+  }
 }
 
-export const emptyStats = (): Stats => ({ raidsWon: 0, lootTaken: 0, perfectRaids: 0, chestsOpened: 0, cleanWins: 0, dailyWins: 0 })
+export const emptyStats = (): Stats => ({ raidsWon: 0, lootTaken: 0, perfectRaids: 0, chestsOpened: 0, cleanWins: 0, dailyWins: 0, kegsBlown: 0 })
 export const emptyMeta = (): Meta => ({ stats: emptyStats(), unlocked: {}, ship: 'ormen', migrated: false })
 
 /**
@@ -158,10 +174,11 @@ export function migrate(meta: Meta, progress: Progress, modes: ModeProgress): Me
   const s = { ...meta.stats }
   progress.stars.forEach((stars, i) => {
     if (!stars || !levels[i]) return
-    const { loot, chests } = lootOf(levels[i])
+    const { loot, chests, kegs } = lootOf(levels[i])
     s.raidsWon++
     s.lootTaken += loot
     s.chestsOpened += chests
+    s.kegsBlown += kegs
     if (stars >= 3) s.perfectRaids++
   })
   s.dailyWins += Object.keys(modes.daily.results).length

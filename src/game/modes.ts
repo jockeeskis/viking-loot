@@ -4,12 +4,16 @@ import type { Mechanic } from './intros.ts'
 import type { Level } from './levels.ts'
 
 /** Mechanics by world. Kusten has none; the generated raids only use worlds the player has completed. */
-const WORLD_MECHANICS: Mechanic[][] = [[], ['house', 'stone', 'jarl', 'wild', 'hidden'], ['key', 'ice', 'ships', 'scout']]
-export type Tier = 0 | 1 | 2
+const WORLD_MECHANICS: Mechanic[][] = [
+  [], ['house', 'stone', 'jarl', 'wild', 'hidden'], ['key', 'ice', 'ships', 'scout'], ['keg', 'tide', 'cage', 'raven'],
+]
+export type Tier = 0 | 1 | 2 | 3
 
-/** 0 = only plain loot, 1 = + Fjordarna, 2 = + Isriket. `completed[w]` = world w's last level is won. */
+/** 0 = only plain loot, 1 = + Fjordarna, 2 = + Isriket, 3 = + Muspelheim. `completed[w]` = world w's last level is won. */
 export function tierFor(completed: boolean[]): Tier {
-  return completed[1] ? (completed[2] ? 2 : 1) : 0
+  if (!completed[1]) return 0
+  if (!completed[2]) return 1
+  return completed[3] ? 3 : 2
 }
 export const mechanicsForTier = (tier: Tier): Mechanic[] => WORLD_MECHANICS.slice(0, tier + 1).flat()
 

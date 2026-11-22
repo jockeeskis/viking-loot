@@ -24,6 +24,10 @@ export type AssetManifest = {
   island?: IslandInfo | null
   /** The winter island used in Isriket. */
   islandSnow?: IslandInfo | null
+  /** The volcanic island used in Muspelheim (0.5). */
+  islandLava?: IslandInfo | null
+  /** The raven that carries off waiting vikings (0.5). */
+  raven?: (SheetInfo & { anims: { fly: AnimRange } }) | null
   /** Small colour ships, one frame per colour. */
   boats?: (SheetInfo & { frames: Record<LootColor, number> }) | null
 }
@@ -37,6 +41,9 @@ export const LOOT_KEY = 'loot'
 export const SHIP_KEY = 'longship'
 export const ISLAND_KEY = 'island'
 export const ISLAND_SNOW_KEY = 'island-snow'
+export const ISLAND_LAVA_KEY = 'island-lava'
+export const RAVEN_KEY = 'raven'
+export type IslandStyle = 'grass' | 'snow' | 'lava'
 export const BOATS_KEY = 'boats'
 
 /** Animations that play once and stop on their last frame. */
@@ -66,8 +73,14 @@ export function ensureShip(scene: Phaser.Scene, id: string, done: () => void) {
   scene.load.once(Phaser.Loader.Events.COMPLETE, () => { createAnims(scene); done() })
   scene.load.start()
 }
-export const islandAsset = (snow = false) => (snow ? MANIFEST.islandSnow ?? MANIFEST.island : MANIFEST.island) ?? null
-export const islandKey = (snow = false) => (snow && MANIFEST.islandSnow ? ISLAND_SNOW_KEY : ISLAND_KEY)
+export const islandAsset = () => MANIFEST.island ?? null
+/** The island image for a world style (falls back to the green island when one is missing). */
+export function islandKey(style: IslandStyle = 'grass') {
+  if (style === 'snow' && MANIFEST.islandSnow) return ISLAND_SNOW_KEY
+  if (style === 'lava' && MANIFEST.islandLava) return ISLAND_LAVA_KEY
+  return ISLAND_KEY
+}
+export const ravenAsset = () => MANIFEST.raven ?? null
 export const boatsAsset = () => MANIFEST.boats ?? null
 export const lootFrame = (kind: LootKind | 'house-open' | 'padlock', color: LootColor) => MANIFEST.loot?.frames[`${kind}-${color}`]
 /** Colourless loot frames: 'stone', 'hidden' (loot under a tarp) and the 'ice' overlay. */
@@ -87,6 +100,9 @@ export function preloadAssets(scene: Phaser.Scene) {
   const island = MANIFEST.island
   if (island) scene.load.image(ISLAND_KEY, island.image)
   if (MANIFEST.islandSnow) scene.load.image(ISLAND_SNOW_KEY, MANIFEST.islandSnow.image)
+  if (MANIFEST.islandLava) scene.load.image(ISLAND_LAVA_KEY, MANIFEST.islandLava.image)
+  const raven = MANIFEST.raven
+  if (raven) scene.load.spritesheet(RAVEN_KEY, raven.sheet, { frameWidth: raven.frameWidth, frameHeight: raven.frameHeight })
   const boats = MANIFEST.boats
   if (boats) scene.load.spritesheet(BOATS_KEY, boats.sheet, { frameWidth: boats.frameWidth, frameHeight: boats.frameHeight })
 }
@@ -119,6 +135,13 @@ export function createAnims(scene: Phaser.Scene) {
       })
     }
   }
+  const raven = MANIFEST.raven
+  if (raven && scene.textures.exists(RAVEN_KEY) && !scene.anims.exists('raven-fly')) {
+    scene.anims.create({
+      key: 'raven-fly', frameRate: raven.anims.fly.fps, repeat: -1,
+      frames: scene.anims.generateFrameNumbers(RAVEN_KEY, { start: raven.anims.fly.start, end: raven.anims.fly.end }),
+    })
+  }
   for (const id of ['ormen', ...Object.keys(MANIFEST.shipVariants ?? {})]) {
     const ship = shipAsset(id), key = shipKey(id), anim = shipAnimKey(id)
     if (!ship || !scene.textures.exists(key) || scene.anims.exists(anim)) continue
@@ -133,4 +156,5 @@ export const hasSheet = (scene: Phaser.Scene, a: VikingAsset | undefined): a is 
 export const hasLoot = (scene: Phaser.Scene) => !!MANIFEST.loot && scene.textures.exists(LOOT_KEY)
 export const hasShip = (scene: Phaser.Scene) => !!MANIFEST.ship && scene.textures.exists(SHIP_KEY)
 export const hasIsland = (scene: Phaser.Scene) => !!MANIFEST.island && scene.textures.exists(ISLAND_KEY)
+export const hasRaven = (scene: Phaser.Scene) => !!MANIFEST.raven && scene.textures.exists(RAVEN_KEY)
 export const hasBoats = (scene: Phaser.Scene) => !!MANIFEST.boats && scene.textures.exists(BOATS_KEY)

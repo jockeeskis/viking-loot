@@ -12,7 +12,7 @@ const ctx = (over: Partial<Ctx> = {}): Ctx => ({ stats: emptyStats(), progress: 
 const earned = (c: Ctx) => ACHIEVEMENTS.filter(a => a.done(c)).map(a => a.id)
 const progressWith = (stars: number[]): Progress => ({ ...emptyProgress(), stars, unlocked: stars.length })
 const win = (over: Partial<RaidResult> = {}): RaidResult =>
-  ({ mode: 'campaign', stars: 2, par: 1, loot: 12, chests: 0, usedUndo: false, usedHint: false, ...over })
+  ({ mode: 'campaign', stars: 2, par: 1, loot: 12, chests: 0, kegs: 0, usedUndo: false, usedHint: false, ...over })
 
 test('achievements have unique ids, and nothing is earned from a fresh start', () => {
   assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, ACHIEVEMENTS.length)
@@ -40,7 +40,8 @@ test('each achievement is unlocked by its own event', () => {
   assert.ok(!earned(ctx({ progress: kusten })).includes('gold-coast'))
   assert.ok(earned(ctx({ progress: progressWith(Array(12).fill(3)) })).includes('gold-coast'))
   const all = earned(ctx({ progress: progressWith(Array(levels.length).fill(3)) }))
-  for (const id of ['kusten', 'fjordarna', 'isriket', 'gold-coast', 'all-gold']) assert.ok(all.includes(id), id)
+  for (const id of ['kusten', 'fjordarna', 'isriket', 'muspelheim', 'gold-coast', 'all-gold']) assert.ok(all.includes(id), id)
+  assert.ok(after(recordRaid(emptyStats(), win({ kegs: 25 }))).includes('kegs-25'))
 
   let m = emptyModes()
   for (let d = 1; d <= 7; d++) m = recordDailyWin(m, `2026-12-0${d}`, 2)
@@ -69,7 +70,8 @@ test('ships unlock with total stars', () => {
   assert.deepEqual(unlockedShips(emptyProgress()), ['ormen'])
   assert.equal(totalStars(progressWith([3, 3, 2, 0, 1])), 9)
   assert.deepEqual(unlockedShips(progressWith(Array(10).fill(3))), ['ormen', 'havsorn'])
-  assert.deepEqual(unlockedShips(progressWith(Array(36).fill(3))), SHIPS.map(s => s.id))
+  assert.deepEqual(unlockedShips(progressWith(Array(48).fill(3))), SHIPS.map(s => s.id))
+  assert.ok(!unlockedShips(progressWith(Array(36).fill(3))).includes('surt'), 'Surtsglöd needs 130 stars')
 })
 
 test('0.3 progress is migrated into the statistics once', () => {
@@ -77,7 +79,7 @@ test('0.3 progress is migrated into the statistics once', () => {
   const modes = recordDailyWin(emptyModes(), '2026-11-21', 3)
   const m = migrate(emptyMeta(), p, modes)
   const expectLoot = [0, 1, 2, 24].reduce((a, i) => a + lootOf(levels[i]).loot, 0)
-  assert.deepEqual(m.stats, { raidsWon: 4, lootTaken: expectLoot, perfectRaids: 2, chestsOpened: 1, cleanWins: 0, dailyWins: 1 })
+  assert.deepEqual(m.stats, { raidsWon: 4, lootTaken: expectLoot, perfectRaids: 2, chestsOpened: 1, cleanWins: 0, dailyWins: 1, kegsBlown: 0 })
   assert.equal(migrate(m, p, modes), m, 'only once')
   const c = { stats: m.stats, progress: p, modes }
   assert.ok(newlyEarned(m, c).includes('first-raid') && newlyEarned(m, c).includes('daily-1'))

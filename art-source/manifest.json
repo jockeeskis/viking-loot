@@ -151,7 +151,13 @@
       "padlock-red": 17,
       "padlock-blue": 18,
       "padlock-yellow": 19,
-      "ice": 20
+      "ice": 20,
+      "keg-red": 21,
+      "keg-blue": 22,
+      "keg-yellow": 23,
+      "cage-red": 24,
+      "cage-blue": 25,
+      "cage-yellow": 26
     }
   },
   "ship": {
@@ -461,6 +467,41 @@
           "end": 11,
           "fps": 8
         }
+      }
+    },
+    "surt": {
+      "sheet": "assets/ships/longship-surt.webp",
+      "frameWidth": 424,
+      "frameHeight": 272,
+      "originX": 0.4722,
+      "originY": 0.6977,
+      "anims": {
+        "bob": {
+          "start": 0,
+          "end": 11,
+          "fps": 8
+        }
+      }
+    }
+  },
+  "islandLava": {
+    "image": "assets/island/island-lava.webp",
+    "x": 0,
+    "y": 36,
+    "width": 360,
+    "height": 372
+  },
+  "raven": {
+    "sheet": "assets/fx/raven.webp",
+    "frameWidth": 200,
+    "frameHeight": 160,
+    "originX": 0.5,
+    "originY": 0.5,
+    "anims": {
+      "fly": {
+        "start": 0,
+        "end": 5,
+        "fps": 12
       }
     }
   }

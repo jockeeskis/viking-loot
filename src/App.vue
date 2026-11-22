@@ -8,7 +8,7 @@ import { isMuted, setMuted, unlockAudio, isMusicOn, setMusicOn } from './game/sf
 import { loadProgress, saveProgress, recordWin, starsFor } from './game/progress'
 import { INTROS, mechanicsOf, type Mechanic } from './game/intros'
 import {
-  dateKey, tierFor, loadModes, saveModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound,
+  dateKey, tierFor, type Tier, loadModes, saveModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound,
 } from './game/modes'
 import { requestLevel } from './game/levelGen'
 import {
@@ -96,7 +96,7 @@ const mode = ref<Mode>('campaign')
 const active = shallowRef<Level>(levels[current.value])
 const today = ref(dateKey(new Date()))
 const playingDay = ref('') // the day of the Dagens räd being played
-const endless = ref({ round: 0, runSeed: 0, tier: 0 as 0 | 1 | 2, over: false, bestBefore: 0 })
+const endless = ref({ round: 0, runSeed: 0, tier: 0 as Tier, over: false, bestBefore: 0 })
 let nextEndless: Promise<Level> | null = null // the next round, generated while this one is played
 const generating = ref(false)
 let ticket = 0 // the newest load request; older ones that finish later are ignored
@@ -139,11 +139,11 @@ function update(d: RaidUpdate) {
       modes.value = recordEndlessRound(modes.value, endless.value.round)
       saveModes(modes.value)
     }
-    const { loot, chests } = lootOf(active.value)
+    const { loot, chests, kegs } = lootOf(active.value)
     meta.value = {
       ...meta.value,
       stats: recordRaid(meta.value.stats, {
-        mode: mode.value, stars: lastStars.value, par: active.value.par, loot, chests, usedUndo, usedHint,
+        mode: mode.value, stars: lastStars.value, par: active.value.par, loot, chests, kegs, usedUndo, usedHint,
       }),
     }
     checkAchievements()
@@ -330,6 +330,7 @@ const statRows = computed(() => {
     ['🪙', t('stat.loot'), s.lootTaken],
     ['✨', t('stat.perfect'), s.perfectRaids],
     ['🗝️', t('stat.chests'), s.chestsOpened],
+    ['💥', t('stat.kegs'), s.kegsBlown],
     ['⭐', t('stat.stars'), `${stars.value}/${levels.length * 3}`],
     ['📅', t('stat.daily'), s.dailyWins],
     ['🔥', t('stat.streak'), `${streak.value} (${modes.value.daily.bestStreak})`],

@@ -228,6 +228,27 @@ export const sfx = {
   },
   /** The ice melts a little (one move closer to thawing). */
   drip() { tone(1760, 0.08, { type: 'sine', vol: 0.05, slide: 1200 }) },
+  /** A powder keg goes off. */
+  explode() {
+    noise(0.5, 180, 0.9)
+    noise(0.25, 900, 0.4, 0.02)
+    tone(70, 0.5, { type: 'sine', vol: 0.2, slide: 35 })
+  },
+  /** The tide washes over a pile. */
+  wave() {
+    noise(0.7, 600, 0.35)
+    noise(0.5, 1400, 0.15, 0.15)
+  },
+  /** A cage opens and the prisoner runs free. */
+  free() {
+    ;[523, 659, 784].forEach((f, i) => tone(f, 0.16, { type: 'triangle', vol: 0.09, at: i * 0.08 }))
+    noise(0.08, 2600, 0.2)
+  },
+  /** The raven caws. */
+  raven() {
+    tone(620, 0.16, { type: 'sawtooth', vol: 0.06, slide: 380, lowpass: 1800 })
+    tone(560, 0.2, { type: 'sawtooth', vol: 0.06, slide: 320, lowpass: 1800, at: 0.22 })
+  },
   /** The scout looks over the island. */
   scout() {
     tone(659, 0.25, { type: 'triangle', vol: 0.08 })

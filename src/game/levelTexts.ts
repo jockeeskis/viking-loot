@@ -39,4 +39,17 @@ export const LEVEL_EN: { name: string; hint: string }[] = [
   { name: 'Northern Lights', hint: 'Houses, a stone and a small red ship with a single seat. Who needs it most?' },
   { name: 'The Ice Hall', hint: 'A hidden chest, frozen loot and Harald at the end of the queue. Sigrid helps you plan.' },
   { name: 'Ymir\'s Heart', hint: 'The last raid in the ice: everything you have learned, on one island.' },
+  // Muspelheim
+  { name: 'Powder Cellar', hint: 'The powder keg goes off when it is plundered – the stone next to it crumbles at once.' },
+  { name: 'Sulphur Mine', hint: 'Two powder kegs. Which stone has to go first – and which keg should go off when?' },
+  { name: 'Ash Beach', hint: 'Every third move the wave washes the front loot of the wave pile to the back.' },
+  { name: 'Ember Bays', hint: 'Two wave piles. Count the moves – what will be in front when you need it?' },
+  { name: 'The Jailer\'s Hut', hint: 'Plunder the cage and the prisoner steps up to the front of the queue.' },
+  { name: 'Fetter Harbour', hint: 'Two cages, two prisoners. Who should be set free first?' },
+  { name: 'Raven Rock', hint: 'The raven comes every third move and takes the viking that has waited longest.' },
+  { name: 'Huginn\'s Crag', hint: 'The raven can save a seat – or take a viking you need. Think about when it comes.' },
+  { name: 'Lava River', hint: 'Powder kegs, the tide and a house. Let the wave do the work for you.' },
+  { name: 'Veil of Smoke', hint: 'Everything is hidden in the smoke, a prisoner waits in a cage and the raven is circling.' },
+  { name: 'The Volcano', hint: 'Ice in the fire, a powder keg, a cage and the tide – all on one island.' },
+  { name: 'Surtr\'s Forge', hint: 'The last raid: everything you have learned, in the fire giant\'s forge.' },
 ]

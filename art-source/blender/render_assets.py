@@ -39,6 +39,8 @@ P = {
     # 0.4 – Isriket
     'ice': '#BFE8F7', 'ice_dark': '#78BCDD', 'cloak': '#3E7D6A', 'hair_red': '#B5532E',
     'snow': '#F1F6FA', 'snow_shade': '#D3E2EC',
+    # 0.5 – Muspelheim
+    'lava': '#F2642A', 'lava_hot': '#FFC23D', 'basalt': '#3B3536', 'ash': '#5E5553', 'soot': '#231E1F', 'raven': '#1E2128',
 }
 TEAM = {'ragnar': 'red', 'bjorn': 'blue', 'freja': 'yellow'}
 
@@ -634,6 +636,83 @@ def build_ice(_color=None):
     return root
 
 
+def build_keg(color):
+    """A squat black powder keg with a band in the team colour, a skull-free warning stripe and a lit fuse."""
+    team = P[color]
+    root = empty('root')
+    prof = [(0.19 + 0.045 * math.sin(math.pi * k / 10), 0.5 * k / 10) for k in range(11)]
+    part('body', lathe(prof), P['soot'], root)
+    part('band', lathe([(0.238, 0.2), (0.238, 0.31)]), team, root)
+    for z in (0.06, 0.44):
+        rr = 0.19 + 0.045 * math.sin(math.pi * z / 0.5) + 0.01
+        part('hoop', lathe([(rr, z - 0.02), (rr, z + 0.02)]), P['steel_dark'], root)
+    part('lid', cyl(0.19, 0.19, 0.02, loc=(0, 0, 0.505)), P['ash'], root, smooth=False)
+    part('fuse', cyl(0.014, 0.014, 0.16, seg=8, rot=(0.35, 0.25, 0), loc=(0.03, -0.02, 0.58)), P['rope'], root)
+    part('spark', sphere(0.045, seg=10, rings=6, loc=(0.06, -0.05, 0.66)), P['lava_hot'], root, outline=False, emission=True)
+    part('spark2', sphere(0.028, seg=8, rings=6, loc=(0.09, -0.07, 0.69)), P['lava'], root, outline=False, emission=True)
+    return root
+
+
+def build_cage(color):
+    """A round cage with bars in the team colour. The prisoner is drawn by the game behind the bars."""
+    team = P[color]
+    root = empty('root')
+    part('base', cyl(0.3, 0.32, 0.07, seg=28, loc=(0, 0, 0.035)), P['wood'], root, bevel=0.01)
+    part('ring', torus(0.28, 0.022, seg=32, ring=8, loc=(0, 0, 0.62)), team, root)
+    part('ringlow', torus(0.28, 0.018, seg=32, ring=8, loc=(0, 0, 0.09)), team, root)
+    for k in range(10):  # only the bars in front and at the sides (the back ones would hide the prisoner)
+        a = math.pi * (1.05 + 0.9 * k / 9)
+        part('bar', cyl(0.016, 0.016, 0.56, seg=8, loc=(0.28 * math.cos(a), 0.28 * math.sin(a), 0.36)), team, root)
+    for k in range(4):
+        a = math.pi * k / 4
+        part('dome', torus(0.28, 0.014, seg=24, ring=6, rot=(math.pi / 2, 0, a), loc=(0, 0, 0.62), scale=(1, 1, 0.55)), team, root, outline=False)
+    part('hook', torus(0.05, 0.014, seg=16, ring=6, rot=(math.pi / 2, 0, 0), loc=(0, 0, 0.8)), P['steel_dark'], root)
+    part('lock', box(scale=(0.09, 0.03, 0.08), loc=(0, -0.29, 0.3)), P['gold'], root, smooth=False)
+    return root
+
+
+def build_raven(t):
+    """A cartoon raven seen from the side, wings at phase t (0..1 of one flap)."""
+    root = empty('root')
+    blk = P['raven']
+    part('body', sphere(1, scale=(0.3, 0.16, 0.17), loc=(0, 0, 0)), blk, root)
+    part('head', sphere(0.13, loc=(0.3, 0, 0.1)), blk, root)
+    part('beak', cyl(0.05, 0.0, 0.16, seg=10, rot=(0, math.pi / 2, 0), loc=(0.47, 0, 0.08)), '#5A5F6A', root)
+    part('eye', sphere(0.03, seg=10, rings=6, loc=(0.36, -0.11, 0.15)), P['white'], root, outline=False)
+    part('pupil', sphere(0.016, seg=8, rings=6, loc=(0.375, -0.13, 0.155)), P['black'], root, outline=False)
+    part('tail', box(scale=(0.24, 0.12, 0.03), rot=(0, 0.25, 0), loc=(-0.36, 0, -0.02)), blk, root, smooth=False)
+    flap = math.sin(2 * math.pi * t)
+    for side in (-1, 1):
+        wing = empty('wing', (0, side * 0.1, 0.1), root)
+        wing.rotation_euler = (side * (0.2 + 0.8 * flap), 0, side * -0.45)  # swept back
+        part('feathers', sphere(1, seg=20, rings=10, scale=(0.17, 0.4, 0.03), loc=(0, side * 0.34, 0)), '#343A48', wing)
+        for k in range(3):  # three long primary feathers
+            part('primary', sphere(1, seg=12, rings=6, scale=(0.05, 0.16, 0.02), loc=(-0.06 - 0.05 * k, side * (0.72 - 0.03 * k), 0)),
+                 '#2B2F38', wing)
+    for side in (-1, 1):
+        part('leg', cyl(0.012, 0.012, 0.12, seg=6, loc=(0.02, side * 0.05, -0.2)), '#5A5F6A', root, outline=False)
+    return root
+
+
+RAVEN_W, RAVEN_H, RAVEN_FRAMES = 200, 160, 6
+
+
+def render_raven(manifest):
+    frames = []
+    for f in range(RAVEN_FRAMES):
+        reset_scene()
+        OUTLINE_W[0] = 0.014
+        build_raven(f / RAVEN_FRAMES)
+        cam = camera((0, 0, 0.05), 1.9, (RAVEN_W, RAVEN_H), elev=30)
+        path = os.path.join(TMP, 'raven', f'fly_{f:02d}.png')
+        render_to(path)
+        frames.append(path)
+    rel = 'assets/fx/raven.webp'
+    pack(frames, RAVEN_W, RAVEN_H, 3, os.path.join(PUBLIC, rel))
+    manifest['raven'] = {'sheet': rel, 'frameWidth': RAVEN_W, 'frameHeight': RAVEN_H, 'originX': 0.5, 'originY': 0.5,
+                         'anims': {'fly': {'start': 0, 'end': RAVEN_FRAMES - 1, 'fps': 12}}}
+
+
 # ---------------------------------------------------------------- longship (ui-settings.md §4)
 # Longship looks: the default one plus three unlocked by stars in Skeppsvarvet (0.4).
 SHIP_STYLES = {
@@ -642,6 +721,7 @@ SHIP_STYLES = {
     'nordstjarnan': {'sail': ('#22365F', '#22365F'), 'dragon': '#A9B3BD', 'shields': ('#22365F', '#F5C542'), 'horn': '#F4E6C8',
                      'star': True},
     'ymer': {'sail': ('#2A1D17', '#F5C542'), 'dragon': '#B8322A', 'shields': ('#2A1D17', '#F5C542'), 'horn': '#F5C542'},
+    'surt': {'sail': ('#F2642A', '#FFC23D'), 'dragon': '#2A2224', 'shields': ('#F2642A', '#2A2224'), 'horn': '#FFC23D'},
 }
 
 
@@ -844,6 +924,9 @@ def render_loot(manifest):
     jobs += [('key', build_key, color) for color in ('red', 'blue', 'yellow')]
     jobs += [('padlock', build_padlock, color) for color in ('red', 'blue', 'yellow')]
     jobs += [('ice', build_ice, None)]
+    # 0.5 – Muspelheim: powder kegs and cages per colour.
+    jobs += [('keg', build_keg, color) for color in ('red', 'blue', 'yellow')]
+    jobs += [('cage', build_cage, color) for color in ('red', 'blue', 'yellow')]
     for kind, build, color in jobs:
             reset_scene()
             OUTLINE_W[0] = 0.012
@@ -960,6 +1043,16 @@ def ground_disc(lx, ly, w, h, z, thick=0.01, seg=20):
     return b
 
 
+def build_spire(lx, ly, s):
+    """Muspelheim: a basalt spire with glowing cracks instead of a tree."""
+    root = empty('spire', L(lx, ly))
+    part('spire', cyl(0.13 * s, 0.03 * s, 0.62 * s, seg=7, loc=(0, 0, 0.31 * s)), P['basalt'], root, smooth=False)
+    part('spire2', cyl(0.08 * s, 0.02 * s, 0.38 * s, seg=6, loc=(0.12 * s, 0.03 * s, 0.19 * s)), P['ash'], root, smooth=False)
+    part('crack', box(scale=(0.02 * s, 0.01, 0.3 * s), rot=(0, 0.2, 0), loc=(0.01, -0.1 * s, 0.25 * s)), P['lava'], root,
+         smooth=False, outline=False, emission=True)
+    return root
+
+
 def build_tree(lx, ly, s, snow=False):
     root = empty('tree', L(lx, ly))
     part('trunk', cyl(0.04 * s, 0.035 * s, 0.24 * s, seg=10, loc=(0, 0, 0.12 * s)), P['wood_dark'], root)
@@ -983,14 +1076,17 @@ def build_rock(lx, ly, s, snow=False):
     return root
 
 
-def build_island(snow=False):
-    """The island under the loot. snow=True: the winter version used in Isriket."""
+def build_island(snow=False, lava=False):
+    """The island under the loot. snow=True: the winter version used in Isriket; lava=True: Muspelheim."""
     C = {
         'cliff': '#7A8591' if snow else '#7D8086', 'sand': '#D6E1E8' if snow else '#E6CF98',
         'grass': P['snow'] if snow else '#6CBB48', 'patch': P['snow_shade'] if snow else '#86CC5B',
         'cobble': '#B7C6D2' if snow else '#D3CBB8',
         'bush': ('#3F7F63', '#4C8E70') if snow else ('#4FAE52', '#5FBF5A'),
     }
+    if lava:
+        C = {'cliff': '#2E292A', 'sand': '#4A4244', 'grass': '#5E5553', 'patch': P['lava'], 'cobble': '#766B68',
+             'bush': (P['basalt'], P['ash'])}
     root = empty('island')
     x, y, w, h = 8, 58, 344, 326  # ISLAND in RaidScene.ts
     part('cliff', slab(rrect(x, y, w, h - 4, 30), rrect(x - 4, y + 4, w + 8, h + 4, 34), -0.03, -0.4),
@@ -999,14 +1095,21 @@ def build_island(snow=False):
     part('grass', slab(rrect(x + 11, y + 8, w - 22, h - 28, 22), rrect(x + 8, y + 8, w - 16, h - 22, 25), 0.035, 0.0),
          C['grass'], root, smooth=False, bevel=0.012)
     for px, py, pw, ph in ((70, 110, 70, 26), (260, 150, 80, 30), (120, 330, 90, 24), (300, 300, 50, 22), (190, 230, 110, 34)):
-        part('patch', ground_disc(px, py, pw, ph, 0.035, 0.004), C['patch'], root, outline=False)
+        if lava:  # glowing lava pools with a hot core
+            part('lavapool', ground_disc(px, py, pw * 0.8, ph * 0.8, 0.036, 0.004), C['patch'], root, outline=False, emission=True)
+            part('lavacore', ground_disc(px, py, pw * 0.4, ph * 0.4, 0.037, 0.004), P['lava_hot'], root, outline=False, emission=True)
+        else:
+            part('patch', ground_disc(px, py, pw, ph, 0.035, 0.004), C['patch'], root, outline=False)
     for r in range(7):
         for c in range(9):
             if (r * 7 + c * 3) % 4 != 0:
                 part('cobble', ground_disc(48 + c * 33 + (r % 2) * 15, 92 + r * 42, 20, 11, 0.035, 0.012),
                      C['cobble'], root, outline=False)
     for tx, ty, ts in ((26, 120, 1.0), (334, 104, 1.1), (30, 300, 0.95), (336, 260, 1.0), (346, 180, 0.8)):
-        build_tree(tx, ty, ts, snow)
+        if lava:
+            build_spire(tx, ty, ts)
+        else:
+            build_tree(tx, ty, ts, snow)
     for rx, ry, rs in ((22, 210, 0.8), (340, 350, 0.9), (300, 76, 0.7), (60, 368, 0.8)):
         build_rock(rx, ry, rs, snow)
     # a small dock reaching out towards the longship
@@ -1023,7 +1126,10 @@ def build_island(snow=False):
             part('bushsnow', sphere(0.1, seg=12, rings=8, cut=('above', 0), loc=L(bx, by, 0.05), scale=(1.2, 1, 0.45)), P['snow'], root, outline=False)
     # flowers and tufts (or ice crystals in winter) scattered along the edges, away from the loot grid
     for i, (fx, fy) in enumerate(((40, 80), (200, 66), (320, 140), (28, 250), (338, 220), (150, 372), (250, 370), (90, 70))):
-        if snow:
+        if lava:  # small flames
+            part('flame', cyl(0.035, 0.0, 0.11, seg=6, loc=L(fx, fy, 0.09)), P['lava'], root, smooth=False, outline=False, emission=True)
+            part('flame2', cyl(0.02, 0.0, 0.07, seg=6, loc=L(fx + 6, fy + 2, 0.07)), P['lava_hot'], root, smooth=False, outline=False, emission=True)
+        elif snow:
             part('crystal', cyl(0.03, 0.0, 0.1, seg=4, loc=L(fx, fy, 0.09)), P['ice'], root, smooth=False)
             part('crystal2', cyl(0.022, 0.0, 0.07, seg=4, rot=(0, 0.5, 0), loc=L(fx + 7, fy + 2, 0.07)), P['ice_dark'], root, smooth=False)
         else:
@@ -1032,18 +1138,19 @@ def build_island(snow=False):
     return root
 
 
-def render_island(manifest, snow=False):
+def render_island(manifest, snow=False, lava=False):
     reset_scene()
     OUTLINE_W[0] = 0.012
-    build_island(snow)
+    build_island(snow, lava)
     res = (720, ISLAND_H * 2)
     camera((0, 0, 0), 3.6, res, elev=ISLAND_ELEV)
-    name = 'island-snow' if snow else 'island'
+    name = 'island-lava' if lava else 'island-snow' if snow else 'island'
     tmp = os.path.join(TMP, 'island', f'{name}.png')
     render_to(tmp)
     rel = f'assets/island/{name}.webp'
     pack([tmp], res[0], res[1], 1, os.path.join(PUBLIC, rel))
-    manifest['islandSnow' if snow else 'island'] = {'image': rel, 'x': 0, 'y': ISLAND_TOP, 'width': 360, 'height': ISLAND_H}
+    key = 'islandLava' if lava else 'islandSnow' if snow else 'island'
+    manifest[key] = {'image': rel, 'x': 0, 'y': ISLAND_TOP, 'width': 360, 'height': ISLAND_H}
 
 
 ICON_BG = '#193a4b'  # same sea blue as the game background / manifest
@@ -1100,7 +1207,7 @@ def write_manifest(manifest):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'boats', 'island', 'island-snow'}
+    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'boats', 'island', 'island-snow', 'island-lava', 'raven'}
     if 'harald' in want:
         want |= {'harald-red', 'harald-blue', 'harald-yellow'}
     manifest = {'vikings': {}, 'loot': None, 'ship': None, 'island': None}
@@ -1126,6 +1233,12 @@ def main():
     if 'island-snow' in want:
         render_island(manifest, snow=True)
         print('[viking-loot] rendered snowy island')
+    if 'island-lava' in want:
+        render_island(manifest, lava=True)
+        print('[viking-loot] rendered lava island')
+    if 'raven' in want:
+        render_raven(manifest)
+        print('[viking-loot] rendered raven')
     if 'icons' in want and argv:  # only on request: icons are not part of the game manifest
         render_icons()
         print('[viking-loot] rendered icons')

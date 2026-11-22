@@ -1,6 +1,6 @@
 # Viking Loot 0.5 – Muspelheim, bossar, baneditor och engelska
 
-> **Status (2026-11-22):** Fas 1–2 är klara: inställningar, färgblindläge, vibration, engelska och regelmotorn för krutfat, tidvatten, burar och korpen. Nästa: fas 3 (Muspelheim).
+> **Status (2026-11-22):** Fas 1–3 är klara: inställningar och tillgänglighet, regelmotorn för de fyra mekanikerna och Muspelheim med bana 37–48. Nästa: fas 4 (berättelse och bossar).
 
 ## Syfte
 
@@ -83,7 +83,42 @@ Krutfat och burar verkar direkt när de plundras: explosionen kommer före raset
 
 ## 3. Muspelheim (bana 37–48)
 
-En vulkanö med svart sten, lavaflöden och glöd. Varje mekanik introduceras på en bana som inte går att förlora och används sedan i ett pussel. Bana 45–47 blandar mekanikerna, och bana 48, *Surts smedja*, är finalen.
+En vulkanö med svart sten, lavapölar, basaltspiror och små eldflammor. Varje mekanik introduceras på en bana som inte går att förlora och används sedan i ett pussel. Bana 45–47 blandar mekanikerna, och bana 48, *Surts smedja*, är finalen.
+
+| # | Namn | Innehåll | Vinstchans | Par |
+|---|---|---|---|---|
+| 37 | Krutkällaren | Krutfat (intro) | 100 % | 0 |
+| 38 | Svavelgruvan | Två krutfat och två stenar | ca 32 % | 1 |
+| 39 | Askstranden | Tidvatten (intro) | 100 % | 0 |
+| 40 | Glödvikarna | Två våghögar | ca 36 % | 2 |
+| 41 | Fångvaktarens hydda | Bur (intro) | 100 % | 0 |
+| 42 | Bojhamnen | Två burar | ca 34 % | 2 |
+| 43 | Korpberget | Korpen (intro) | 100 % | 0 |
+| 44 | Hugins klippa | Korpen | ca 34 % | 1 |
+| 45 | Lavafloden | Krutfat, sten, hus och tidvatten | ca 29 % | 1 |
+| 46 | Rökslöjan | Bur, korp och dolda skatter | ca 18 % | 2 |
+| 47 | Eldfjället | Krutfat, is, bur, hus och tidvatten | ca 14 % | 2 |
+| 48 | Surts smedja | Allt, med Sigrid och jarl (final) | ca 14 % | 1 |
+
+**Grafik (Blender):**
+- krutfat och burar i tre färger, där fångens ansikte syns bakom gallret
+- korpen med sex bilder för vingslagen
+- Muspelheim-ön
+- det femte skeppet, Surtsglöd
+
+**I spelet:**
+- **Krutfat:** blixt, eldring, gnistor, rök och skakning när fatet smäller.
+- **Tidvatten:** våghögar står i en strimma grunt vatten. En våg sveper över högen när tidvattnet vänder, och skatterna glider till sina nya platser.
+- **Burar:** fången springer från buren ner till kön.
+- **Korpen:** den flyger in, lyfter vikingen och flyger iväg med den.
+- **Nedräkning:** överst visas hur många utskick det är kvar till tidvattnet (🌊) och korpen (🐦‍⬛).
+
+**Följdändringar:**
+- Dagens räd och den oändliga räden får nivå 3 med Muspelheims mekaniker när världen är klarad.
+- Nya prestationer: "Muspelheims herre" och "Krutgubbe" (spräng 25 krutfat).
+- Det femte skeppet, Surtsglöd, låses upp vid ★ 130.
+
+**Tidvatten och svårighet:** tidvattnet ger spelaren fler val och gör banorna lättare. Pusslen med tidvatten har därför högre högar (bana 40) eller fler mekaniker.
 
 ## 4. Berättelse och bossar
 
@@ -118,7 +153,7 @@ En vulkanö med svart sten, lavaflöden och glöd. Varje mekanik introduceras p�
 - [x] All text finns på svenska och engelska, och ett test kontrollerar att inga översättningar saknas (`i18n.test.ts`).
 - [x] Färgblindläget visar en symbol överallt där en färg betyder något (skatter, nycklar, hänglås, kort, kö, väntande vikingar och färgskepp).
 - [x] Banorna 1–36 ger samma siffror från lösaren som i 0.4 (regressionstest i `engine.test.ts`).
-- [ ] Varje ny mekanik har tester och en introbana som inte går att förlora.
+- [x] Varje ny mekanik har tester och en introbana som inte går att förlora (`progress.test.ts`).
 - [ ] Alla 48 banor och de fyra bossarna är vinnbara, och `par` stämmer med lösaren.
 - [ ] En delad länk öppnar samma ö hos mottagaren. Trasiga eller för stora koder avvisas.
 - [ ] Testat på Android.

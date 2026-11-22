@@ -3,7 +3,7 @@
 import { dailySpec, endlessSpec, daySeed, generateWithFallback, dateKey, type Tier } from '../src/game/modes.ts'
 
 const timed = <T>(f: () => T): [T, number] => { const t = performance.now(); const r = f(); return [r, performance.now() - t] }
-for (const tier of [0, 1, 2] as Tier[]) {
+for (const tier of [0, 1, 2, 3] as Tier[]) {
   const times: number[] = [], steps: number[] = []
   for (let d = 0; d < 30; d++) {
     const seed = daySeed(dateKey(new Date(2026, 10, 1 + d)), tier)
@@ -13,7 +13,7 @@ for (const tier of [0, 1, 2] as Tier[]) {
   times.sort((a, b) => a - b)
   console.log(`daily tier ${tier}: median ${times[15].toFixed(0)} ms, max ${times.at(-1)!.toFixed(0)} ms, steps ${steps.join('')}`)
 }
-for (const tier of [0, 1, 2] as Tier[]) {
+for (const tier of [0, 1, 2, 3] as Tier[]) {
   const out: string[] = []
   let total = 0
   for (let round = 1; round <= 14; round++) {

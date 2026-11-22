@@ -35,6 +35,8 @@ test('tiers: only completed worlds give mechanics', () => {
   assert.equal(tierFor([true, false, false]), 0) // Kusten has no mechanics of its own
   assert.equal(tierFor([true, true, false]), 1)
   assert.equal(tierFor([true, true, true]), 2)
+  assert.equal(tierFor([true, true, true, true]), 3)
+  assert.ok(mechanicsForTier(3).includes('raven') && mechanicsForTier(3).includes('key'))
   assert.deepEqual(mechanicsForTier(0), [])
   assert.ok(mechanicsForTier(1).includes('house') && !mechanicsForTier(1).includes('key'))
 })
@@ -49,7 +51,7 @@ test('specs always give an even number of hits', () => {
 })
 
 test('Dagens räd is the same for the same day and tier, and always winnable', () => {
-  for (const tier of [0, 1, 2] as Tier[]) {
+  for (const tier of [0, 1, 2, 3] as Tier[]) {
     const seen = new Set<string>()
     for (const day of days) {
       const a = dailyLevel(day, tier)
@@ -62,7 +64,7 @@ test('Dagens räd is the same for the same day and tier, and always winnable', (
 })
 
 test('the endless raid is winnable round after round, and seeded by the run', () => {
-  for (const tier of [0, 2] as Tier[]) {
+  for (const tier of [0, 3] as Tier[]) {
     for (let round = 1; round <= 8; round++) checkLevel(endlessLevel(round, tier, 4242), tier)
   }
   assert.deepEqual(endlessLevel(3, 1, 99), endlessLevel(3, 1, 99))

@@ -86,6 +86,36 @@ export function sparkle(scene: Phaser.Scene, x: number, y: number) {
   })
 }
 
+/** A powder keg goes off: a flash, a ring of fire, sparks and smoke. */
+export function explosion(scene: Phaser.Scene, x: number, y: number) {
+  const flash = scene.add.circle(x, y, 12, 0xfff1b0, 0.95).setDepth(36)
+  scene.tweens.add({ targets: flash, radius: 46, alpha: 0, duration: 260, ease: 'Sine.easeOut', onComplete: () => flash.destroy() })
+  const ring = scene.add.circle(x, y, 18).setStrokeStyle(5, 0xf2642a, 1).setDepth(36)
+  scene.tweens.add({ targets: ring, radius: 70, alpha: 0, duration: 420, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() })
+  burst(scene, x, y, DOT, 18, {
+    speed: { min: 80, max: 220 }, angle: { min: 0, max: 360 }, lifespan: 560,
+    scale: { start: 0.5, end: 0 }, tint: [0xffc23d, 0xf2642a, 0xfff1b0], alpha: { start: 1, end: 0 },
+  })
+  burst(scene, x, y - 6, DOT, 10, {
+    speed: { min: 10, max: 40 }, angle: { min: 240, max: 300 }, lifespan: 900,
+    scale: { start: 0.5, end: 1.4 }, alpha: { start: 0.5, end: 0 }, tint: 0x5e5553,
+  })
+}
+
+/** A wave sweeps over a tide pile, from its front (y1) to its back (y0). */
+export function wave(scene: Phaser.Scene, x: number, y0: number, y1: number) {
+  const g = scene.add.graphics().setDepth(34)
+  const draw = (y: number, a: number) => {
+    g.clear()
+    g.fillStyle(0x7cc4ef, 0.55 * a); g.fillEllipse(x, y, 74, 22)
+    g.lineStyle(3, 0xffffff, 0.9 * a)
+    g.beginPath(); g.arc(x - 18, y - 2, 10, Math.PI * 1.1, Math.PI * 1.9); g.strokePath()
+    g.beginPath(); g.arc(x + 6, y - 4, 12, Math.PI * 1.1, Math.PI * 1.9); g.strokePath()
+  }
+  const o = { y: y1 + 20, a: 1 }
+  scene.tweens.add({ targets: o, y: y0 - 10, a: 0.2, duration: 520, ease: 'Sine.easeInOut', onUpdate: () => draw(o.y, o.a), onComplete: () => g.destroy() })
+}
+
 /** A soft puff of dust where a viking lands. */
 export function dustPuff(scene: Phaser.Scene, x: number, y: number) {
   burst(scene, x, y, DOT, 6, {

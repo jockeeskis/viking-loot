@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { levels, worlds, startGame, type Level } from './levels'
 import { mechanicsOf } from './intros'
 import {
-  createGame, selectViking, isAvailable, mainSeats, SELECTABLE,
+  createGame, selectViking, isAvailable, mainSeats, SELECTABLE, TIDE_EVERY,
   type GameEvent, type GameState, type LootColor, type LossReason, type GameStatus, type Viking,
 } from './engine'
 import {
@@ -11,10 +11,10 @@ import {
 } from './art'
 import {
   preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, hasBoats, lootAsset, shipAsset,
-  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, shipKey, shipAnimKey,
+  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, shipKey, shipAnimKey, hasRaven, RAVEN_KEY, ravenAsset, type IslandStyle,
   type VikingAnim, type VikingAsset,
 } from './assets'
-import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, CAMERA_ZOOM } from './fx'
+import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, explosion, wave, CAMERA_ZOOM } from './fx'
 import { sfx } from './sfx'
 import { haptics } from './haptics'
 import { t } from './i18n'
@@ -70,6 +70,15 @@ function kindFor(id: string): LootKind {
 
 type Sprite = Phaser.GameObjects.Container
 
+/** Which island a level is played on: by its world, or for generated raids by the newest mechanics it uses. */
+function islandStyleOf(data: Level): IslandStyle {
+  const index = levels.indexOf(data)
+  if (index >= 0) return index >= (worlds[3]?.first ?? Infinity) ? 'lava' : index >= (worlds[2]?.first ?? Infinity) ? 'snow' : 'grass'
+  const m = mechanicsOf(data)
+  if (m.some(x => x === 'keg' || x === 'tide' || x === 'cage' || x === 'raven')) return 'lava'
+  return m.some(x => x === 'key' || x === 'ice' || x === 'ships' || x === 'scout') ? 'snow' : 'grass'
+}
+
 /** The colour a viking is drawn in. A wild viking without a colour yet uses Freja's look plus a rainbow ring. */
 const lookOf = (v: Viking): LootColor => v.color ?? 'yellow'
 
@@ -102,6 +111,9 @@ export class RaidScene extends Phaser.Scene {
   private queueLabel?: Phaser.GameObjects.Text
   private seatsLabel?: Phaser.GameObjects.Text
   private colorMarks = false // colour-blind mode: symbols on everything whose colour matters
+  private decor: Phaser.GameObjects.GameObject[] = [] // per-level marks on the island (tide water)
+  private tideText?: Phaser.GameObjects.Text // moves until the tide turns
+  private ravenText?: Phaser.GameObjects.Text // moves until the raven comes
 
   constructor() { super('Raid') }
 
@@ -182,11 +194,8 @@ export class RaidScene extends Phaser.Scene {
     this.titleText = title
     this.history = []
     this.title?.setText(title)
-    // Isriket is a winter island – and so is any generated raid that uses its mechanics.
-    const isrikeMechanics = ['key', 'ice', 'ships', 'scout']
-    const index = levels.indexOf(data)
-    const snow = index >= 0 ? index >= (worlds[2]?.first ?? Infinity) : mechanicsOf(data).some(m => isrikeMechanics.includes(m))
-    if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(snow))
+    // Isriket is a winter island and Muspelheim a volcano – and so are generated raids that use their mechanics.
+    if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(islandStyleOf(data)))
     const state = startGame(data)
     this.rebuild(state)
     // Harald, Ylva and Sigrid are downloaded the first time a level needs them; refresh the cards when they arrive.
@@ -209,6 +218,7 @@ export class RaidScene extends Phaser.Scene {
     this.state = state
     this.lootSprites.forEach(s => s.destroy()); this.lootSprites.clear()
     this.actors.forEach(s => s.destroy()); this.actors.clear()
+    this.decor.forEach(d => d.destroy()); this.decor = []
     this.drawLootSprites()
     this.drawBoat()
     this.layout(false)
@@ -261,7 +271,7 @@ export class RaidScene extends Phaser.Scene {
     if (hasIsland(this)) {
       // rendered 3D island (trees, rocks and cobbles included)
       const is = islandAsset()!
-      this.islandImg = this.add.image(is.x, is.y, islandKey(false)).setOrigin(0, 0).setDisplaySize(is.width, is.height)
+      this.islandImg = this.add.image(is.x, is.y, islandKey()).setOrigin(0, 0).setDisplaySize(is.width, is.height)
     } else this.drawIsland(g)
     if (hasShip(this)) {
       const sh = shipAsset()!
@@ -307,6 +317,10 @@ export class RaidScene extends Phaser.Scene {
     this.seatsLabel = this.add.text(WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 1, t('scene.seats'), cartoonText(10)).setOrigin(0.5).setDepth(1)
     this.slotsGfx = this.add.graphics().setDepth(2)
     this.warning = this.add.text(180, 436, '', { ...cartoonText(11), padding: { x: 8, y: 3 } }).setOrigin(0.5).setDepth(40)
+    // Countdowns for the tide (left of the title) and the raven (right of it), shown only when the level has them.
+    const badge = { ...cartoonText(12), padding: { x: 6, y: 2 } }
+    this.tideText = this.add.text(38, 26, '', { ...badge, backgroundColor: '#1f6fb0ee' }).setOrigin(0.5).setDepth(41).setVisible(false)
+    this.ravenText = this.add.text(322, 26, '', { ...badge, backgroundColor: '#2b2f38ee' }).setOrigin(0.5).setDepth(41).setVisible(false)
   }
 
   private drawSlots(waiting: Viking[] = this.state.waiting) {
@@ -454,6 +468,7 @@ export class RaidScene extends Phaser.Scene {
       const { x, y } = this.lootPos(p.at)
       const kind = p.kind ?? this.kindOf(p.id)
       const art = this.makeItemGraphic(p, item.hidden)
+      if (p.cage && !item.hidden) this.addPrisoner(art, p.cage)
       const shadeG = this.add.graphics().setName('shade')
       // Sprites are darkened with a tint instead (see refreshLocks); the box is only for drawn art.
       if (!art.getByName('img')) { shadeG.fillStyle(0x0b1a22, 0.55); shadeG.fillRoundedRect(-33, -36, 66, 62, 12) }
@@ -474,8 +489,41 @@ export class RaidScene extends Phaser.Scene {
       if (item.hitsLeft < (p.hits ?? 1)) this.markOpened(c)
       this.lootSprites.set(p.id, c)
     })
-    this.state.tides.forEach((_, i) => this.placeTidePile(this.state, i, false))
+    this.state.tides.forEach((_, i) => { this.drawTideWater(i, scale); this.placeTidePile(this.state, i, false) })
     this.refreshLocks(this.state, false)
+  }
+
+  /** A strip of shallow water with waves under a tide pile, so it is clear which pile the tide moves. */
+  private drawTideWater(pile: number, scale: number) {
+    const spots = this.levelData.loot.filter(l => l.tidePile === pile).map(l => this.lootPos(l.at))
+    if (!spots.length) return
+    const x = spots[0].x, top = Math.min(...spots.map(p => p.y)) - 34 * scale, bottom = Math.max(...spots.map(p => p.y)) + 30 * scale
+    const g = this.add.graphics().setDepth(1.5)
+    g.fillStyle(0x2f8fd0, 0.42); g.fillRoundedRect(x - 38, top, 76, bottom - top, 26)
+    g.lineStyle(2, 0xbfe6f7, 0.8); g.strokeRoundedRect(x - 38, top, 76, bottom - top, 26)
+    g.lineStyle(2.5, 0xffffff, 0.75)
+    for (let y = top + 16; y < bottom - 6; y += 26) {
+      g.beginPath(); g.arc(x - 26, y, 6, Math.PI * 1.1, Math.PI * 1.9); g.strokePath()
+      g.beginPath(); g.arc(x + 26, y + 10, 6, Math.PI * 1.1, Math.PI * 1.9); g.strokePath()
+    }
+    this.decor.push(g)
+  }
+
+  /** The prisoner's face behind the bars of a cage (plus its colour symbol in colour-blind mode). */
+  private addPrisoner(art: Sprite, color: LootColor) {
+    const asset = teamAsset(color)
+    let face: Phaser.GameObjects.GameObject
+    if (asset && this.textures.exists(portraitKey(asset))) {
+      const img = this.add.image(0, -6, portraitKey(asset))
+      img.setScale(46 / img.width)
+      face = img
+    } else {
+      const g = this.add.graphics()
+      drawHead(g, color, 14, 0, -6)
+      face = g
+    }
+    art.addAt(face.setName('prisoner'), Math.min(1, art.length))
+    art.add(this.mark(color, -24, -22, 6))
   }
 
   /** On levels with keys every chest is a locked chest, so plain loot is drawn as barrels there. */
@@ -748,6 +796,14 @@ export class RaidScene extends Phaser.Scene {
       this.setBadge(a, v.collectedCount, v.capacity)
     })
     this.drawSlots()
+    this.updateCountdowns(this.state)
+  }
+
+  /** How many vikings can be sent before the tide turns / the raven comes (it happens as the N-th is sent). */
+  private updateCountdowns(state: GameState) {
+    const left = (every: number) => every - (state.moves % every)
+    this.tideText?.setVisible(state.tides.length > 0).setText(`🌊 ${left(TIDE_EVERY)}`)
+    this.ravenText?.setVisible(state.raven > 0).setText(`🐦‍⬛ ${state.raven ? left(state.raven) : ''}`)
   }
 
   // ---------- Moves ----------
@@ -867,7 +923,10 @@ export class RaidScene extends Phaser.Scene {
             this.tweens.add({ targets: fly, y: fly.y - 46, x: fly.x + 26, angle: 35, alpha: 0, duration: 420, ease: 'Sine.easeOut', onComplete: () => fly.destroy() })
           }
           old?.destroy()
-          target.addAt(this.makeLootGraphic(target.getData('kind'), target.getData('color')), 0)
+          const art = this.makeLootGraphic(target.getData('kind'), target.getData('color'))
+          const cageOf = this.levelData.loot.find(l => l.id === e.lootId)?.cage
+          if (cageOf) this.addPrisoner(art, cageOf)
+          target.addAt(art, 0)
           sfx.reveal()
           coinBurst(this, target.x, target.y - 6, target.getData('color'))
           this.tweens.add({ targets: target, scale: { from: target.scale * 0.6, to: target.scale }, duration: 260, ease: 'Back.easeOut' })
@@ -908,39 +967,58 @@ export class RaidScene extends Phaser.Scene {
         continue
       }
 
-      // 0.5 board events. (Phase 3 adds the rendered keg, wave, cage and raven art.)
+      // 0.5 board events: powder kegs, the tide, cages and the raven.
       if (e.type === 'explode') {
-        const target = this.lootSprites.get(e.lootId)
-        sfx.crumble()
-        this.cameras.main.shake(220, 0.01)
-        if (target) { dustPuff(this, target.x - 14, target.y); dustPuff(this, target.x + 14, target.y); rockBits(this, target.x, target.y) }
-        await this.delay(140)
+        const at = this.levelData.loot.find(l => l.id === e.lootId)?.at
+        const p = at ? this.lootPos(at) : { x: 180, y: ISLAND_CY }
+        sfx.explode(); haptics.overflow()
+        explosion(this, p.x, p.y)
+        this.cameras.main.shake(260, 0.012)
+        await this.delay(220)
         continue
       }
       if (e.type === 'tide') {
         view = { ...view, tides: view.tides.map((p, i) => (i === e.pile ? [p[p.length - 1], ...p.slice(0, -1)] : p)) }
+        const spots = this.levelData.loot.filter(l => l.tidePile === e.pile).map(l => this.lootPos(l.at))
+        if (spots.length) wave(this, spots[0].x, Math.min(...spots.map(p => p.y)), Math.max(...spots.map(p => p.y)))
+        sfx.wave()
+        await this.delay(180)
         this.placeTidePile(view, e.pile, true)
         this.refreshLocks(view, true)
-        await this.delay(380)
+        await this.delay(360)
         continue
       }
       if (e.type === 'free') {
-        const prisoner = { id: e.vikingId, kind: 'normal' as const, color: this.levelData.loot.find(l => l.id === e.lootId)?.cage ?? 'red', capacity: 2, collectedCount: 0, ship: 0 }
-        view = { ...view, queue: [prisoner, ...view.queue] }
-        const at = this.levelData.loot.find(l => l.id === e.lootId)?.at
-        if (at) { const p = this.lootPos(at); sparkle(this, p.x, p.y - 6) }
-        sfx.unlock()
-        await this.delay(160)
+        const cage = this.levelData.loot.find(l => l.id === e.lootId)
+        const color = cage?.cage ?? 'red'
+        view = { ...view, queue: [{ id: e.vikingId, kind: 'normal', color, capacity: 2, collectedCount: 0, ship: 0 }, ...view.queue] }
+        // The prisoner leaves the (now plundered) cage and runs down to the front of the queue.
+        const from = cage ? this.lootPos(cage.at) : { x: 180, y: ISLAND_CY }
+        const runner = this.makeActor({ id: e.vikingId, kind: 'normal', color, capacity: 2, collectedCount: 0, ship: 0 }).setPosition(from.x, from.y)
+        sfx.free()
+        sparkle(this, from.x, from.y - 8)
+        this.animate(runner, 'run')
+        await this.tween({ targets: runner, x: cardX(0), y: CARD.y - 30, scale: 0.7, duration: 520, ease: 'Sine.easeInOut' })
+        await this.tween({ targets: runner, alpha: 0, scale: 0.4, duration: 160 })
+        runner.destroy()
         continue
       }
       if (e.type === 'raven') {
         const victim = this.actors.get(e.vikingId)
         view = { ...view, waiting: view.waiting.filter(w => w.id !== e.vikingId) }
+        sfx.raven()
         if (victim) {
           this.actors.delete(e.vikingId)
-          sfx.scout()
-          await this.tween({ targets: victim, y: victim.y - 120, x: victim.x + 40, alpha: 0, scale: victim.scale * 0.6, duration: 520, ease: 'Sine.easeIn' })
-          victim.destroy()
+          let bird: Phaser.GameObjects.Sprite | Phaser.GameObjects.Text
+          if (hasRaven(this)) {
+            const a = ravenAsset()!
+            bird = this.add.sprite(380, 120, RAVEN_KEY).setScale(70 / a.frameWidth).setFlipX(true).play('raven-fly')
+          } else bird = this.add.text(380, 120, '🐦‍⬛', { fontSize: '30px' }).setOrigin(0.5)
+          bird.setDepth(45)
+          await this.tween({ targets: bird, x: victim.x + 6, y: victim.y - 34, duration: 520, ease: 'Sine.easeInOut' })
+          this.tweens.add({ targets: victim, x: -40, y: 60, scale: victim.scale * 0.6, duration: 700, ease: 'Sine.easeIn' })
+          await this.tween({ targets: bird, x: -34, y: 26, duration: 700, ease: 'Sine.easeIn' })
+          victim.destroy(); bird.destroy()
         }
         this.drawSlots(view.waiting)
         continue
@@ -960,6 +1038,8 @@ export class RaidScene extends Phaser.Scene {
           return { ...l, frozenLeft: l.frozenLeft - 1 }
         }) }
         if (dripped) sfx.drip()
+        view = { ...view, moves: view.moves + 1 }
+        this.updateCountdowns(view)
         const index = view.queue.findIndex(v => v.id === e.vikingId)
         const card = this.cards[index]
         if (card) this.tweens.add({ targets: card, scale: 0.88, alpha: 0.3, duration: 160 })

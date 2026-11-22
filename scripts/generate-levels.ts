@@ -9,20 +9,22 @@ import type { QueueEntry } from '../src/game/engine.ts'
 
 type Spec = BaseSpec & { label: string; seed: number; tries?: number }
 
-// Isriket (0.4): each mechanic is introduced on a level that cannot be lost, then used in a puzzle.
+// Muspelheim (0.5): each mechanic is introduced on a level that cannot be lost, then used in a puzzle.
+// (Isriket, levels 25–36, was found with the 0.4 version of these specs; see git history.)
+// The tide gives the player more choices, so tide puzzles need taller piles or company.
 const SPECS: Spec[] = [
-  { label: '25', heights: [3, 2, 3], keys: 1, min: 1, max: 1, seed: 25 },
-  { label: '26', heights: [4, 4, 4], keys: 2, min: 0.35, max: 0.5, seed: 26 },
-  { label: '27', heights: [3, 2, 3], ice: 1, min: 1, max: 1, seed: 27 },
-  { label: '28', heights: [4, 4, 4], ice: 2, min: 0.3, max: 0.45, seed: 28 },
-  { label: '29', heights: [3, 2, 3], colourShip: 2, min: 1, max: 1, seed: 29 },
-  { label: '30', heights: [4, 4, 4, 4], colourShip: 2, min: 0.2, max: 0.5, seed: 30, tries: 40000 },
-  { label: '31', heights: [3, 2, 3], hidden: true, scouts: 1, min: 1, max: 1, seed: 31 },
-  { label: '32', heights: [4, 4, 4, 4], hidden: true, scouts: 1, houses: 2, min: 0.25, max: 0.4, seed: 32 },
-  { label: '33', heights: [4, 4, 4, 4], keys: 1, ice: 2, min: 0.2, max: 0.35, seed: 33, tries: 30000 },
-  { label: '34', heights: [4, 4, 4, 4], colourShip: 1, stones: 1, houses: 1, min: 0.15, max: 0.32, seed: 34, tries: 80000 },
-  { label: '35', heights: [4, 5, 4, 4], keys: 1, ice: 1, colourShip: 1, jarls: 1, hidden: true, scouts: 1, min: 0.14, max: 0.28, seed: 35, tries: 40000 },
-  { label: '36', heights: [5, 4, 4, 5], keys: 1, ice: 2, colourShip: 1, houses: 2, stones: 1, hidden: true, scouts: 1, jarls: 1, wilds: 1, min: 0.06, max: 0.2, seed: 36, tries: 60000 },
+  { label: '37', heights: [3, 3, 3], kegs: 1, stones: 1, min: 1, max: 1, seed: 37 },
+  { label: '38', heights: [4, 4, 4, 4], kegs: 2, stones: 2, min: 0.3, max: 0.5, seed: 38, tries: 40000 },
+  { label: '39', heights: [3, 2, 3], tides: 1, min: 1, max: 1, seed: 39 },
+  { label: '40', heights: [4, 5, 4, 5], tides: 2, min: 0.25, max: 0.45, seed: 40, tries: 40000 },
+  { label: '41', heights: [3, 2, 3], cages: 1, min: 1, max: 1, seed: 41 },
+  { label: '42', heights: [4, 4, 4, 4], cages: 2, min: 0.25, max: 0.45, seed: 42 },
+  { label: '43', heights: [3, 2, 3], raven: 3, min: 1, max: 1, seed: 43 },
+  { label: '44', heights: [4, 4, 4, 4], raven: 3, min: 0.2, max: 0.4, seed: 44 },
+  { label: '45', heights: [4, 4, 4, 4], kegs: 1, stones: 1, houses: 1, tides: 1, min: 0.18, max: 0.35, seed: 45, tries: 40000 },
+  { label: '46', heights: [4, 4, 4, 4], cages: 1, raven: 4, hidden: true, min: 0.15, max: 0.3, seed: 46, tries: 40000 },
+  { label: '47', heights: [4, 5, 4, 5], kegs: 1, stones: 1, ice: 1, cages: 1, houses: 1, tides: 1, min: 0.12, max: 0.28, seed: 47, tries: 60000 },
+  { label: '48', heights: [5, 4, 4, 5], kegs: 1, stones: 2, tides: 1, cages: 1, raven: 4, jarls: 1, houses: 1, hidden: true, scouts: 1, min: 0.05, max: 0.2, seed: 48, tries: 80000 },
 ]
 const DEFAULT_TRIES = 20000
 const KEEP = 6 // candidates collected per spec
@@ -49,7 +51,7 @@ for (const spec of SPECS.filter(s => !wanted.length || wanted.includes(s.label))
   // Intro levels prefer few lines (simple); puzzles prefer many (more to think about).
   const sorted = found.sort((a, b) => (spec.min === 1 ? a.lines - b.lines : b.lines - a.lines)).slice(0, 3)
   for (const f of sorted) {
-    const ships = f.ships ? `, ships ${JSON.stringify(f.ships).replaceAll('"', '')}` : ''
+    const ships = (f.ships ? `, ships ${JSON.stringify(f.ships).replaceAll('"', '')}` : '') + (f.raven ? `, raven ${f.raven}` : '')
     console.log(`  stacks(${JSON.stringify(f.columns).replaceAll('"', "'").replaceAll(',', ', ')}), queue [${fmtQueue(f.queue)}]${ships}  ` +
       `win ${(f.rate * 100).toFixed(1)} % of ${f.lines} lines, par ${f.par}`)
   }
