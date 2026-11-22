@@ -4,10 +4,11 @@ import {
   createGame, selectViking, getAvailableLoot, getSelectableVikings, resolveWaitingVikings,
   evaluateGameStatus, validateLevelGraph, type GameState, type LevelLoot, type LootColor,
 } from './engine.ts'
-import { levels, stacks, SCOUT } from './levels.ts'
+import { levels, stacks, SCOUT, startGame } from './levels.ts'
 import { solve, hint } from './solver.ts'
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
+const DEFAULT_TEST_SHIPS = [{ slots: 3 }]
 const pick = (s: GameState, ...ids: string[]) => ids.reduce(selectViking, s)
 const slim = (vs: GameState['waiting']) => vs.map(({ id, color, collectedCount }) => ({ id, color, collectedCount }))
 const collected = (s: GameState) => s.loot.filter(l => l.collected).map(l => l.id).sort()
@@ -185,10 +186,10 @@ test('level graphs are valid and acyclic; cycles are rejected', () => {
 test('there are at least five levels and every one is winnable', () => {
   assert.ok(levels.length >= 5)
   for (const l of levels) {
-    const report = solve(createGame(l.loot, l.queue, l.ships))
+    const report = solve(startGame(l))
     assert.ok(report.winnable, `${l.name} must be winnable`)
     // Replay the found sequence to verify it independently.
-    const end = report.winPath!.reduce(selectViking, createGame(l.loot, l.queue, l.ships))
+    const end = report.winPath!.reduce(selectViking, startGame(l))
     assert.equal(end.status, 'won', `${l.name}: win path replays to a win`)
   }
 })
@@ -205,12 +206,12 @@ test('the first levels follow the planned progression', () => {
 })
 
 test('puzzle levels have verified win and loss sequences', () => {
-  const puzzles = levels.filter(l => solve(createGame(l.loot, l.queue, l.ships)).lossPath)
+  const puzzles = levels.filter(l => solve(startGame(l)).lossPath)
   assert.ok(puzzles.length >= 1)
   for (const l of puzzles) {
-    const r = solve(createGame(l.loot, l.queue, l.ships))
-    assert.equal(r.winPath!.reduce(selectViking, createGame(l.loot, l.queue, l.ships)).status, 'won', `${l.name} win`)
-    assert.equal(r.lossPath!.reduce(selectViking, createGame(l.loot, l.queue, l.ships)).status, 'lost', `${l.name} loss`)
+    const r = solve(startGame(l))
+    assert.equal(r.winPath!.reduce(selectViking, startGame(l)).status, 'won', `${l.name} win`)
+    assert.equal(r.lossPath!.reduce(selectViking, startGame(l)).status, 'lost', `${l.name} loss`)
   }
   // Hand-checked Fästet lines.
   const f = levels.find(x => x.name === 'Fästet')!
@@ -474,8 +475,104 @@ test('every colour ship in the levels matters: without it the level is clearly h
   assert.ok(withShips.length >= 4)
   const rate = (r: ReturnType<typeof solve>) => r.winningLines / (r.winningLines + r.losingLines)
   for (const l of withShips) {
-    const a = rate(solve(createGame(l.loot, l.queue, l.ships)))
+    const a = rate(solve(startGame(l)))
     const b = rate(solve(createGame(l.loot, l.queue)))
     assert.ok(b < a - 0.05, `${l.name}: ${Math.round(a * 100)} % with the colour ship vs ${Math.round(b * 100)} % without`)
   }
+})
+
+// --- 0.5: powder kegs, tide, cages, the raven -------------------------------------
+
+test('regression: levels 1–36 give exactly the same solver numbers as in 0.4', () => {
+  // [winning lines, losing lines, par] per level, computed with the 0.4 engine.
+  const v04 = [[1458, 0, 0], [6, 0, 0], [18, 0, 0], [122, 34, 1], [68, 83, 1], [256, 429, 2], [22, 28, 1], [52, 91, 1], [168, 360, 2], [104, 340, 2], [208, 1055, 1], [88, 419, 2], [54, 0, 0], [180, 210, 1], [18, 0, 0], [20, 33, 1], [18, 0, 1], [308, 722, 2], [18, 0, 0], [154, 331, 1], [18, 0, 0], [162, 324, 2], [366, 923, 1], [510, 3852, 0], [18, 0, 0], [74, 76, 2], [18, 0, 0], [42, 70, 2], [18, 0, 1], [276, 280, 2], [54, 0, 0], [4308, 6963, 1], [392, 892, 2], [224, 742, 2], [259, 969, 2], [1296, 9594, 3]]
+  v04.forEach((want, i) => {
+    const r = solve(startGame(levels[i]))
+    assert.deepEqual([r.winningLines, r.losingLines, r.minWaits], want, levels[i].name)
+  })
+})
+
+test('a powder keg clears stones, ice and tarps in reach – and never takes loot', () => {
+  const loot: LevelLoot[] = [
+    { id: 'k', color: R, keg: true, blasts: ['s', 'i', 'h'] },
+    { id: 's', stone: true, clearedBy: ['w'] },
+    { id: 'i', color: B, frozen: 9 },
+    { id: 'h', color: B, hidden: true, blockedBy: ['w'] },
+    { id: 'w', color: Y },
+  ]
+  const s = pick(createGame(loot, [R, B]), 'v1')
+  const board = s.events.filter(e => ['explode', 'crumble', 'thaw', 'reveal'].includes(e.type))
+  assert.deepEqual(board.map(e => `${e.type}:${'lootId' in e ? e.lootId : ''}`), ['explode:k', 'crumble:s', 'thaw:i', 'reveal:h'])
+  const byId = (id: string) => s.loot.find(l => l.id === id)!
+  assert.ok(byId('s').collected && byId('i').frozenLeft === 0 && !byId('h').hidden)
+  assert.deepEqual(collected(s), ['k', 's'], 'loot is never destroyed')
+})
+
+test('stacks: kegs reach their own and neighbouring piles, one row away', () => {
+  const loot = stacks(['?bb', 'y*r', '~9yy', '?rb'])
+  const keg = loot.find(l => l.keg)!
+  assert.equal(keg.id, 'c2-2')
+  assert.equal(keg.kind, 'keg')
+  assert.deepEqual([...keg.blasts!].sort(), ['c1-1', 'c3-1'], 'pile 4 is two piles away')
+  assert.throws(() => stacks(['≈rs', 'b']), /tide pile/)
+  const cage = stacks(['&rby'])[0]
+  assert.deepEqual([cage.color, cage.cage, cage.kind], [R, B, 'cage'])
+})
+
+test('the tide washes the front item to the back every third move, and blocking follows it', () => {
+  const start = createGame(stacks(['≈rby']), [Y, R, R, B], [{ slots: 9 }])
+  assert.deepEqual(start.tides, [['c1-1', 'c1-2', 'c1-3']])
+  assert.deepEqual(getAvailableLoot(start).map(l => l.id), ['c1-3'], 'only the front of a tide pile')
+  const two = pick(start, 'v1', 'v2')
+  assert.ok(!two.events.some(e => e.type === 'tide'), 'no tide before move 3')
+  assert.deepEqual(two.tides, [['c1-1', 'c1-2']])
+  const three = pick(two, 'v3')
+  assert.deepEqual(three.events.find(e => e.type === 'tide'), { type: 'tide', pile: 0, lootId: 'c1-2' })
+  assert.ok(three.loot.find(l => l.id === 'c1-1')!.collected, 'the red item came to the front and was taken')
+  assert.deepEqual(three.tides, [['c1-2']])
+})
+
+test('a cage frees its prisoner at the front of the queue', () => {
+  const loot: LevelLoot[] = [{ id: 'c', color: R, cage: B }, { id: 'b1', color: B }, { id: 'b2', color: B }]
+  const s = pick(createGame(loot, [R, Y]), 'v1')
+  assert.deepEqual(s.events.find(e => e.type === 'free'), { type: 'free', lootId: 'c', vikingId: 'p-c' })
+  assert.deepEqual(s.queue.map(v => `${v.id}:${v.color}`), ['p-c:blue', 'v2:yellow'])
+  assert.deepEqual(getSelectableVikings(s).map(v => v.id), ['p-c', 'v2'])
+  const freed = pick(s, 'p-c')
+  assert.deepEqual(collected(freed), ['b1', 'b2', 'c'])
+  assert.equal(freed.status, 'won')
+})
+
+test('the raven carries off the longest-waiting viking, main ship first', () => {
+  const loot: LevelLoot[] = [{ id: 'y1', color: Y }]
+  let s = pick(createGame(loot, [R, B, Y], DEFAULT_TEST_SHIPS, { raven: 2 }), 'v1')
+  assert.equal(s.waiting.length, 1)
+  s = pick(s, 'v2')
+  assert.deepEqual(s.events.find(e => e.type === 'raven'), { type: 'raven', vikingId: 'v1' })
+  assert.deepEqual(s.waiting.map(w => w.id), ['v2'], 'v1 is gone, v2 took a seat')
+  assert.equal(pick(s, 'v3').status, 'won')
+  // Main ship before the colour ship, even when someone on the colour ship waited longer.
+  const ships = [{ slots: 3 }, { slots: 2, color: R }]
+  const t = pick(createGame(loot, [R, B, B, Y], ships, { raven: 3 }), 'v1', 'v2', 'v3')
+  assert.deepEqual(t.events.find(e => e.type === 'raven'), { type: 'raven', vikingId: 'v2' })
+  assert.deepEqual(t.waiting.map(w => w.id), ['v1', 'v3'])
+})
+
+test('solver and hints work with every new mechanic', () => {
+  const level = { loot: stacks(['ys', '*rb', '≈ybr', '&brb']), queue: [R, B, B, Y, R, B] as LootColor[], raven: 4 }
+  const r = solve(startGame(level))
+  assert.ok(r.winnable)
+  assert.equal(r.winPath!.reduce(selectViking, startGame(level)).status, 'won')
+  const h = hint(startGame(level))
+  assert.ok(h && getSelectableVikings(startGame(level)).some(v => v.id === h))
+})
+
+test('validation catches broken kegs, cages, tide piles and ravens', () => {
+  assert.throws(() => validateLevelGraph([{ id: 'a', color: R, blasts: ['b'] }, { id: 'b', color: B }]), /Only powder kegs/)
+  assert.throws(() => validateLevelGraph([{ id: 'a', color: R, keg: true, blasts: ['x'] }]), /unknown/)
+  assert.throws(() => validateLevelGraph([{ id: 'a', color: R, cage: 'green' as LootColor }]), /prisoner colour/)
+  assert.throws(() => validateLevelGraph([{ id: 'a', color: R, key: true, cage: B }]), /plain loot/)
+  assert.throws(() => validateLevelGraph([{ id: 'a', color: R, tidePile: 0, blockedBy: ['b'] }, { id: 'b', color: B, tidePile: 0 }]), /tide/)
+  assert.throws(() => validateLevelGraph([{ id: 'a', color: R }], undefined, undefined, { raven: 1 }), /raven/)
+  validateLevelGraph(stacks(['ys', '*rb', '≈ybr', '&brb']), undefined, undefined, { raven: 4 })
 })

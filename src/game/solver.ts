@@ -16,9 +16,12 @@ type Node = { win: string[] | null; loss: string[] | null; wins: number; losses:
 function key(s: GameState): string {
   const loot = s.loot.map(l => (l.collected ? '-' : l.hitsLeft)).join('')
   const queue = s.queue.map(v => v.id).join(',')
-  // Ice needs no entry of its own: how far it has melted follows from how many vikings have left the queue.
+  // Ice and the raven need no entry of their own: they follow from how many vikings have been sent
+  // (the queue and the opened cages tell). The order of a tide pile depends on when items were taken
+  // relative to the tide, so it is part of the key.
   const waiting = s.waiting.map(v => `${v.id}:${v.color ?? '?'}:${v.collectedCount}:${v.ship}`).join(',')
-  return `${loot}|${queue}|${waiting}`
+  const tides = s.tides.length ? `|${s.tides.map(p => p.join('.')).join('/')}` : ''
+  return `${loot}|${queue}|${waiting}${tides}`
 }
 
 function searcher() {

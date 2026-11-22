@@ -4,7 +4,7 @@
 import Phaser from 'phaser'
 import type { LootColor } from './engine'
 
-export type LootKind = 'barrel' | 'house' | 'chest' | 'key'
+export type LootKind = 'barrel' | 'house' | 'chest' | 'key' | 'keg' | 'cage'
 type G = Phaser.GameObjects.Graphics
 
 // Tokens from ui-settings.md §2 (color.red / color.blue / color.yellow)
@@ -44,7 +44,26 @@ export function drawLoot(g: G, kind: LootKind, color: LootColor) {
   if (kind === 'barrel') drawBarrel(g, COLORS[color])
   else if (kind === 'house') drawHouse(g, COLORS[color])
   else if (kind === 'key') drawKey(g, COLORS[color])
+  else if (kind === 'keg') drawKeg(g, COLORS[color])
+  else if (kind === 'cage') drawCage(g, COLORS[color])
   else drawChest(g, COLORS[color])
+}
+
+/** Fallback powder keg: a small dark keg with a band in the team colour and a lit fuse. */
+function drawKeg(g: G, c: number) {
+  g.fillStyle(0x3b2a20); g.fillRoundedRect(-19, -16, 38, 38, 10)
+  g.fillStyle(c); g.fillRect(-19, -2, 38, 9)
+  g.lineStyle(3, INK); g.strokeRoundedRect(-19, -16, 38, 38, 10)
+  g.lineStyle(3, 0xd9b57a); g.beginPath(); g.moveTo(0, -16); g.lineTo(5, -26); g.strokePath()
+  g.fillStyle(0xffb02e); g.fillCircle(6, -28, 4)
+}
+
+/** Fallback cage: bars in the team colour on a wooden base. */
+function drawCage(g: G, c: number) {
+  g.fillStyle(0x6b4a35); g.fillRoundedRect(-24, 12, 48, 10, 4)
+  g.lineStyle(4, c)
+  for (const x of [-18, -6, 6, 18]) { g.beginPath(); g.moveTo(x, 12); g.lineTo(x, -18); g.strokePath() }
+  g.beginPath(); g.arc(0, -18, 18, Math.PI, 0); g.strokePath()
 }
 
 /** Fallback key: a cushion in the team colour with an iron key on it. */

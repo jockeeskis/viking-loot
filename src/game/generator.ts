@@ -3,12 +3,13 @@
 // Everything is seeded and counts attempts instead of time, so a seed gives the same level on every device.
 //
 // Pile letters (see `stacks` in levels.ts): r b y loot, R B Y houses (two hits), s stone, ? hidden,
-// !r key, #r chest (locked by the keys of its colour), ~N ice (thaws when move N starts).
+// !r key, #r chest (locked by the keys of its colour), ~N ice (thaws when move N starts),
+// *r powder keg, &rb red cage with a blue prisoner, ≈ at the start of a pile: a tide pile.
 import {
   createGame, selectViking, getSelectableVikings, validateLevelGraph,
   type LootColor, type QueueEntry, type ShipSpec,
 } from './engine.ts'
-import { stacks, type Level } from './levels.ts'
+import { stacks, startGame, type Level } from './levels.ts'
 import { solve } from './solver.ts'
 
 export type Spec = {
@@ -24,10 +25,15 @@ export type Spec = {
   ice?: number // frozen items
   colourShip?: number // seats on a colour ship (0/undefined = only the main ship)
   scouts?: number
+  // 0.5
+  kegs?: number // powder kegs; each must reach a stone, ice or tarp
+  tides?: number // tide piles
+  cages?: number // cages, each with a prisoner who joins the queue
+  raven?: number // the raven comes every N-th move; adds one spare viking
 }
 // Note: total hits (loot + 1 extra per house) minus 3 per jarl must be even, or no queue fits.
 
-export type Candidate = { columns: string[]; queue: QueueEntry[]; ships?: ShipSpec[] }
+export type Candidate = { columns: string[]; queue: QueueEntry[]; ships?: ShipSpec[]; raven?: number }
 export type Found = Candidate & { rate: number; lines: number; par: number }
 
 /** mulberry32: a small, fast seeded random generator. */
@@ -58,12 +64,12 @@ const LETTER: Record<LootColor, string> = { red: 'r', blue: 'b', yellow: 'y' }
 
 /** Always sending the front viking must lose – otherwise the level is not a real puzzle. */
 export function naiveLoses(c: Candidate) {
-  let s = createGame(stacks(c.columns), c.queue, c.ships)
+  let s = startGame({ loot: stacks(c.columns), queue: c.queue, ships: c.ships, raven: c.raven })
   while (s.status === 'playing') s = selectViking(s, getSelectableVikings(s)[0].id)
   return s.status === 'lost'
 }
 
-type Kind = 'loot' | 'stone' | 'house' | 'key' | 'chest'
+type Kind = 'loot' | 'stone' | 'house' | 'key' | 'chest' | 'keg' | 'cage'
 
 /** One random candidate, or null when the colours cannot be split evenly over the vikings. */
 export function candidate(spec: Spec, rand: () => number): Candidate | null {
@@ -72,13 +78,16 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
   const order = shuffle(slots.map((_, i) => i), rand)
   const kind: Kind[] = slots.map(() => 'loot')
   const color = slots.map(() => COLORS[Math.floor(rand() * 3)])
+  // Tide piles first: they may hold neither stones nor locked chests.
+  const tidal = spec.heights.map(() => false)
+  for (const c of shuffle(spec.heights.map((_, c) => c), rand).slice(0, spec.tides ?? 0)) tidal[c] = true
   let stones = spec.stones ?? 0
-  for (const i of order) if (stones > 0 && !slots[i].back) { kind[i] = 'stone'; stones-- }
+  for (const i of order) if (stones > 0 && !slots[i].back && !tidal[slots[i].c]) { kind[i] = 'stone'; stones-- }
   if (stones > 0) return null
   // Keys and chests: each pair has its own colour, and the key lies in another pile than its chest.
   const pairColours = shuffle([...COLORS], rand)
   for (let k = 0; k < (spec.keys ?? 0); k++) {
-    const chest = shuffle([...order], rand).find(i => kind[i] === 'loot' && !slots[i].front)
+    const chest = shuffle([...order], rand).find(i => kind[i] === 'loot' && !slots[i].front && !tidal[slots[i].c])
     if (chest === undefined) return null
     const key = shuffle([...order], rand).find(i => kind[i] === 'loot' && slots[i].c !== slots[chest].c)
     if (key === undefined) return null
@@ -87,10 +96,20 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
   }
   let houses = spec.houses ?? 0
   for (const i of shuffle([...order], rand)) if (houses > 0 && kind[i] === 'loot') { kind[i] = 'house'; houses-- }
+  let kegs = spec.kegs ?? 0
+  for (const i of shuffle([...order], rand)) if (kegs > 0 && kind[i] === 'loot') { kind[i] = 'keg'; kegs-- }
+  if (kegs > 0) return null
+  const prisoners: LootColor[] = []
+  for (const i of shuffle([...order], rand)) {
+    if (prisoners.length < (spec.cages ?? 0) && kind[i] === 'loot') { kind[i] = 'cage'; prisoners.push(COLORS[Math.floor(rand() * 3)]) }
+  }
+  if (prisoners.length < (spec.cages ?? 0)) return null
   // 2. Colours, and how many hits each colour needs.
   const hits: Record<LootColor, number> = { red: 0, blue: 0, yellow: 0 }
   slots.forEach((_, i) => { if (kind[i] !== 'stone') hits[color[i]] += kind[i] === 'house' ? 2 : 1 })
   if (COLORS.some(c => hits[c] === 0)) return null // every colour used
+  // Each prisoner carries two of its colour, so the queue needs one viking less of that colour.
+  for (const p of prisoners) { if (hits[p] < 2) return null; hits[p] -= 2 }
   // 3. Vikings that exactly cover those hits: a jarl carries 3, a wild viking covers 2 of any colour, the rest 2 each.
   const queue: QueueEntry[] = []
   for (let j = 0; j < (spec.jarls ?? 0); j++) {
@@ -110,6 +129,8 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
     for (let k = 0; k < hits[c] / 2; k++) queue.push(c)
   }
   for (let s = 0; s < (spec.scouts ?? 0); s++) queue.push({ kind: 'scout' })
+  // With the raven, one spare viking makes up for the one it may carry off.
+  if (spec.raven) queue.push(COLORS[Math.floor(rand() * 3)])
   // 4. Ice: frozen items thaw somewhere in the first part of the raid, never after the last viking.
   const frozen = slots.map(() => 0)
   let ice = spec.ice ?? 0
@@ -117,12 +138,14 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
     if (ice > 0 && kind[i] !== 'stone') { frozen[i] = 2 + Math.floor(rand() * Math.max(1, queue.length - 3)); ice-- }
   }
   // 5. Pile strings, back→front.
-  const columns = spec.heights.map((h, c) => slots.map((s, i) => ({ s, i })).filter(o => o.s.c === c).map(({ s, i }) => {
+  let cageNo = 0
+  const prisonerOf = slots.map((_, i) => (kind[i] === 'cage' ? prisoners[cageNo++] : null))
+  const columns = spec.heights.map((h, c) => (tidal[c] ? '≈' : '') + slots.map((s, i) => ({ s, i })).filter(o => o.s.c === c).map(({ s, i }) => {
     if (kind[i] === 'stone') return 's'
     const letter = kind[i] === 'house' ? LETTER[color[i]].toUpperCase() : LETTER[color[i]]
     const prefix = (spec.hidden && s.row < h - 1 ? '?' : '') + (frozen[i] ? `~${frozen[i]}` : '') +
-      (kind[i] === 'key' ? '!' : kind[i] === 'chest' ? '#' : '')
-    return prefix + letter
+      (kind[i] === 'key' ? '!' : kind[i] === 'chest' ? '#' : kind[i] === 'keg' ? '*' : '')
+    return kind[i] === 'cage' ? `${prefix}&${letter}${LETTER[prisonerOf[i]!]}` : prefix + letter
   }).join(''))
   // 6. A colour ship for one of the colours in the queue.
   let ships: ShipSpec[] | undefined
@@ -130,7 +153,7 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
     const used = COLORS.filter(c => queue.some(q => q === c || (typeof q !== 'string' && q.kind === 'jarl' && q.color === c)))
     ships = [{ slots: 3 }, { slots: spec.colourShip, color: used[Math.floor(rand() * used.length)] }]
   }
-  return { columns, queue: shuffle(queue, rand), ships }
+  return { columns, queue: shuffle(queue, rand), ships, ...(spec.raven ? { raven: spec.raven } : {}) }
 }
 
 /** Check a candidate against a spec with the solver. Returns the reason when it is rejected. */
@@ -138,9 +161,10 @@ export function evaluate(spec: Spec, cand: Candidate): Found | string {
   let loot
   try {
     loot = stacks(cand.columns)
-    validateLevelGraph(loot, cand.ships, cand.queue)
+    validateLevelGraph(loot, cand.ships, cand.queue, { raven: cand.raven })
   } catch { return 'invalid' } // e.g. a chest whose key ended up behind it
-  const r = solve(createGame(loot, cand.queue, cand.ships))
+  if (loot.some(l => l.keg && !l.blasts?.length)) return 'keg reaches nothing'
+  const r = solve(startGame({ loot, queue: cand.queue, ships: cand.ships, raven: cand.raven }))
   if (!r.winnable) return 'unwinnable'
   const lines = r.winningLines + r.losingLines
   const rate = r.winningLines / lines
@@ -150,7 +174,7 @@ export function evaluate(spec: Spec, cand: Candidate): Found | string {
   if (spec.min > 0 && spec.min < 1 && !naiveLoses(cand)) return 'front-first wins'
   // A colour ship must matter: without it the level has to be clearly harder (or lose outright).
   if (cand.ships) {
-    const bare = solve(createGame(loot, cand.queue))
+    const bare = solve(startGame({ loot, queue: cand.queue, raven: cand.raven }))
     const bareRate = bare.winningLines / (bare.winningLines + bare.losingLines)
     if (bareRate > rate - (spec.min === 1 ? 0.15 : 0.1)) return 'ship does not matter'
   }
@@ -171,5 +195,8 @@ export function generate(spec: Spec, seed: number, tries: number): Found | null 
 
 /** Turn a found candidate into a playable level. */
 export function toLevel(f: Found, name: string, hint: string): Level {
-  return { name, hint, par: f.par, queue: f.queue, loot: stacks(f.columns), ...(f.ships ? { ships: f.ships } : {}) }
+  return {
+    name, hint, par: f.par, queue: f.queue, loot: stacks(f.columns),
+    ...(f.ships ? { ships: f.ships } : {}), ...(f.raven ? { raven: f.raven } : {}),
+  }
 }

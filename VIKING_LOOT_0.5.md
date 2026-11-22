@@ -1,6 +1,6 @@
 # Viking Loot 0.5 – Muspelheim, bossar, baneditor och engelska
 
-> **Status (2026-11-22):** Fas 1 är klar: inställningar, färgblindläge, vibration och engelska. Nästa: fas 2 (regelmotor för de fyra mekanikerna).
+> **Status (2026-11-22):** Fas 1–2 är klara: inställningar, färgblindläge, vibration, engelska och regelmotorn för krutfat, tidvatten, burar och korpen. Nästa: fas 3 (Muspelheim).
 
 ## Syfte
 
@@ -58,6 +58,29 @@ Alla nya egenskaper är valfria i bandatan. Ett regressionstest kontrollerar att
 - Banan har `raven: N`. I början av var N:e drag flyger korpen in och lyfter bort den viking som har väntat längst. Korpen tar i första hand från huvudskeppet och annars från färgskeppet (händelsen `raven`).
 - Det frigör en plats, men vikingens återstående bärplatser försvinner. Därför har banor med korp en extra viking i kön.
 
+### 2.5 Ordning inom ett drag
+
+1. Isen smälter.
+2. Tidvattnet vänder (om draget är delbart med 3).
+3. Korpen kommer (om draget är delbart med N).
+4. Vikingen plundrar, och sedan får de väntande sin chans.
+
+Krutfat och burar verkar direkt när de plundras: explosionen kommer före raset av stenar, och fången ställer sig först i kön mitt i draget.
+
+### 2.6 Kod och tester
+
+- `engine.ts` innehåller nya fält på skatterna (`keg`/`blasts`, `cage`, `tidePile`), `GameState.tides` och `raven`, och `createGame(…, { raven })`.
+- `levels.ts`: `startGame(level)` startar en bana med alla inställningar för hela banan. Den används överallt där en bana blir ett spel.
+- Lösarens memo-nyckel innehåller tidvattnets ordning. Den följer inte enbart av antalet drag, eftersom det spelar roll om en skatt togs före eller efter att tidvattnet vände.
+- Generatorn klarar `kegs`, `tides`, `cages` och `raven`. Ett krutfat som inte når någonting avvisas.
+- Tester:
+  - ett regressionstest där banorna 1–36 ger exakt samma siffror från lösaren som 0.4-motorn,
+  - ett test per mekanik,
+  - lösare och tips,
+  - validering,
+  - att generatorn kan bygga banor med varje mekanik.
+- *Iakttagelse inför fas 3:* tidvatten gör banor lättare (fler val), så tidvattenpussel behöver högre högar eller fler mekaniker.
+
 ## 3. Muspelheim (bana 37–48)
 
 En vulkanö med svart sten, lavaflöden och glöd. Varje mekanik introduceras på en bana som inte går att förlora och används sedan i ett pussel. Bana 45–47 blandar mekanikerna, och bana 48, *Surts smedja*, är finalen.
@@ -94,7 +117,7 @@ En vulkanö med svart sten, lavaflöden och glöd. Varje mekanik introduceras p�
 
 - [x] All text finns på svenska och engelska, och ett test kontrollerar att inga översättningar saknas (`i18n.test.ts`).
 - [x] Färgblindläget visar en symbol överallt där en färg betyder något (skatter, nycklar, hänglås, kort, kö, väntande vikingar och färgskepp).
-- [ ] Banorna 1–36 ger samma siffror från lösaren som i 0.4.
+- [x] Banorna 1–36 ger samma siffror från lösaren som i 0.4 (regressionstest i `engine.test.ts`).
 - [ ] Varje ny mekanik har tester och en introbana som inte går att förlora.
 - [ ] Alla 48 banor och de fyra bossarna är vinnbara, och `par` stämmer med lösaren.
 - [ ] En delad länk öppnar samma ö hos mottagaren. Trasiga eller för stora koder avvisas.

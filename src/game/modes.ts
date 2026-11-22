@@ -24,6 +24,10 @@ function withMechanic(spec: Spec, m: Mechanic, rand: () => number): Spec {
     case 'ice': return { ...spec, ice: 1 + Math.floor(rand() * 2) }
     case 'ships': return { ...spec, colourShip: 1 + Math.floor(rand() * 2) }
     case 'scout': return { ...spec, hidden: true, scouts: 1 } // Sigrid only makes sense with tarps
+    case 'keg': return { ...spec, kegs: 1, stones: Math.max(spec.stones ?? 0, 1) } // a keg needs something to blast
+    case 'tide': return { ...spec, tides: 1 }
+    case 'cage': return { ...spec, cages: 1 }
+    case 'raven': return { ...spec, raven: 3 + Math.floor(rand() * 2) }
   }
 }
 

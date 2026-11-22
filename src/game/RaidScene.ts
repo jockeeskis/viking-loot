@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { levels, worlds, type Level } from './levels'
+import { levels, worlds, startGame, type Level } from './levels'
 import { mechanicsOf } from './intros'
 import {
   createGame, selectViking, isAvailable, mainSeats, SELECTABLE,
@@ -120,6 +120,19 @@ export class RaidScene extends Phaser.Scene {
 
   setUpdate(fn: (u: RaidUpdate) => void) { this.onUpdate = fn }
 
+  /** Where the items of a tide pile stand: the remaining items fill the pile's back slots in tide order. */
+  private placeTidePile(state: GameState, pile: number, animate: boolean) {
+    const slots = this.levelData.loot.filter(l => l.tidePile === pile).map(l => l.at)
+    state.tides[pile].forEach((id, k) => {
+      const sprite = this.lootSprites.get(id)
+      if (!sprite || !slots[k]) return
+      const { x, y } = this.lootPos(slots[k])
+      sprite.setDepth(2 + slots[k][1] * 0.01)
+      if (animate) this.tweens.add({ targets: sprite, x, y, duration: 360, ease: 'Sine.easeInOut' })
+      else sprite.setPosition(x, y)
+    })
+  }
+
   /** Redraw texts after a language change (the title comes from the app). */
   relabel(title: string) {
     this.titleText = title
@@ -174,7 +187,7 @@ export class RaidScene extends Phaser.Scene {
     const index = levels.indexOf(data)
     const snow = index >= 0 ? index >= (worlds[2]?.first ?? Infinity) : mechanicsOf(data).some(m => isrikeMechanics.includes(m))
     if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(snow))
-    const state = createGame(data.loot, data.queue, data.ships)
+    const state = startGame(data)
     this.rebuild(state)
     // Harald, Ylva and Sigrid are downloaded the first time a level needs them; refresh the cards when they arrive.
     const special = state.queue.filter(v => v.kind !== 'normal').map(assetFor).filter((a): a is VikingAsset => !!a)
@@ -461,6 +474,7 @@ export class RaidScene extends Phaser.Scene {
       if (item.hitsLeft < (p.hits ?? 1)) this.markOpened(c)
       this.lootSprites.set(p.id, c)
     })
+    this.state.tides.forEach((_, i) => this.placeTidePile(this.state, i, false))
     this.refreshLocks(this.state, false)
   }
 
@@ -812,6 +826,8 @@ export class RaidScene extends Phaser.Scene {
     const seatOf = (id: string) => view.waiting.findIndex(w => w.id === id)
     const setLoot = (id: string, patch: Partial<GameState['loot'][number]>) => {
       view = { ...view, loot: view.loot.map(l => (l.id === id ? { ...l, ...patch } : l)) }
+      // A collected item also leaves its tide pile.
+      if (patch.collected) view = { ...view, tides: view.tides.map(p => p.filter(x => x !== id)) }
     }
     const bumpWaiter = (actor: Sprite, vikingId: string) => {
       const seat = seatOf(vikingId)
@@ -889,6 +905,44 @@ export class RaidScene extends Phaser.Scene {
         }
         this.refreshLocks(view, true)
         await this.delay(160)
+        continue
+      }
+
+      // 0.5 board events. (Phase 3 adds the rendered keg, wave, cage and raven art.)
+      if (e.type === 'explode') {
+        const target = this.lootSprites.get(e.lootId)
+        sfx.crumble()
+        this.cameras.main.shake(220, 0.01)
+        if (target) { dustPuff(this, target.x - 14, target.y); dustPuff(this, target.x + 14, target.y); rockBits(this, target.x, target.y) }
+        await this.delay(140)
+        continue
+      }
+      if (e.type === 'tide') {
+        view = { ...view, tides: view.tides.map((p, i) => (i === e.pile ? [p[p.length - 1], ...p.slice(0, -1)] : p)) }
+        this.placeTidePile(view, e.pile, true)
+        this.refreshLocks(view, true)
+        await this.delay(380)
+        continue
+      }
+      if (e.type === 'free') {
+        const prisoner = { id: e.vikingId, kind: 'normal' as const, color: this.levelData.loot.find(l => l.id === e.lootId)?.cage ?? 'red', capacity: 2, collectedCount: 0, ship: 0 }
+        view = { ...view, queue: [prisoner, ...view.queue] }
+        const at = this.levelData.loot.find(l => l.id === e.lootId)?.at
+        if (at) { const p = this.lootPos(at); sparkle(this, p.x, p.y - 6) }
+        sfx.unlock()
+        await this.delay(160)
+        continue
+      }
+      if (e.type === 'raven') {
+        const victim = this.actors.get(e.vikingId)
+        view = { ...view, waiting: view.waiting.filter(w => w.id !== e.vikingId) }
+        if (victim) {
+          this.actors.delete(e.vikingId)
+          sfx.scout()
+          await this.tween({ targets: victim, y: victim.y - 120, x: victim.x + 40, alpha: 0, scale: victim.scale * 0.6, duration: 520, ease: 'Sine.easeIn' })
+          victim.destroy()
+        }
+        this.drawSlots(view.waiting)
         continue
       }
 

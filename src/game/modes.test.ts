@@ -8,12 +8,12 @@ import {
   emptyModes, parseModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound, type Tier,
 } from './modes.ts'
 import { hashString } from './generator.ts'
-import type { Level } from './levels.ts'
+import { startGame, type Level } from './levels.ts'
 
 const days = Array.from({ length: 8 }, (_, d) => dateKey(new Date(2026, 10, 25 + d))) // crosses into December
 
 function checkLevel(l: Level, tier: Tier) {
-  const r = solve(createGame(l.loot, l.queue, l.ships))
+  const r = solve(startGame(l))
   assert.ok(r.winnable, `${l.name} can be won`)
   assert.equal(l.par, r.minWaits, `${l.name}: par matches the solver`)
   const allowed = mechanicsForTier(tier)
@@ -73,7 +73,7 @@ test('generated puzzles cannot be won by always sending the front viking', () =>
   let puzzles = 0
   for (const day of days) {
     const l = dailyLevel(day, 1)
-    let s = createGame(l.loot, l.queue, l.ships)
+    let s = startGame(l)
     while (s.status === 'playing') s = selectViking(s, getSelectableVikings(s)[0].id)
     if (s.status === 'lost') puzzles++
   }
@@ -105,4 +105,25 @@ test('endless record and saved data tolerate junk', () => {
   assert.deepEqual(odd.daily.results, { '2026-01-01': 3 })
   assert.equal(odd.daily.streak, 0)
   assert.equal(odd.endless.best, 0)
+})
+
+test('the generator builds winnable levels with kegs, tide, cages and the raven', async () => {
+  const { generate, toLevel } = await import('./generator.ts')
+  const { validateLevelGraph } = await import('./engine.ts')
+  const { mechanicsOf } = await import('./intros.ts')
+  const specs = [
+    { want: 'keg', spec: { heights: [3, 3, 3, 3], stones: 2, kegs: 1, min: 0.2, max: 0.7 } },
+    { want: 'tide', spec: { heights: [3, 4, 3], tides: 1, min: 0.2, max: 0.95 } },
+    { want: 'cage', spec: { heights: [4, 4, 4], cages: 1, min: 0.2, max: 0.7 } },
+    { want: 'raven', spec: { heights: [4, 4, 4], raven: 3, min: 0.2, max: 0.7 } },
+  ] as const
+  for (const { want, spec } of specs) {
+    const f = generate({ ...spec, heights: [...spec.heights] }, 7, 4000)
+    assert.ok(f, `found a ${want} level`)
+    const l = toLevel(f!, want, '')
+    validateLevelGraph(l.loot, l.ships, l.queue, { raven: l.raven })
+    assert.ok(mechanicsOf(l).includes(want), `${want} is used`)
+    const r = solve(startGame(l))
+    assert.ok(r.winnable && r.minWaits === l.par)
+  }
 })

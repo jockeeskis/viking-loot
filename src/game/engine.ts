@@ -15,6 +15,13 @@
 // - ice: `frozen: N` keeps an item unreachable until move N starts (it thaws before that viking raids)
 // - ships: an optional colour ship gives extra safe seats to one colour; only the main ship sinks the raid
 // - scout: a queue entry that carries nothing; dispatching it reveals every hidden item
+//
+// 0.5 additions (also optional, so earlier levels behave exactly as before):
+// - powder kegs: loot with `keg: true`; when taken, it clears the stones, ice and tarps listed in `blasts`
+// - tide: items with the same `tidePile` form a pile whose front item is washed to the back every
+//   TIDE_EVERY moves (at the start of the move); inside such a pile only the current front is reachable
+// - cages: loot with `cage: <colour>`; taking it frees a prisoner of that colour at the front of the queue
+// - the raven: with `raven: N`, at the start of every N-th move the longest-waiting viking is carried off
 
 export type LootColor = 'red' | 'blue' | 'yellow'
 export type ItemKind = 'loot' | 'stone'
@@ -32,6 +39,10 @@ export type LootItem = {
   hitsLeft: number // 1 for ordinary loot, 2 for an unopened house
   hidden: boolean // colour not yet revealed to the player
   collected: boolean // for stones: crumbled
+  keg: boolean // a powder keg: taking it clears `blasts`
+  blasts: string[] // stones, ice and tarps a keg clears
+  cage: LootColor | null // a cage: taking it frees a prisoner of this colour
+  tidePile: number // index in GameState.tides, -1 when not in a tide pile
 }
 
 export type Viking = {
@@ -62,6 +73,10 @@ export type GameEvent =
   | { type: 'return'; vikingId: string; fromWaiting: boolean }
   | { type: 'wait'; vikingId: string; ship: number; slot: number }
   | { type: 'overflow'; vikingId: string }
+  | { type: 'explode'; lootId: string } // a powder keg went off (crumble/thaw/reveal events follow)
+  | { type: 'tide'; pile: number; lootId: string } // the tide washed the front item to the back of its pile
+  | { type: 'free'; lootId: string; vikingId: string } // a prisoner left its cage and joined the front of the queue
+  | { type: 'raven'; vikingId: string } // the raven carried off a waiting viking
 
 export type GameState = {
   loot: LootItem[]
@@ -73,6 +88,8 @@ export type GameState = {
   moves: number
   waits: number // how many times a viking had to take a seat (used for stars)
   events: GameEvent[] // what happened during the most recent move
+  tides: string[][] // tide piles: ids of the items still there, back→front
+  raven: number // the raven comes every N-th move (0 = no raven)
 }
 
 export const SELECTABLE = 3
@@ -80,6 +97,8 @@ export const SELECTABLE = 3
 export const WAITING_SLOTS = 3
 export const CAPACITY = 2
 export const JARL_CAPACITY = 3
+/** The tide washes a tide pile's front item to the back at the start of every third move. */
+export const TIDE_EVERY = 3
 
 export type LevelLoot = {
   id: string
@@ -92,7 +111,13 @@ export type LevelLoot = {
   key?: boolean
   lockedBy?: string[]
   frozen?: number
+  keg?: boolean
+  blasts?: string[]
+  cage?: LootColor
+  tidePile?: number
 }
+/** Level-wide options (0.5). */
+export type GameOptions = { raven?: number }
 export type QueueEntry = LootColor | { kind: 'jarl'; color: LootColor } | { kind: 'wild' } | { kind: 'scout' }
 export type ShipSpec = { slots: number; color?: LootColor }
 /** One ship with WAITING_SLOTS seats, as in every level before 0.4. */
@@ -106,7 +131,7 @@ export function makeViking(entry: QueueEntry, index: number): Viking {
   return { ...base, kind: 'wild', color: null, capacity: CAPACITY }
 }
 
-export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSpec[] = DEFAULT_SHIPS): GameState {
+export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSpec[] = DEFAULT_SHIPS, options: GameOptions = {}): GameState {
   const items: LootItem[] = loot.map(l => ({
     id: l.id,
     kind: l.stone ? 'stone' : 'loot',
@@ -119,7 +144,14 @@ export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSp
     hitsLeft: l.stone ? 1 : Math.max(1, l.hits ?? 1),
     hidden: !!l.hidden,
     collected: false,
+    keg: !!l.keg,
+    blasts: [...(l.blasts ?? [])],
+    cage: l.cage ?? null,
+    tidePile: l.tidePile ?? -1,
   }))
+  // Tide piles keep the level order of their items (back→front).
+  const tides: string[][] = []
+  for (const l of items) if (l.tidePile >= 0) (tides[l.tidePile] ??= []).push(l.id)
   let state: GameState = {
     loot: items,
     queue: queue.map(makeViking),
@@ -130,6 +162,8 @@ export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSp
     moves: 0,
     waits: 0,
     events: [],
+    tides: Array.from(tides, p => p ?? []),
+    raven: options.raven ?? 0,
   }
   // Anything reachable from the start is visible from the start.
   const start = state
@@ -139,6 +173,11 @@ export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSp
 
 export function isAvailable(state: GameState, item: LootItem): boolean {
   if (item.collected || item.frozenLeft > 0) return false
+  // In a tide pile only the current front item can be reached.
+  if (item.tidePile >= 0) {
+    const pile = state.tides[item.tidePile]
+    if (pile[pile.length - 1] !== item.id) return false
+  }
   const gone = (id: string) => state.loot.find(l => l.id === id)?.collected ?? true
   return item.blockedBy.every(gone) && item.lockedBy.every(gone)
 }
@@ -170,6 +209,15 @@ function revealReachable(state: GameState, events: GameEvent[]): GameState {
 /** After an item is taken: open chests whose last key it was, crumble the stones it clears, then reveal. */
 function settleBoard(state: GameState, takenId: string, events: GameEvent[]): GameState {
   let s = state
+  const taken = s.loot.find(l => l.id === takenId)!
+  if (taken.tidePile >= 0) s = { ...s, tides: s.tides.map((p, i) => (i === taken.tidePile ? p.filter(id => id !== takenId) : p)) }
+  if (taken.keg) s = explode(s, taken, events)
+  if (taken.cage) {
+    // The prisoner joins the front of the queue, so it can be chosen at once.
+    const prisoner: Viking = { id: `p-${taken.id}`, kind: 'normal', color: taken.cage, capacity: CAPACITY, collectedCount: 0, ship: 0 }
+    s = { ...s, queue: [prisoner, ...s.queue] }
+    events.push({ type: 'free', lootId: taken.id, vikingId: prisoner.id })
+  }
   const gone = (id: string) => s.loot.find(l => l.id === id)?.collected ?? true
   for (const ch of s.loot) {
     if (!ch.collected && ch.lockedBy.includes(takenId) && ch.lockedBy.every(gone)) events.push({ type: 'unlock', lootId: ch.id })
@@ -181,6 +229,39 @@ function settleBoard(state: GameState, takenId: string, events: GameEvent[]): Ga
     }
   }
   return revealReachable(s, events)
+}
+
+/** A powder keg goes off: stones in reach crumble, ice melts and tarps blow away. Loot is never destroyed. */
+function explode(state: GameState, keg: LootItem, events: GameEvent[]): GameState {
+  events.push({ type: 'explode', lootId: keg.id })
+  const loot = state.loot.map(l => {
+    if (!keg.blasts.includes(l.id) || l.collected) return l
+    if (l.kind === 'stone') { events.push({ type: 'crumble', lootId: l.id }); return { ...l, collected: true } }
+    let n = l
+    if (n.frozenLeft > 0) { events.push({ type: 'thaw', lootId: n.id }); n = { ...n, frozenLeft: 0 } }
+    if (n.hidden) { events.push({ type: 'reveal', lootId: n.id }); n = { ...n, hidden: false } }
+    return n
+  })
+  return { ...state, loot }
+}
+
+/** Every TIDE_EVERY moves the front item of each tide pile is washed to the back. */
+function turnTide(state: GameState, events: GameEvent[]): GameState {
+  if (!state.tides.length || state.moves % TIDE_EVERY !== 0) return state
+  const tides = state.tides.map((p, i) => {
+    if (p.length < 2) return p
+    events.push({ type: 'tide', pile: i, lootId: p[p.length - 1] })
+    return [p[p.length - 1], ...p.slice(0, -1)]
+  })
+  return revealReachable({ ...state, tides }, events)
+}
+
+/** Every `raven` moves the raven carries off the viking that has waited longest (main ship first). */
+function ravenVisit(state: GameState, events: GameEvent[]): GameState {
+  if (!state.raven || state.moves % state.raven !== 0 || !state.waiting.length) return state
+  const victim = state.waiting.find(w => w.ship === 0) ?? state.waiting[0]
+  events.push({ type: 'raven', vikingId: victim.id })
+  return { ...state, waiting: state.waiting.filter(w => w !== victim) }
 }
 
 /** At the start of every move the ice melts a little; items whose ice is gone thaw. */
@@ -269,8 +350,10 @@ export function selectViking(state: GameState, vikingId: string): GameState {
   const events: GameEvent[] = [{ type: 'dispatch', vikingId }]
   const viking = state.queue[index]
   let s: GameState = { ...state, queue: state.queue.filter((_, i) => i !== index), moves: state.moves + 1, events }
-  // 0. A new move begins: the ice melts before anyone raids.
+  // 0. A new move begins: the ice melts, the tide turns and the raven visits before anyone raids.
   s = meltIce(s, events)
+  s = turnTide(s, events)
+  s = ravenVisit(s, events)
 
   if (viking.kind === 'scout') {
     // The scout looks over the island and sails home; she carries nothing and never takes a seat.
@@ -344,7 +427,7 @@ export function evaluateGameStatus(state: GameState): GameStatus {
 }
 
 /** Throws if a level references unknown ids, contains a blocking cycle or a malformed item or ship. */
-export function validateLevelGraph(loot: LevelLoot[], ships: ShipSpec[] = DEFAULT_SHIPS, queue?: QueueEntry[]): void {
+export function validateLevelGraph(loot: LevelLoot[], ships: ShipSpec[] = DEFAULT_SHIPS, queue?: QueueEntry[], options: GameOptions = {}): void {
   const ids = new Set(loot.map(l => l.id))
   if (ids.size !== loot.length) throw new Error('Duplicate loot id')
   const byId = new Map(loot.map(l => [l.id, l]))
@@ -366,6 +449,22 @@ export function validateLevelGraph(loot: LevelLoot[], ships: ShipSpec[] = DEFAUL
       if (!l.color) throw new Error(`${l.id} needs a colour`)
       if (l.clearedBy?.length) throw new Error(`Only stones use clearedBy (${l.id})`)
     }
+    // 0.5: kegs, cages and tide piles.
+    if (l.blasts?.length && !l.keg) throw new Error(`Only powder kegs use blasts (${l.id})`)
+    for (const b of l.blasts ?? []) if (!ids.has(b)) throw new Error(`${l.id} blasts unknown ${b}`)
+    if (l.keg && (l.stone || l.key || l.cage || l.lockedBy?.length)) throw new Error(`Powder keg ${l.id} must be plain loot`)
+    if (l.cage !== undefined) {
+      if (!['red', 'blue', 'yellow'].includes(l.cage)) throw new Error(`Cage ${l.id} needs a prisoner colour`)
+      if (l.stone || l.key || l.lockedBy?.length || (l.hits ?? 1) > 1) throw new Error(`Cage ${l.id} must be plain loot`)
+    }
+    if (l.tidePile !== undefined) {
+      if (!(Number.isInteger(l.tidePile) && l.tidePile >= 0)) throw new Error(`${l.id} has a bad tide pile`)
+      if (l.stone || l.lockedBy?.length) throw new Error(`No stones or locked chests in a tide pile (${l.id})`)
+      if (l.blockedBy?.length) throw new Error(`Items in a tide pile are ordered by the tide, not blockedBy (${l.id})`)
+    }
+  }
+  if (options.raven !== undefined && options.raven !== 0 && !(Number.isInteger(options.raven) && options.raven >= 2)) {
+    throw new Error('The raven needs a whole number of moves ≥ 2')
   }
   // Blocking and locking together must not form a cycle (a key behind its own chest, …).
   const state = new Map<string, 'visiting' | 'done'>()

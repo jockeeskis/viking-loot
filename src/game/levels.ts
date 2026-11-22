@@ -1,4 +1,4 @@
-import type { LevelLoot, LootColor, QueueEntry, ShipSpec } from './engine.ts'
+import { createGame, type LevelLoot, type LootColor, type QueueEntry, type ShipSpec } from './engine.ts'
 import type { LootKind } from './art.ts'
 
 /**
@@ -11,7 +11,13 @@ export type Level = {
   name: string; hint: string; par: number; loot: LevelLootPlaced[]; queue: QueueEntry[]
   /** Optional since 0.4: ship 0 is the main ship, more ships are colour ships. Default: one ship, three seats. */
   ships?: ShipSpec[]
+  /** Optional since 0.5: the raven carries off the longest-waiting viking every N-th move. */
+  raven?: number
 }
+
+/** Start a game of a level, with every level-wide option (ships, raven). */
+export const startGame = (l: Pick<Level, 'loot' | 'queue' | 'ships' | 'raven'>) =>
+  createGame(l.loot, l.queue, l.ships, { raven: l.raven })
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
 const item = (id: string, color: LootColor, at: [number, number], ...blockedBy: string[]): LevelLootPlaced => ({ id, color, at, blockedBy })
@@ -30,26 +36,38 @@ export const SCOUT: QueueEntry = { kind: 'scout' }
 
 const code: Record<string, LootColor> = { r: R, b: B, y: Y }
 
-type Token = { ch: string; hidden: boolean; frozen: number; key: boolean; chest: boolean }
-/** Split a pile string into tokens. Prefixes (any order) apply to the next letter: `?` hidden, `~N` ice, `!` key, `#` locked chest. */
+type Token = { ch: string; hidden: boolean; frozen: number; key: boolean; chest: boolean; keg: boolean; cage: LootColor | null }
+const fresh = (): Omit<Token, 'ch'> => ({ hidden: false, frozen: 0, key: false, chest: false, keg: false, cage: null })
+/**
+ * Split a pile string into tokens. Prefixes (any order) apply to the next letter: `?` hidden, `~N` ice,
+ * `!` key, `#` locked chest, `*` powder keg. `&rb` is a red cage holding a blue prisoner.
+ * A leading `≈` marks a tide pile (handled by `stacks`).
+ */
 function tokens(col: string): Token[] {
   const out: Token[] = []
-  let t: Omit<Token, 'ch'> = { hidden: false, frozen: 0, key: false, chest: false }
-  for (let i = 0; i < col.length; i++) {
+  let t = fresh()
+  for (let i = col.startsWith('≈') ? 1 : 0; i < col.length; i++) {
     const c = col[i]
     if (c === '?') t.hidden = true
     else if (c === '!') t.key = true
     else if (c === '#') t.chest = true
-    else if (c === '~') {
+    else if (c === '*') t.keg = true
+    else if (c === '&') {
+      const [loot, prisoner] = [col[i + 1], col[i + 2]]
+      if (!loot || !prisoner || !/[rby]/.test(loot) || !/[rby]/.test(prisoner)) throw new Error(`"&" needs a cage colour and a prisoner colour in "${col}"`)
+      out.push({ ch: loot, ...t, cage: code[prisoner] })
+      t = fresh()
+      i += 2
+    } else if (c === '~') {
       const m = /^\d+/.exec(col.slice(i + 1))
       if (!m) throw new Error(`"~" needs a number of moves in "${col}"`)
       t.frozen = Number(m[0])
       i += m[0].length
     } else {
       if (!/[rbyRBYs]/.test(c)) throw new Error(`Unknown pile letter "${c}" in "${col}"`)
-      if ((t.key || t.chest) && c !== c.toLowerCase()) throw new Error(`Keys and chests are ordinary loot, not houses ("${col}")`)
+      if ((t.key || t.chest || t.keg) && c !== c.toLowerCase()) throw new Error(`Keys, chests and kegs are ordinary loot, not houses ("${col}")`)
       out.push({ ch: c, ...t })
-      t = { hidden: false, frozen: 0, key: false, chest: false }
+      t = fresh()
     }
   }
   return out
@@ -63,6 +81,9 @@ function tokens(col: string): Token[] {
  * `?` before a letter hides that item's colour until it is reachable.
  * 0.4: `!r` a red key · `#r` a red chest, locked until every key of the same colour is taken ·
  * `~3r` red loot frozen until move 3 starts. Prefixes combine, e.g. `?~2b`.
+ * 0.5: `*r` a red powder keg (clears stones, ice and tarps within a row of it, in its own and the
+ * neighbouring piles) · `&rb` a red cage with a blue prisoner · a pile starting with `≈` is a tide pile
+ * (no blocking inside it: the tide decides which item is in front).
  * A stone crumbles when an item next to it (in a neighbouring pile, at about the same
  * depth) is plundered. What stands behind a stone also stays behind the item in front of
  * the stone, so a pile is always emptied front to back.
@@ -75,15 +96,31 @@ export function stacks(columns: string[]): LevelLootPlaced[] {
   const yOf = (c: number, row: number) => (row * 3) / Math.max(1, piles[c].length - 1)
   const idOf = (c: number, row: number) => `c${c + 1}-${row + 1}`
   const keysOf = (color: LootColor) => piles.flatMap((p, c) => p.flatMap((t, row) => (t.key && code[t.ch] === color ? [idOf(c, row)] : [])))
-  return piles.flatMap((pile, c) => pile.map(({ ch, hidden, frozen, key, chest }, row) => {
+  const tidal = columns.map(col => col.startsWith('≈'))
+  const tideIndex = (c: number) => tidal.slice(0, c).filter(Boolean).length
+  /** Stones, ice and tarps a keg at (c, row) reaches: its own and the neighbouring piles, within one row. */
+  const blastOf = (c: number, row: number) => {
+    const reach = 3 / Math.max(1, piles[c].length - 1) + 0.01
+    const out: string[] = []
+    for (const nc of [c - 1, c, c + 1]) {
+      if (nc < 0 || nc >= n) continue
+      piles[nc].forEach((t, r) => {
+        if ((nc === c && r === row) || Math.abs(yOf(nc, r) - yOf(c, row)) > reach) return
+        if (t.ch === 's' || t.frozen || t.hidden) out.push(idOf(nc, r))
+      })
+    }
+    return out
+  }
+  return piles.flatMap((pile, c) => pile.map(({ ch, hidden, frozen, key, chest, keg, cage }, row) => {
     const id = idOf(c, row)
     const at: [number, number] = [xOf(c), yOf(c, row)]
-    // Blocked by everything in front up to and including the first non-stone item.
+    // Blocked by everything in front up to and including the first non-stone item (not in a tide pile).
     const blockedBy: string[] = []
-    for (let k = row + 1; k < pile.length; k++) {
+    for (let k = row + 1; k < pile.length && !tidal[c]; k++) {
       blockedBy.push(idOf(c, k))
       if (pile[k].ch !== 's') break
     }
+    if (tidal[c] && (ch === 's' || chest)) throw new Error(`No stones or locked chests in a tide pile ("${columns[c]}")`)
     if (ch === 's') {
       // Cleared by the closest non-stone item(s) in each neighbouring pile.
       const clearedBy: string[] = []
@@ -100,6 +137,9 @@ export function stacks(columns: string[]): LevelLootPlaced[] {
     if (hidden) l = { ...l, hidden: true }
     if (frozen) l = { ...l, frozen }
     if (key) l = { ...l, key: true, kind: 'key' }
+    if (keg) l = { ...l, keg: true, blasts: blastOf(c, row), kind: 'keg' }
+    if (cage) l = { ...l, cage, kind: 'cage' }
+    if (tidal[c]) l = { ...l, tidePile: tideIndex(c) }
     if (chest) {
       const lockedBy = keysOf(color)
       if (!lockedBy.length) throw new Error(`Chest ${id} has no ${color} key in the level`)
