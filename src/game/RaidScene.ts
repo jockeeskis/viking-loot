@@ -6,7 +6,7 @@ import {
   type GameEvent, type GameState, type LootColor, type LossReason, type GameStatus, type Viking,
 } from './engine'
 import {
-  COLORS, GOLD, INK, shade, cartoonText, drawLoot, drawChibi, drawPortrait, drawHead,
+  COLORS, GOLD, INK, shade, cartoonText, drawColorMark, drawLoot, drawChibi, drawPortrait, drawHead,
   drawTree, drawRock, drawShip, drawPanel, drawTab, type LootKind,
 } from './art'
 import {
@@ -16,6 +16,8 @@ import {
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, CAMERA_ZOOM } from './fx'
 import { sfx } from './sfx'
+import { haptics } from './haptics'
+import { t } from './i18n'
 import { hint } from './solver'
 
 export type RaidUpdate = {
@@ -97,6 +99,9 @@ export class RaidScene extends Phaser.Scene {
   private boat?: Phaser.GameObjects.GameObject
   private longship?: Phaser.GameObjects.Sprite
   private shipId = 'ormen'
+  private queueLabel?: Phaser.GameObjects.Text
+  private seatsLabel?: Phaser.GameObjects.Text
+  private colorMarks = false // colour-blind mode: symbols on everything whose colour matters
 
   constructor() { super('Raid') }
 
@@ -114,6 +119,30 @@ export class RaidScene extends Phaser.Scene {
   }
 
   setUpdate(fn: (u: RaidUpdate) => void) { this.onUpdate = fn }
+
+  /** Redraw texts after a language change (the title comes from the app). */
+  relabel(title: string) {
+    this.titleText = title
+    this.title?.setText(title)
+    this.queueLabel?.setText(t('scene.queue'))
+    this.seatsLabel?.setText(t('scene.seats'))
+    if (this.ready && this.state && !this.busy) this.layout(false)
+  }
+
+  /** Colour-blind mode on or off; the board is redrawn without animation. */
+  setColorMarks(on: boolean) {
+    if (on === this.colorMarks) return
+    this.colorMarks = on
+    if (this.ready && this.state && !this.busy) this.rebuild(this.state)
+  }
+
+  /** A colour symbol (▲ ● ■) when colour-blind mode is on, otherwise nothing. */
+  private mark(color: LootColor | null | undefined, x: number, y: number, r: number): Phaser.GameObjects.Graphics[] {
+    if (!this.colorMarks || !color) return []
+    const g = this.add.graphics().setName('mark')
+    drawColorMark(g, color, x, y, r)
+    return [g]
+  }
 
   /** Sail with another longship style (Skeppsvarvet). Loaded the first time it is chosen. */
   setShip(id: string) {
@@ -260,9 +289,9 @@ export class RaidScene extends Phaser.Scene {
     drawPanel(p, WAIT_PANEL.x, PANEL_Y, WAIT_PANEL.w, 62)
     drawPanel(p, QUEUE_PANEL.x, PANEL_Y, QUEUE_PANEL.w, 62)
     drawTab(p, QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y - 10, 100)
-    this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y - 1, 'VIKINGAKÖ', cartoonText(10)).setOrigin(0.5)
+    this.queueLabel = this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y - 1, t('scene.queue'), cartoonText(10)).setOrigin(0.5)
     this.waitTab = this.add.graphics()
-    this.add.text(WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 1, 'VÄNTPLATSER', cartoonText(10)).setOrigin(0.5).setDepth(1)
+    this.seatsLabel = this.add.text(WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 1, t('scene.seats'), cartoonText(10)).setOrigin(0.5).setDepth(1)
     this.slotsGfx = this.add.graphics().setDepth(2)
     this.warning = this.add.text(180, 436, '', { ...cartoonText(11), padding: { x: 8, y: 3 } }).setOrigin(0.5).setDepth(40)
   }
@@ -289,12 +318,12 @@ export class RaidScene extends Phaser.Scene {
         g.lineStyle(2.5, COLORS[boat.color], i < onBoat ? 1 : 0.8); g.strokeEllipse(x, y + 10, 20, 8)
       }
     }
-    const t = this.waitTab!
-    t.clear(); drawTab(t, WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 10, 104, risk ?? 0x8a5a33)
+    const tab = this.waitTab!
+    tab.clear(); drawTab(tab, WAIT_PANEL.x + WAIT_PANEL.w / 2, PANEL_Y - 10, 104, risk ?? 0x8a5a33)
     const w = this.warning!
-    if (used >= slots) w.setText('💀 Skeppet är fullt!').setBackgroundColor('#a3261bee')
-    else if (used === slots - 1) w.setText('🔥 Sista platsen – nästa viking utan byte förlorar!').setBackgroundColor('#a3261bee')
-    else if (used >= 1) w.setText('⚠️ En viking väntar – en säker plats kvar').setBackgroundColor('#9a6a10ee')
+    if (used >= slots) w.setText(t('scene.full')).setBackgroundColor('#a3261bee')
+    else if (used === slots - 1) w.setText(t('scene.last')).setBackgroundColor('#a3261bee')
+    else if (used >= 1) w.setText(t('scene.one')).setBackgroundColor('#9a6a10ee')
     else w.setText('').setBackgroundColor('#00000000')
   }
 
@@ -316,7 +345,7 @@ export class RaidScene extends Phaser.Scene {
     const color = this.state.ships[1]?.color
     this.longship?.setX(color ? SHIP.x - SHIP_SHIFT : SHIP.x)
     if (!color) return
-    let boat: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics
+    let boat: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics | Phaser.GameObjects.Container
     if (hasBoats(this)) {
       const a = boatsAsset()!
       boat = this.add.image(BOAT.x, BOAT.y, BOATS_KEY, a.frames[color]).setOrigin(a.originX, a.originY).setScale(BOAT_W / a.frameWidth)
@@ -328,6 +357,8 @@ export class RaidScene extends Phaser.Scene {
       boat = g.setPosition(BOAT.x, BOAT.y)
     }
     boat.setDepth(1)
+    const marks = this.mark(color, 0, 0, 8)
+    if (marks.length) boat = this.add.container(BOAT.x, BOAT.y, [boat.setPosition(0, 0), ...marks]).setDepth(1)
     this.tweens.add({ targets: boat, y: BOAT.y + 2, angle: 1.5, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
     this.boat = boat
   }
@@ -343,11 +374,11 @@ export class RaidScene extends Phaser.Scene {
       const a = lootAsset()!
       const shadow = this.add.ellipse(0, 22, 54, 15, 0x000000, 0.22)
       const img = this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName('img')
-      return this.add.container(0, 0, [shadow, img]).setName('art')
+      return this.add.container(0, 0, [shadow, img, ...this.mark(color, 25, 12, 7)]).setName('art')
     }
     const g = this.add.graphics()
     drawLoot(g, kind, color)
-    return this.add.container(0, 0, [g]).setName('art')
+    return this.add.container(0, 0, [g, ...this.mark(color, 25, 12, 7)]).setName('art')
   }
 
   /** Stones (no colour) and hidden loot (colour not yet known) use their own looks. */
@@ -448,7 +479,8 @@ export class RaidScene extends Phaser.Scene {
     const frame = lootFrame('padlock', color)
     if (hasLoot(this) && frame !== undefined) {
       const a = lootAsset()!
-      return this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName('padlock')
+      const img = this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth)
+      return this.add.container(0, 0, [img, ...this.mark(color, -14, 4, 6)]).setName('padlock')
     }
     const g = this.add.graphics().setName('padlock')
     g.lineStyle(4, 0xa9b3bd); g.beginPath(); g.arc(0, 0, 7, Math.PI, 0); g.strokePath()
@@ -548,7 +580,8 @@ export class RaidScene extends Phaser.Scene {
     rig.setScale(rig.getData('size'))
     const carry = this.add.container(0, -36).setName('carry')
     const badge = this.add.text(0, 34, '', { ...cartoonText(14), padding: { x: 4, y: 0 } }).setOrigin(0.5).setName('badge').setVisible(false)
-    return this.add.container(0, 0, [rig, carry, badge]).setDepth(30)
+    const marks = v.kind === 'scout' ? [] : this.mark(v.color, -20, 24, 7)
+    return this.add.container(0, 0, [rig, carry, badge, ...marks]).setDepth(30)
   }
 
   /** Play one of the rendered animations (no-op for the drawn fallback). Resolves when a one-shot ends. */
@@ -589,6 +622,7 @@ export class RaidScene extends Phaser.Scene {
     const s = rig.getData('size') as number
     this.tweens.add({ targets: rig, scaleX: Math.sign(rig.scaleX) * s * 1.2, scaleY: s * 1.2, yoyo: true, duration: 140 })
     floatText(this, actor.x, actor.y - 40, '✦', color)
+    if (!actor.getByName('mark')) actor.add(this.mark(color, -20, 24, 7))
   }
 
   private setBadge(actor: Sprite, collected: number | null, capacity = 2) {
@@ -623,16 +657,17 @@ export class RaidScene extends Phaser.Scene {
     portrait.setMask(mask.createGeometryMask())
     const extras: Phaser.GameObjects.GameObject[] = []
     if (v.kind === 'jarl') extras.push(this.add.text(w / 2 - 14, -h / 2 + 14, '👑', { fontSize: '18px', resolution: 2 }).setOrigin(0.5))
-    if (v.kind === 'jarl') extras.push(this.add.text(0, h / 2 - 12, 'BÄR 3', cartoonText(10)).setOrigin(0.5))
+    if (v.kind === 'jarl') extras.push(this.add.text(0, h / 2 - 12, t('scene.carries3'), cartoonText(10)).setOrigin(0.5))
     if (v.kind === 'scout') {
       extras.push(this.add.text(w / 2 - 14, -h / 2 + 14, '🔭', { fontSize: '16px', resolution: 2 }).setOrigin(0.5))
-      extras.push(this.add.text(0, h / 2 - 12, 'SPEJAR', cartoonText(10)).setOrigin(0.5))
+      extras.push(this.add.text(0, h / 2 - 12, t('scene.scout'), cartoonText(10)).setOrigin(0.5))
     }
     if (v.kind === 'wild') {
       const stripes = this.add.graphics()
       ;[COLORS.red, COLORS.blue, COLORS.yellow].forEach((col, i) => { stripes.fillStyle(col); stripes.fillRect(-w / 2 + 8 + i * ((w - 16) / 3), h / 2 - 18, (w - 16) / 3, 8) })
       extras.push(stripes, this.add.text(w / 2 - 14, -h / 2 + 14, '✦', cartoonText(14, '#ffffff')).setOrigin(0.5))
     }
+    if (v.kind !== 'scout') extras.push(...this.mark(v.color, -w / 2 + 16, -h / 2 + 16, 9))
     const card = this.add.container(cardX(index), CARD.y, [g, portrait, ...extras]).setSize(w, h).setDepth(20)
     card.once(Phaser.GameObjects.Events.DESTROY, () => mask.destroy())
     return card
@@ -681,9 +716,10 @@ export class RaidScene extends Phaser.Scene {
         head.once(Phaser.GameObjects.Events.DESTROY, () => m.destroy())
         this.preview.push(head)
       } else drawHead(g, lookOf(v), 9, x, y + 1)
+      if (v.kind !== 'scout') this.mark(v.color, x + 10, y + 9, 5).forEach(m => this.preview.push(m.setDepth(7)))
     })
     if (rest.length > PREVIEW_MAX) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w - 10, PANEL_Y + 34, `+${rest.length - PREVIEW_MAX}`, cartoonText(12)).setOrigin(1, 0.5).setDepth(6))
-    if (rest.length === 0) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y + 34, this.state.queue.length ? 'Sista vikingarna!' : 'Kön är tom', cartoonText(11, '#e8d6bb')).setOrigin(0.5).setDepth(6))
+    if (rest.length === 0) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y + 34, this.state.queue.length ? t('scene.lastVikings') : t('scene.emptyQueue'), cartoonText(11, '#e8d6bb')).setOrigin(0.5).setDepth(6))
 
     const seated = new Set(this.state.waiting.map(v => v.id))
     // Keep the victory crew on deck; everyone else not seated has left.
@@ -719,10 +755,10 @@ export class RaidScene extends Phaser.Scene {
     this.playEvents(before, after.events, gen).then(async () => {
       if (gen !== this.generation) return
       if (after.status === 'won') {
-        victory(this); sfx.win(); this.celebrate()
+        victory(this); sfx.win(); haptics.win(); this.celebrate()
         await this.delay(1100)
       } else if (after.status === 'lost') {
-        sfx.lose()
+        sfx.lose(); haptics.lose()
         this.actors.forEach(a => this.animate(a, 'fail'))
         await this.delay(900)
       }
@@ -875,7 +911,7 @@ export class RaidScene extends Phaser.Scene {
         if (card) this.tweens.add({ targets: card, scale: 0.88, alpha: 0.3, duration: 160 })
         const actor = this.makeActor(view.queue[index]).setPosition(cardX(index), CARD.y - 10).setScale(0.4)
         this.actors.set(e.vikingId, actor)
-        sfx.dispatch()
+        sfx.dispatch(); haptics.dispatch()
         await this.tween({ targets: actor, scale: 1, y: CARD.y - 46, duration: 180, ease: 'Back.easeOut' })
         dustPuff(this, actor.x, actor.y + 28)
         continue
@@ -949,7 +985,7 @@ export class RaidScene extends Phaser.Scene {
         this.drawSlots(view.waiting)
       } else if (e.type === 'overflow') {
         // The viking has just taken the last seat (the preceding `wait` event put it there).
-        sfx.overflow()
+        sfx.overflow(); haptics.overflow()
         this.cameras.main.shake(260, 0.012)
         this.cameras.main.flash(220, 160, 30, 20)
         await this.tween({ targets: actor, angle: { from: -12, to: 12 }, duration: 70, yoyo: true, repeat: 3 })

@@ -8,7 +8,7 @@ import { isMuted, setMuted, unlockAudio, isMusicOn, setMusicOn } from './game/sf
 import { loadProgress, saveProgress, recordWin, starsFor } from './game/progress'
 import { INTROS, mechanicsOf, type Mechanic } from './game/intros'
 import {
-  dateKey, dayLabel, tierFor, loadModes, saveModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound,
+  dateKey, tierFor, loadModes, saveModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound,
 } from './game/modes'
 import { requestLevel } from './game/levelGen'
 import {
@@ -17,6 +17,12 @@ import {
 } from './game/achievements'
 import { shipSheet } from './game/assets'
 import LevelMap from './components/LevelMap.vue'
+import SettingsPanel from './components/Settings.vue'
+import {
+  t as tt, tn as ttn, tr as ttr, getLang, setLang, detectLang, levelName, levelHint, worldName, dayLabel,
+} from './game/i18n'
+import { loadSettings, saveSettings, type Lang } from './game/settings'
+import { setVibration, haptics } from './game/haptics'
 import { registerSW } from 'virtual:pwa-register'
 
 // ---------- app updates (PWA) ----------
@@ -40,6 +46,33 @@ const updateSW = registerSW({
   },
 })
 function reloadApp() { updateSW(true) }
+
+// ---------- settings and language (0.5) ----------
+const settings = ref(loadSettings())
+setLang(settings.value.lang ?? detectLang())
+setVibration(settings.value.vibration)
+const lang = ref<Lang>(getLang())
+// Texts read `lang` so that the page re-renders when the language changes.
+const t = (key: string, params?: Record<string, string | number>) => { void lang.value; return tt(key, params) }
+const tn = (key: string, n: number) => { void lang.value; return ttn(key, n) }
+const tr = (sv: string, enKey: string, params?: Record<string, string | number>) => { void lang.value; return ttr(sv, enKey, params) }
+const dayLbl = (d: string) => { void lang.value; return dayLabel(d) }
+const lvlName = (i: number) => { void lang.value; return levelName(i) }
+const wName = (i: number) => { void lang.value; return worldName(i) }
+const showSettings = ref(false)
+function changeSetting(key: 'vibration' | 'colorMarks', on: boolean) {
+  settings.value = { ...settings.value, [key]: on }
+  saveSettings(settings.value)
+  if (key === 'vibration') { setVibration(on); if (on) haptics.test() }
+  else scene?.setColorMarks(on)
+}
+function changeLang(l: Lang) {
+  settings.value = { ...settings.value, lang: l }
+  saveSettings(settings.value)
+  setLang(l)
+  lang.value = l
+  scene?.relabel(currentTitle())
+}
 
 // ---------- progress ----------
 const progress = ref(loadProgress())
@@ -76,13 +109,10 @@ const won = computed(() => info.value.status === 'won' && !info.value.busy)
 const lost = computed(() => info.value.status === 'lost' && !info.value.busy)
 const lastStars = ref(0)
 const dailyCounted = ref(true) // false when today's raid was already won before (replay)
-const lossText = computed(() =>
-  info.value.lossReason === 'slots-full'
-    ? 'En viking hittade inget byte och fick ta skeppets sista väntplats.'
-    : 'Kön är slut och ingen väntande viking kan plundra något mer.')
+const lossText = computed(() => t(info.value.lossReason === 'slots-full' ? 'loss.full' : 'loss.stuck'))
 const par = computed(() => active.value.par)
-const waitsText = (n: number) => `${n} ${n === 1 ? 'väntning' : 'väntningar'}`
-const roundsText = (n: number) => `${n} ${n === 1 ? 'runda' : 'rundor'}`
+const waitsText = (n: number) => tn('waits', n)
+const roundsText = (n: number) => tn('rounds', n)
 const isEndless = computed(() => mode.value === 'endless')
 
 let game: Phaser.Game | undefined
@@ -118,7 +148,7 @@ function update(d: RaidUpdate) {
     }
     checkAchievements()
     for (const id of unlockedShips(progress.value)) {
-      if (!shipsBefore.includes(id)) toast('⛵', `Nytt skepp: ${SHIPS.find(x => x.id === id)!.name}`, 'Välj det i Skeppsvarvet.')
+      if (!shipsBefore.includes(id)) toast('⛵', t('toast.ship', { name: shipName(id) }), t('toast.shipText'))
     }
   }
   if (justLost && mode.value === 'endless') endless.value = { ...endless.value, over: true }
@@ -137,11 +167,12 @@ function closeIntro() {
 }
 
 // ---------- starting raids ----------
-function show(level: Level, title: string) {
+/** Show a level. `key` identifies it for the one-hint rule (titles change with the language). */
+function show(level: Level, title: string, key: string) {
   active.value = level
   usedUndo = usedHint = false
-  hintFor = title
-  hintsLeft.value = hintsUsed.has(title) ? 0 : HINTS_PER_LEVEL
+  hintFor = key
+  hintsLeft.value = hintsUsed.has(key) ? 0 : HINTS_PER_LEVEL
   info.value = { ...info.value, status: 'playing', busy: false }
   scene?.play(level, title)
   maybeIntro()
@@ -154,7 +185,7 @@ function openLevel(i: number) {
   generating.value = false
   mode.value = 'campaign'
   current.value = i
-  show(levels[i], `${i + 1}. ${levels[i].name}`)
+  show(levels[i], currentTitle(), `c${i}`)
 }
 
 /** Today's level is kept for the day, so it is only generated once. */
@@ -172,18 +203,18 @@ function cacheDaily(day: string, t: number, level: Level) {
 async function openDaily() {
   const my = ++ticket
   today.value = dateKey(new Date())
-  const day = today.value, t = tier.value
+  const day = today.value, tierNow = tier.value
   mode.value = 'daily'
   playingDay.value = day
-  let level = cachedDaily(day, t)
+  let level = cachedDaily(day, tierNow)
   if (!level) {
     generating.value = true
-    level = await requestLevel({ kind: 'daily', day, tier: t })
+    level = await requestLevel({ kind: 'daily', day, tier: tierNow })
     if (my !== ticket) return
-    cacheDaily(day, t, level)
+    cacheDaily(day, tierNow, level)
     generating.value = false
   }
-  show(level, `Dagens räd · ${dayLabel(day)}`)
+  show(level, currentTitle(), `d${day}`)
 }
 
 async function playEndlessRound(level: Promise<Level>, round: number) {
@@ -193,7 +224,7 @@ async function playEndlessRound(level: Promise<Level>, round: number) {
   if (my !== ticket) return
   generating.value = false
   endless.value = { ...endless.value, round, over: false }
-  show(l, `Oändlig räd · runda ${round}`)
+  show(l, currentTitle(), `e${endless.value.runSeed}-${round}`)
   // Start on the next island while this one is played.
   nextEndless = requestLevel({ kind: 'endless', round: round + 1, tier: endless.value.tier, runSeed: endless.value.runSeed })
 }
@@ -219,7 +250,7 @@ const hintMsg = ref('')
 /** One hint per level, so the puzzles cannot be solved by following hints. Kept when restarting. */
 const HINTS_PER_LEVEL = 1
 const hintsLeft = ref(HINTS_PER_LEVEL)
-let hintFor = `${current.value + 1}. ${levels[current.value].name}` // the level being played (the first one shown at start)
+let hintFor = `c${current.value}` // the level being played (the first one shown at start)
 const hintsUsed = new Set<string>() // levels whose hint is spent – restarting or reopening them gives no new one
 let usedUndo = false, usedHint = false // in this attempt (for the "Utan ånger" achievement)
 function restart() { if (!isEndless.value) { usedUndo = usedHint = false; scene?.restart() } }
@@ -228,8 +259,20 @@ function showHint() {
   if (!scene || isEndless.value || hintsLeft.value <= 0) return
   // A hint is only used up when there is a winning move to point at.
   if (scene.showHint()) { hintsLeft.value--; hintsUsed.add(hintFor); usedHint = true; hintMsg.value = '' }
-  else hintMsg.value = 'Inget drag räddar räden längre – ångra eller börja om.'
+  else hintMsg.value = t('hint.none')
 }
+/** The title of what is being played, in the current language. */
+function currentTitle(): string {
+  if (mode.value === 'daily') return t('daily.name', { day: dayLabel(playingDay.value) })
+  if (mode.value === 'endless') return t('endless.name', { n: endless.value.round })
+  return `${current.value + 1}. ${levelName(current.value)}`
+}
+const activeHint = computed(() => {
+  void lang.value
+  if (mode.value === 'daily') return t('daily.hint')
+  if (mode.value === 'endless') return t('endless.hint')
+  return levelHint(current.value)
+})
 function next() { if (current.value < levels.length - 1) openLevel(current.value + 1) }
 
 const muted = ref(isMuted())
@@ -242,9 +285,9 @@ type Toast = { id: number; icon: string; title: string; text: string }
 const toasts = ref<Toast[]>([])
 let toastId = 0
 function toast(icon: string, title: string, text: string) {
-  const t = { id: ++toastId, icon, title, text }
-  toasts.value = [...toasts.value, t]
-  setTimeout(() => { toasts.value = toasts.value.filter(x => x.id !== t.id) }, 4200 + 600 * (toasts.value.length - 1))
+  const item = { id: ++toastId, icon, title, text }
+  toasts.value = [...toasts.value, item]
+  setTimeout(() => { toasts.value = toasts.value.filter(x => x.id !== item.id) }, 4200 + 600 * (toasts.value.length - 1))
 }
 function checkAchievements() {
   const ids = newlyEarned(meta.value, { stats: meta.value.stats, progress: progress.value, modes: modes.value })
@@ -252,15 +295,21 @@ function checkAchievements() {
   saveMeta(meta.value)
   for (const id of ids) {
     const a = ACHIEVEMENTS.find(x => x.id === id)!
-    toast(a.icon, `Prestation: ${a.title}`, a.text)
+    toast(a.icon, t('toast.achievement', { t: achTitle(a) }), achText(a))
   }
 }
 const achievementView = computed(() => {
   const c = { stats: meta.value.stats, progress: progress.value, modes: modes.value }
   return ACHIEVEMENTS.map(a => {
     const p = a.progress?.(c)
-    return { ...a, earned: !!meta.value.unlocked[a.id], progressText: p ? `${p[0]}/${p[1]}` : '' }
+    return { ...a, title: achTitle(a), text: achText(a), earned: !!meta.value.unlocked[a.id], progressText: p ? `${p[0]}/${p[1]}` : '' }
   })
+})
+const achTitle = (a: { id: string; title: string }) => tr(a.title, `ach.${a.id}.title`)
+const achText = (a: { id: string; text: string }) => tr(a.text, `ach.${a.id}.text`, { n: levels.length })
+const shipName = (id: ShipId) => tr(SHIPS.find(x => x.id === id)!.name, `ship.${id}.name`)
+const introText = (m: Mechanic) => ({
+  icon: INTROS[m].icon, title: tr(INTROS[m].title, `intro.${m}.title`), text: tr(INTROS[m].text, `intro.${m}.text`),
 })
 const earnedCount = computed(() => achievementView.value.filter(a => a.earned).length)
 const stars = computed(() => totalStars(progress.value))
@@ -277,14 +326,14 @@ const shipPreview = (id: string) => {
 const statRows = computed(() => {
   const s = meta.value.stats
   return [
-    ['🏆', 'Räder vunna', s.raidsWon],
-    ['🪙', 'Skatter plundrade', s.lootTaken],
-    ['✨', 'Perfekta räder', s.perfectRaids],
-    ['🗝️', 'Kistor öppnade', s.chestsOpened],
-    ['⭐', 'Stjärnor på kartan', `${stars.value}/${levels.length * 3}`],
-    ['📅', 'Dagens räd vunnen', s.dailyWins],
-    ['🔥', 'Dagar i rad (bästa)', `${streak.value} (${modes.value.daily.bestStreak})`],
-    ['♾️', 'Bästa oändliga räd', roundsText(modes.value.endless.best)],
+    ['🏆', t('stat.raids'), s.raidsWon],
+    ['🪙', t('stat.loot'), s.lootTaken],
+    ['✨', t('stat.perfect'), s.perfectRaids],
+    ['🗝️', t('stat.chests'), s.chestsOpened],
+    ['⭐', t('stat.stars'), `${stars.value}/${levels.length * 3}`],
+    ['📅', t('stat.daily'), s.dailyWins],
+    ['🔥', t('stat.streak'), `${streak.value} (${modes.value.daily.bestStreak})`],
+    ['♾️', t('stat.endless'), roundsText(modes.value.endless.best)],
   ] as [string, string, string | number][]
 })
 
@@ -311,7 +360,8 @@ onMounted(() => {
     game?.canvas.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault() }, { passive: false })
     scene?.setUpdate(update)
     scene?.setShip(meta.value.ship)
-    scene?.reset(current.value)
+    scene?.setColorMarks(settings.value.colorMarks)
+    scene?.play(levels[current.value], currentTitle())
   })
   maybeIntro()
 })
@@ -321,107 +371,117 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
 <template>
   <main class="shell">
     <div v-if="updateReady" class="update-banner" role="status">
-      <span>⛵ Ny version finns</span>
-      <button @click="reloadApp">Ladda om</button>
-      <button class="close" aria-label="Senare" @click="updateReady = false">✕</button>
+      <span>{{ t('update.ready') }}</span>
+      <button @click="reloadApp">{{ t('update.reload') }}</button>
+      <button class="close" :aria-label="t('update.later')" @click="updateReady = false">✕</button>
     </div>
     <header>
-      <div class="logo"><h1>VIKING LOOT</h1><div class="eyebrow">The First Raid · 0.4</div></div>
-      <p>Välj en av de tre främsta vikingarna. Plundra framifrån – och fyll aldrig skeppets tre väntplatser!</p>
+      <div class="logo"><h1>VIKING LOOT</h1><div class="eyebrow">The First Raid · 0.5</div></div>
+      <p>{{ t('header.text') }}</p>
     </header>
     <div class="stats">
-      <span>🪙 Kvar: <strong>{{ info.remaining }}</strong></span>
-      <span>🛡️ Kö: <strong>{{ info.queue }}</strong></span>
-      <span :class="{ risk: info.waiting >= WAITING_SLOTS - 1 }">⛵ Väntar: <strong>{{ info.waiting }}/{{ WAITING_SLOTS }}</strong></span>
-      <span title="Väntningar hittills / par för tre stjärnor">⭐ <strong>{{ info.waits }}</strong>/{{ par }}</span>
+      <span>🪙 {{ t('stats.left') }}: <strong>{{ info.remaining }}</strong></span>
+      <span>🛡️ {{ t('stats.queue') }}: <strong>{{ info.queue }}</strong></span>
+      <span :class="{ risk: info.waiting >= WAITING_SLOTS - 1 }">⛵ {{ t('stats.waiting') }}: <strong>{{ info.waiting }}/{{ WAITING_SLOTS }}</strong></span>
+      <span :title="t('stats.parTitle')">⭐ <strong>{{ info.waits }}</strong>/{{ par }}</span>
     </div>
-    <p class="hint">💡 {{ hintMsg || active.hint }}</p>
+    <p class="hint">💡 {{ hintMsg || activeHint }}</p>
     <div class="game-wrap">
       <div id="game"></div>
       <div v-if="generating" class="overlay">
         <div class="result generating">
           <div class="intro-icon spin">🧭</div>
-          <h2>Kartlägger ön…</h2>
-          <p>Lösaren letar fram en ö som går att vinna.</p>
+          <h2>{{ t('gen.title') }}</h2>
+          <p>{{ t('gen.text') }}</p>
         </div>
       </div>
       <div v-else-if="won || lost" class="overlay">
         <!-- Endless raid -->
         <div v-if="isEndless" class="result">
-          <h2>{{ won ? `🏆 Runda ${endless.round} klarad!` : '💀 Räden är slut' }}</h2>
-          <div v-if="won" class="result-stars" :aria-label="`${lastStars} av 3 stjärnor`">
+          <h2>{{ won ? t('endless.won', { n: endless.round }) : t('endless.over') }}</h2>
+          <div v-if="won" class="result-stars" :aria-label="t('stars.aria', { n: lastStars })">
             <i v-for="s in 3" :key="s" :class="{ on: s <= lastStars }" :style="{ animationDelay: `${s * 0.18}s` }">★</i>
           </div>
-          <p v-if="won">Nästa ö blir svårare.<br /><small>Rekord: {{ roundsText(modes.endless.best) }}</small></p>
+          <p v-if="won">{{ t('endless.harder') }}<br /><small>{{ t('endless.record', { r: roundsText(modes.endless.best) }) }}</small></p>
           <p v-else>
             {{ lossText }}<br />
-            Du klarade <strong>{{ roundsText(endless.round - 1) }}</strong>.<br />
-            <small v-if="endless.round - 1 > endless.bestBefore">🎉 Nytt rekord!</small>
-            <small v-else>Rekord: {{ roundsText(modes.endless.best) }}</small>
+            <strong>{{ t('endless.survived', { r: roundsText(endless.round - 1) }) }}</strong><br />
+            <small v-if="endless.round - 1 > endless.bestBefore">{{ t('endless.newRecord') }}</small>
+            <small v-else>{{ t('endless.record', { r: roundsText(modes.endless.best) }) }}</small>
           </p>
-          <button v-if="won" @click="nextRound">Nästa runda →</button>
-          <button v-else @click="startEndless">♾️ Ny oändlig räd</button>
+          <button v-if="won" @click="nextRound">{{ t('endless.next') }}</button>
+          <button v-else @click="startEndless">{{ t('endless.new') }}</button>
         </div>
-        <!-- Campaign and Dagens räd -->
+        <!-- Campaign and the daily raid -->
         <div v-else class="result">
-          <h2>{{ won ? '🏆 Seger!' : '💀 Räden misslyckades' }}</h2>
-          <div v-if="won" class="result-stars" :aria-label="`${lastStars} av 3 stjärnor`">
+          <h2>{{ won ? t('result.win') : t('result.lose') }}</h2>
+          <div v-if="won" class="result-stars" :aria-label="t('stars.aria', { n: lastStars })">
             <i v-for="s in 3" :key="s" :class="{ on: s <= lastStars }" :style="{ animationDelay: `${s * 0.18}s` }">★</i>
           </div>
           <p v-if="won">
-            Byn är plundrad på {{ info.moves }} drag med {{ waitsText(info.waits) }}.<br />
-            <small v-if="lastStars < 3">Tre stjärnor: högst {{ waitsText(par) }}.</small>
-            <small v-else>Perfekt räd!</small>
+            {{ t('result.summary', { moves: info.moves, waits: waitsText(info.waits) }) }}<br />
+            <small v-if="lastStars < 3">{{ t('result.threeStars', { waits: waitsText(par) }) }}</small>
+            <small v-else>{{ t('result.perfect') }}</small>
             <template v-if="mode === 'daily'">
-              <br /><strong v-if="dailyCounted">🔥 Dagens räd är klar – svit: {{ streak }} {{ streak === 1 ? 'dag' : 'dagar' }}.</strong>
-              <small v-else>Stjärnorna räknas på dagens första vinst. Ny ö i morgon!</small>
+              <br /><strong v-if="dailyCounted">{{ t('result.dailyDone', { days: tn('days', streak) }) }}</strong>
+              <small v-else>{{ t('result.dailyReplay') }}</small>
             </template>
-            <template v-else-if="current === levels.length - 1"><br /><strong>⚔️ Du har plundrat hela Norden – alla {{ levels.length }} räder är klara!</strong></template>
+            <template v-else-if="current === levels.length - 1"><br /><strong>{{ t('result.allDone', { n: levels.length }) }}</strong></template>
           </p>
           <p v-else>{{ lossText }}</p>
-          <button v-if="won && mode === 'campaign' && current < levels.length - 1" @click="next">Nästa bana →</button>
-          <button v-if="lost && info.canUndo" @click="undo">↶ Ångra</button>
-          <button @click="restart">{{ won ? 'Spela igen' : '↻ Försök igen' }}</button>
+          <button v-if="won && mode === 'campaign' && current < levels.length - 1" @click="next">{{ t('result.next') }}</button>
+          <button v-if="lost && info.canUndo" @click="undo">{{ t('actions.undo') }}</button>
+          <button @click="restart">{{ won ? t('result.again') : t('result.retry') }}</button>
         </div>
       </div>
       <div v-if="intro && !generating" class="overlay">
         <div class="result intro">
-          <div class="intro-icon">{{ INTROS[intro].icon }}</div>
-          <h2>{{ INTROS[intro].title }}</h2>
-          <p>{{ INTROS[intro].text }}</p>
-          <button @click="closeIntro">Uppfattat!</button>
+          <div class="intro-icon">{{ introText(intro).icon }}</div>
+          <h2>{{ introText(intro).title }}</h2>
+          <p>{{ introText(intro).text }}</p>
+          <button @click="closeIntro">{{ t('intro.ok') }}</button>
         </div>
       </div>
+      <SettingsPanel
+        v-if="showSettings" :t="t" :lang="lang" :music="music" :sound="!muted"
+        :vibration="settings.vibration" :color-marks="settings.colorMarks"
+        @music="toggleMusic" @sound="toggleSound" @vibration="changeSetting('vibration', $event)"
+        @color-marks="changeSetting('colorMarks', $event)" @lang="changeLang" @close="showSettings = false"
+      />
     </div>
     <div class="actions">
-      <button :disabled="isEndless" @click="restart">↻ Starta om</button>
-      <button :disabled="isEndless || !info.canUndo || info.busy" @click="undo">↶ Ångra</button>
-      <button :disabled="isEndless || hintsLeft <= 0 || info.busy || info.status !== 'playing'" :title="hintsLeft > 0 ? 'Ett tips per bana' : 'Tipset för den här banan är använt'" @click="showHint">💡 Tips ({{ isEndless ? 0 : hintsLeft }})</button>
-      <button class="icon" :class="{ off: !music }" :aria-label="music ? 'Stäng av musik' : 'Slå på musik'" :title="music ? 'Musik på' : 'Musik av'" @click="toggleMusic">🎵</button>
-      <button class="icon" :aria-label="muted ? 'Slå på ljudeffekter' : 'Stäng av ljudeffekter'" :title="muted ? 'Effekter av' : 'Effekter på'" @click="toggleSound">{{ muted ? '🔇' : '🔊' }}</button>
+      <button :disabled="isEndless" @click="restart">{{ t('actions.restart') }}</button>
+      <button :disabled="isEndless || !info.canUndo || info.busy" @click="undo">{{ t('actions.undo') }}</button>
+      <button :disabled="isEndless || hintsLeft <= 0 || info.busy || info.status !== 'playing'" :title="hintsLeft > 0 ? t('hint.left') : t('hint.used')" @click="showHint">{{ t('actions.hint', { n: isEndless ? 0 : hintsLeft }) }}</button>
+      <button class="icon" :aria-label="t('actions.settings')" :title="t('actions.settings')" @click="showSettings = !showSettings">⚙️</button>
+      <button class="icon" :aria-label="muted ? t('sound.on') : t('sound.off')" :title="muted ? t('sound.on') : t('sound.off')" @click="toggleSound">{{ muted ? '🔇' : '🔊' }}</button>
     </div>
-    <h2 class="section-title">Räder</h2>
+    <h2 class="section-title">{{ t('section.raids') }}</h2>
     <div class="modes">
       <button class="mode-card" :class="{ current: mode === 'daily', done: todayStars > 0 }" @click="openDaily">
         <span class="mode-icon">📅</span>
         <span class="mode-text">
-          <strong>Dagens räd</strong>
-          <small>{{ dayLabel(today) }} · {{ todayStars ? '★'.repeat(todayStars) + '☆'.repeat(3 - todayStars) : 'ny ö väntar' }}</small>
-          <small>🔥 {{ streak }} {{ streak === 1 ? 'dag' : 'dagar' }} i rad</small>
+          <strong>{{ t('daily.title') }}</strong>
+          <small>{{ dayLbl(today) }} · {{ todayStars ? '★'.repeat(todayStars) + '☆'.repeat(3 - todayStars) : t('daily.waiting') }}</small>
+          <small>{{ t('daily.streak', { days: tn('days', streak) }) }}</small>
         </span>
       </button>
       <button class="mode-card" :class="{ current: mode === 'endless' }" @click="startEndless">
         <span class="mode-icon">♾️</span>
         <span class="mode-text">
-          <strong>Oändlig räd</strong>
-          <small>{{ mode === 'endless' && !endless.over ? `Runda ${endless.round}` : 'Hur långt når du?' }}</small>
-          <small>🏆 Rekord: {{ roundsText(modes.endless.best) }}</small>
+          <strong>{{ t('endless.title') }}</strong>
+          <small>{{ mode === 'endless' && !endless.over ? t('endless.round', { n: endless.round }) : t('endless.howFar') }}</small>
+          <small>{{ t('endless.recordCard', { r: roundsText(modes.endless.best) }) }}</small>
         </span>
       </button>
     </div>
-    <h2 class="section-title">Karta</h2>
-    <LevelMap :worlds="worlds" :names="levels.map(l => l.name)" :stars="progress.stars" :unlocked="unlocked" :current="mode === 'campaign' ? current : -1" @select="openLevel" />
-    <h2 class="section-title">Skeppsvarvet <small>★ {{ stars }}</small></h2>
+    <h2 class="section-title">{{ t('section.map') }}</h2>
+    <LevelMap
+      :worlds="worlds.map((w, i) => ({ ...w, name: wName(i) }))"
+      :names="levels.map((_, i) => lvlName(i))" :stars="progress.stars" :unlocked="unlocked"
+      :current="mode === 'campaign' ? current : -1" :t="t" @select="openLevel"
+    />
+    <h2 class="section-title">{{ t('section.shipyard') }} <small>★ {{ stars }}</small></h2>
     <div class="shipyard">
       <button
         v-for="sh in SHIPS" :key="sh.id" class="ship-card"
@@ -429,14 +489,14 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
         :disabled="stars < sh.stars" @click="chooseShip(sh.id)"
       >
         <span class="ship-pic" :style="shipPreview(sh.id)"></span>
-        <strong>{{ sh.name }}</strong>
+        <strong>{{ shipName(sh.id) }}</strong>
         <small v-if="stars < sh.stars">🔒 ★ {{ sh.stars }}</small>
-        <small v-else-if="meta.ship === sh.id">⚓ Seglar nu</small>
-        <small v-else>Välj</small>
+        <small v-else-if="meta.ship === sh.id">{{ t('ship.sailing') }}</small>
+        <small v-else>{{ t('ship.choose') }}</small>
       </button>
     </div>
     <details class="panel">
-      <summary>🏆 Prestationer <span>{{ earnedCount }}/{{ ACHIEVEMENTS.length }}</span></summary>
+      <summary>{{ t('section.achievements') }} <span>{{ earnedCount }}/{{ ACHIEVEMENTS.length }}</span></summary>
       <ul class="badges">
         <li v-for="a in achievementView" :key="a.id" :class="{ earned: a.earned }">
           <span class="badge-icon">{{ a.icon }}</span>
@@ -446,7 +506,7 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
       </ul>
     </details>
     <details class="panel">
-      <summary>📊 Statistik</summary>
+      <summary>{{ t('section.stats') }}</summary>
       <dl class="stat-list">
         <template v-for="[icon, label, value] in statRows" :key="label">
           <dt>{{ icon }} {{ label }}</dt><dd>{{ value }}</dd>
@@ -454,11 +514,11 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
       </dl>
     </details>
     <div class="toasts" aria-live="polite">
-      <div v-for="t in toasts" :key="t.id" class="toast">
-        <span class="toast-icon">{{ t.icon }}</span>
-        <span><strong>{{ t.title }}</strong><small>{{ t.text }}</small></span>
+      <div v-for="item in toasts" :key="item.id" class="toast">
+        <span class="toast-icon">{{ item.icon }}</span>
+        <span><strong>{{ item.title }}</strong><small>{{ item.text }}</small></span>
       </div>
     </div>
-    <p class="foot">Vikingar, skatter, skepp och ö är 3D-renderade i Blender. Ljud och musik är syntetiserade i webbläsaren.</p>
+    <p class="foot">{{ t('foot') }}</p>
   </main>
 </template>

@@ -9,6 +9,7 @@ const props = defineProps<{
   stars: number[]
   unlocked: number
   current: number
+  t: (key: string, params?: Record<string, string | number>) => string
 }>()
 const emit = defineEmits<{ select: [index: number] }>()
 
@@ -37,8 +38,8 @@ const view = computed(() => props.worlds.map(w => {
       <h3>{{ w.name }}</h3>
       <span v-if="w.status === 'open'" class="total">★ {{ w.earned }}/{{ w.max }}</span>
     </div>
-    <div v-if="w.status === 'soon'" class="world-locked">🌊 Nya banor seglar in snart – med hus, stenar, jarlar och dolda skatter.</div>
-    <div v-else-if="w.status === 'locked'" class="world-locked">🔒 Vinn bana {{ w.first }} för att segla vidare hit.</div>
+    <div v-if="w.status === 'soon'" class="world-locked">{{ t('map.soon') }}</div>
+    <div v-else-if="w.status === 'locked'" class="world-locked">{{ t('map.locked', { n: w.first }) }}</div>
     <div v-else class="map" :style="{ gridTemplateRows: `repeat(${w.rows}, 86px)` }">
       <svg class="path" :viewBox="`0 0 ${COLS} ${w.rows}`" preserveAspectRatio="none" aria-hidden="true">
         <polyline :points="w.path" />
@@ -52,7 +53,7 @@ const view = computed(() => props.worlds.map(w => {
         @click="emit('select', n.index)"
       >
         <span class="isle">{{ n.index > unlocked ? '🔒' : n.index + 1 }}</span>
-        <span class="stars" :aria-label="`${stars[n.index] ?? 0} av 3 stjärnor`">
+        <span class="stars" :aria-label="t('stars.aria', { n: stars[n.index] ?? 0 })">
           <i v-for="s in 3" :key="s" :class="{ on: s <= (stars[n.index] ?? 0) }">★</i>
         </span>
       </button>

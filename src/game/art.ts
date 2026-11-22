@@ -26,6 +26,19 @@ export const cartoonText = (size: number, color = '#fff4d6'): Phaser.Types.GameO
 
 // ---------- Loot ----------
 
+/** Colour-blind mode: each team colour has its own shape – red ▲, blue ●, yellow ■. */
+export const COLOR_SYMBOL: Record<LootColor, string> = { red: '▲', blue: '●', yellow: '■' }
+
+/** A small dark badge with the colour's symbol in white, centred on (x, y). */
+export function drawColorMark(g: G, color: LootColor, x: number, y: number, r: number) {
+  g.fillStyle(0x2a190c, 0.9); g.fillCircle(x, y, r + 2.5)
+  g.lineStyle(1.5, COLORS[color]); g.strokeCircle(x, y, r + 2.5)
+  g.fillStyle(0xffffff)
+  if (color === 'red') g.fillTriangle(x, y - r, x + r * 0.95, y + r * 0.7, x - r * 0.95, y + r * 0.7)
+  else if (color === 'blue') g.fillCircle(x, y, r * 0.78)
+  else g.fillRect(x - r * 0.68, y - r * 0.68, r * 1.36, r * 1.36)
+}
+
 export function drawLoot(g: G, kind: LootKind, color: LootColor) {
   g.fillStyle(0x000000, 0.22); g.fillEllipse(0, 24, kind === 'house' ? 64 : 52, 14)
   if (kind === 'barrel') drawBarrel(g, COLORS[color])
