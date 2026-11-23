@@ -41,6 +41,9 @@ P = {
     'snow': '#F1F6FA', 'snow_shade': '#D3E2EC',
     # 0.5 – Muspelheim
     'lava': '#F2642A', 'lava_hot': '#FFC23D', 'basalt': '#3B3536', 'ash': '#5E5553', 'soot': '#231E1F', 'raven': '#1E2128',
+    # 0.5 – bosses
+    'serpent': '#2E8C86', 'serpent_belly': '#CDE8B4', 'serpent_fin': '#E0573A', 'wolf': '#8C8790', 'wolf_dark': '#5E5962',
+    'ulvhild': '#4B3A6B', 'hair_silver': '#C9C6D2', 'giant_ice': '#9FD3EA', 'giant_skin': '#CFE8F4', 'sea': '#5DB3E0',
 }
 TEAM = {'ragnar': 'red', 'bjorn': 'blue', 'freja': 'yellow'}
 
@@ -306,7 +309,8 @@ def empty(name, loc=(0, 0, 0), parent=None):
 # ---------------------------------------------------------------- vikings (ui-settings.md §3)
 def build_viking(who, color=None):
     """who: ragnar, bjorn, freja, harald (the jarl, any team colour), ylva (the wild viking) or sigrid (the scout)."""
-    team = P[color] if color else P['sail_cream'] if who == 'ylva' else P['cloak'] if who == 'sigrid' else P[TEAM[who]]
+    team = P[color] if color else P['sail_cream'] if who == 'ylva' else P['cloak'] if who == 'sigrid' \
+        else P['ulvhild'] if who == 'ulvhild' else P[TEAM[who]]
     sleeve = shade(team, -0.18)
     rig = {}
     root = rig['root'] = empty('root')
@@ -319,7 +323,7 @@ def build_viking(who, color=None):
         for z, c in ((0.07, 'red'), (0.17, 'blue'), (0.26, 'yellow')):
             r = 0.3 * math.sqrt(max(0.0, 1 - ((z - 0.16) / 0.27) ** 2)) + 0.004
             part('stripe', torus(r, 0.03, scale=(1, 0.88, 1), loc=(0, 0, z)), P[c], hips, outline=False)
-    if who in ('harald', 'sigrid'):  # the jarl's cape / the scout's travelling cloak, behind the torso
+    if who in ('harald', 'sigrid', 'ulvhild'):  # the jarl's cape / the scout's travelling cloak, behind the torso
         part('cape', box(scale=(0.52, 0.05, 0.5), rot=(-0.12, 0, 0), loc=(0, 0.25, 0.08)), shade(team, -0.3), hips, smooth=False, bevel=0.03)
         part('clasp', sphere(0.045, loc=(0, -0.2, 0.33)), P['gold'], hips)
     part('belt', torus(0.285, 0.035, scale=(1, 0.88, 1), loc=(0, 0, 0.09)), P['wood_dark'], hips)
@@ -345,13 +349,13 @@ def build_viking(who, color=None):
         part('eye', sphere(0.045, seg=16, rings=10, scale=(1, 1, 1.15), loc=(x, -0.235, 0.215)), P['black'], head, outline=False)
         part('glint', sphere(0.015, seg=10, rings=6, loc=(x + 0.015, -0.275, 0.235)), P['white'], head, outline=False, emission=True)
 
-    if who in ('freja', 'ylva', 'sigrid'):
-        hair = {'freja': P['hair_blonde'], 'ylva': P['hair_dark'], 'sigrid': P['hair_red']}[who]
+    if who in ('freja', 'ylva', 'sigrid', 'ulvhild'):
+        hair = {'freja': P['hair_blonde'], 'ylva': P['hair_dark'], 'sigrid': P['hair_red'], 'ulvhild': P['hair_silver']}[who]
         part('hair', sphere(0.285, loc=(0, 0.035, 0.19)), hair, head)
         for sx in (-1, 1):
             for k, (z, r) in enumerate(((0.06, 0.075), (-0.05, 0.068), (-0.15, 0.06))):
                 part('braid', sphere(r, loc=(sx * 0.245, -0.02, z)), shade(hair, -0.08 * k), head)
-            part('tie', sphere(0.035, loc=(sx * 0.245, -0.02, -0.21)), {'freja': P['red'], 'ylva': P['blue'], 'sigrid': P['gold']}[who], head, outline=False)
+            part('tie', sphere(0.035, loc=(sx * 0.245, -0.02, -0.21)), {'freja': P['red'], 'ylva': P['blue'], 'sigrid': P['gold'], 'ulvhild': P['gold']}[who], head, outline=False)
             part('cheek', sphere(0.042, seg=12, rings=8, scale=(1, 0.4, 0.7), loc=(sx * 0.15, -0.235, 0.115)), P['cheek'], head, outline=False)
         part('smile', sphere(1, seg=16, rings=10, cut=('below', 0), scale=(0.075, 0.03, 0.06), loc=(0, -0.252, 0.085)), P['mouth'], head, outline=False)
         browc = shade(hair, -0.25)
@@ -385,7 +389,7 @@ def build_viking(who, color=None):
         return rig
     part('helmet', sphere(0.29, cut=('above', 0.0), scale=(1, 1, 0.8), loc=(0, 0, hz)), P['steel'], head)
     part('rim', torus(0.29, 0.03, loc=(0, 0, hz)), P['steel_dark'], head)
-    if who == 'harald':  # a gold crown around the helmet marks the jarl
+    if who in ('harald', 'ulvhild'):  # a gold crown around the helmet marks the jarl
         part('crown', cyl(0.305, 0.315, 0.07, loc=(0, 0, hz + 0.03)), P['gold'], head)
         for k in range(6):
             a = 2 * math.pi * k / 6 + math.pi / 6
@@ -397,8 +401,8 @@ def build_viking(who, color=None):
         part('horntip', cyl(0.038, 0.004, 0.16, rot=(0, sx * 0.25, 0), loc=(sx * 0.41, 0, hz + 0.26)), P['horn'], head)
 
     # props
-    if who in ('ragnar', 'freja', 'harald', 'ylva'):
-        k = {'ragnar': 1.0, 'freja': 0.72, 'harald': 1.15, 'ylva': 0.72}[who]
+    if who in ('ragnar', 'freja', 'harald', 'ylva', 'ulvhild'):
+        k = {'ragnar': 1.0, 'freja': 0.72, 'harald': 1.15, 'ylva': 0.72, 'ulvhild': 1.15}[who]
         arm = rig['armR']
         part('handle', cyl(0.022 * k, 0.022 * k, 0.55 * k, loc=(0, -0.06, -0.2 + 0.12 * k)), P['wood_dark'], arm)
         part('blade', sphere(1, seg=24, rings=12, cut=('above', 0.0), scale=(0.17 * k, 0.025, 0.15 * k), rot=(0, math.pi / 2, 0),
@@ -711,6 +715,196 @@ def render_raven(manifest):
     pack(frames, RAVEN_W, RAVEN_H, 3, os.path.join(PUBLIC, rel))
     manifest['raven'] = {'sheet': rel, 'frameWidth': RAVEN_W, 'frameHeight': RAVEN_H, 'originX': 0.5, 'originY': 0.5,
                          'anims': {'fly': {'start': 0, 'end': RAVEN_FRAMES - 1, 'fps': 12}}}
+
+
+
+# ---------------------------------------------------------------- bosses (0.5)
+# Each boss stands in the sea next to the island: a few idle frames plus a portrait for the story cards.
+def water_ring(root, r=0.55):
+    part('sea', cyl(r, r, 0.02, seg=40, loc=(0, 0, 0.0)), P['sea'], root, outline=False)
+    part('foam', torus(r * 0.82, 0.035, seg=40, ring=8, scale=(1, 1, 0.6), loc=(0, 0, 0.02)), P['white'], root, outline=False)
+
+
+def build_serpent(t):
+    """A sea serpent: two coils out of the water and a tall neck with a finned head, facing the viewer."""
+    root = empty('root')
+    water_ring(root, 0.75)
+    p = 2 * math.pi * t
+    body, belly = P['serpent'], P['serpent_belly']
+    # Two coils (half rings standing in the water) behind the neck.
+    for k, (x, r) in enumerate(((-0.5, 0.2), (0.45, 0.17))):
+        rise = 0.02 * math.sin(p + k * 2)
+        for i in range(11):
+            a = math.pi * i / 10
+            part('coil', sphere(0.085 - 0.01 * k, seg=14, rings=8, loc=(x + r * math.cos(a), 0.2, r * math.sin(a) + rise)), body, root)
+        for i in (3, 5, 7):
+            a = math.pi * i / 10
+            part('spike', cyl(0.04, 0.0, 0.09, seg=8, loc=(x + (r + 0.07) * math.cos(a), 0.2, (r + 0.07) * math.sin(a) + rise)),
+                 P['serpent_fin'], root, smooth=False)
+    # The neck: a column of shrinking spheres, swaying.
+    sway = 0.05 * math.sin(p)
+    neck = []
+    for i in range(14):
+        u = i / 13
+        x = 0.0 + sway * u + 0.08 * math.sin(u * math.pi)
+        z = 0.02 + 0.95 * u
+        r = 0.15 - 0.05 * u
+        neck.append((x, z))
+        part('neck', sphere(r, seg=16, rings=10, loc=(x, 0, z)), body, root)
+        part('belly', sphere(r * 0.75, seg=14, rings=8, scale=(1, 0.6, 1), loc=(x, -r * 0.55, z)), belly, root, outline=False)
+        if i % 3 == 1 and i < 12:
+            part('fin', poly([(0, 0, 0), (0, 0.16, 0.06), (0, 0.02, 0.14)], [(0, 1, 2)], loc=(x, r * 0.6, z)), P['serpent_fin'], root, smooth=False)
+    hx, hz = neck[-1]
+    head = empty('head', (hx, 0, hz + 0.08), root)
+    head.rotation_euler = (0.05 * math.sin(p + 1), 0, 0.08 * math.sin(p))
+    part('skull', sphere(1, scale=(0.2, 0.2, 0.15), loc=(0, 0, 0)), body, head)
+    part('snout', sphere(1, scale=(0.13, 0.17, 0.09), loc=(0, -0.17, -0.03)), body, head)
+    part('jaw', sphere(1, scale=(0.12, 0.15, 0.05), loc=(0, -0.15, -0.1)), belly, head)
+    part('mouth', sphere(1, scale=(0.1, 0.05, 0.025), loc=(0, -0.28, -0.07)), P['mouth'], head, outline=False)
+    for sx in (-1, 1):
+        part('eye', sphere(0.06, seg=16, rings=10, loc=(sx * 0.1, -0.12, 0.08)), P['lava_hot'], head, emission=True)
+        part('pupil', box(scale=(0.014, 0.02, 0.07), loc=(sx * 0.1, -0.175, 0.08)), P['black'], head, smooth=False, outline=False)
+        part('fang', cyl(0.018, 0.0, 0.07, seg=8, rot=(math.pi, 0, 0), loc=(sx * 0.05, -0.3, -0.09)), P['white'], head, smooth=False)
+        part('frill', poly([(0, 0, 0), (sx * 0.22, 0.08, 0.12), (sx * 0.2, 0.12, -0.06)], [(0, 1, 2)], loc=(sx * 0.14, 0.02, 0.0)),
+             P['serpent_fin'], head, smooth=False)
+    part('crest', poly([(0, -0.1, 0), (0, 0.18, 0.06), (0, 0.04, 0.22)], [(0, 1, 2)], loc=(0, 0, 0.1)), P['serpent_fin'], head, smooth=False)
+    return root
+
+
+def build_ulvhild(t):
+    """Jarl Ulvhild: a jarl with silver braids, a violet cloak and a wolf pelt, standing on a rock in the sea."""
+    root = empty('root')
+    water_ring(root, 0.55)
+    part('rock', sphere(1, scale=(0.42, 0.34, 0.16), loc=(0, 0, 0.02)), P['stone'], root)
+    rig = build_viking('ulvhild')
+    rig['root'].parent = root
+    rig['root'].location.z = 0.14
+    pose_viking(rig, 'idle', t)
+    # A thick wolf-fur collar around her shoulders, with two paws hanging in front.
+    hips = rig['hips']
+    part('fur', torus(0.25, 0.08, seg=28, ring=10, scale=(1, 0.9, 0.7), loc=(0, 0, 0.38)), P['wolf_dark'], hips)
+    for sx in (-1, 1):
+        part('paw', sphere(1, scale=(0.06, 0.05, 0.1), loc=(sx * 0.12, -0.25, 0.27)), P['wolf_dark'], hips)
+    return root
+
+
+def build_ymer(t):
+    """Ymer the Frost Giant: an icy giant rising waist-deep from the sea, icicle beard and crystal shoulders."""
+    root = empty('root')
+    water_ring(root, 0.7)
+    p = 2 * math.pi * t
+    body = empty('body', (0, 0, 0.012 * math.sin(p)), root)
+    body.rotation_euler = (0, 0.03 * math.sin(p), 0)
+    skin, ice = P['giant_skin'], P['giant_ice']
+    part('torso', sphere(1, scale=(0.4, 0.3, 0.42), loc=(0, 0, 0.3)), ice, body)
+    part('chest', sphere(1, scale=(0.28, 0.12, 0.18), loc=(0, -0.21, 0.4)), skin, body, outline=False)
+    for sx in (-1, 1):
+        part('shoulder', sphere(0.14, loc=(sx * 0.4, 0, 0.58)), ice, body)
+        for k in range(2):
+            part('crystal', cyl(0.045, 0.0, 0.16 - 0.04 * k, seg=6, rot=(0, sx * (0.5 + 0.4 * k), 0),
+                                loc=(sx * (0.44 + 0.07 * k), 0.0, 0.68 - 0.04 * k)), P['ice_dark'], body, smooth=False)
+        arm = empty('arm', (sx * 0.46, 0, 0.52), body)
+        arm.rotation_euler = (0.1 * math.sin(p + sx), sx * 0.25, 0)
+        part('upper', sphere(1, scale=(0.13, 0.13, 0.26), loc=(0, 0, -0.18)), ice, arm)
+        part('fist', sphere(0.15, loc=(0, -0.04, -0.44)), skin, arm)
+    head = empty('head', (0, 0, 0.98), body)
+    head.rotation_euler = (0.04 * math.sin(p), 0, 0.05 * math.sin(p + 1))
+    part('skull', sphere(0.24, scale=(1, 0.95, 1.05)), skin, head)
+    part('brow', box(scale=(0.36, 0.08, 0.06), loc=(0, -0.2, 0.06)), ice, head, smooth=False, bevel=0.02)
+    for sx in (-1, 1):
+        part('eye', sphere(0.04, seg=12, rings=8, loc=(sx * 0.09, -0.21, 0.0)), '#E8FBFF', head, emission=True, outline=False)
+    part('nose', sphere(0.06, loc=(0, -0.25, -0.04)), ice, head)
+    for k in range(7):  # the icicle beard
+        x = -0.15 + 0.05 * k
+        length = 0.22 + 0.1 * math.sin(k * 1.7) ** 2
+        part('icicle', cyl(0.045, 0.0, length, seg=6, rot=(math.pi, 0, 0), loc=(x, -0.17, -0.12 - length / 2)), P['ice'], head, smooth=False)
+    for k in range(5):  # a crown of ice spikes
+        a = math.pi * (0.15 + 0.7 * k / 4)
+        part('spike', cyl(0.05, 0.0, 0.2, seg=6, rot=(-0.2, (a - math.pi / 2) * 0.6, 0),
+                          loc=(0.2 * math.cos(a), 0.03, 0.2 + 0.05 * math.sin(a))), P['ice_dark'], head, smooth=False)
+    return root
+
+
+def build_surt(t):
+    """Surtr the Fire Giant: black basalt with glowing lava cracks, burning hair and a flaming sword raised high."""
+    root = empty('root')
+    p = 2 * math.pi * t
+    part('lavapool', cyl(0.65, 0.65, 0.02, seg=40), P['lava'], root, outline=False, emission=True)
+    part('crust', torus(0.55, 0.05, seg=40, ring=8, scale=(1, 1, 0.5), loc=(0, 0, 0.02)), P['basalt'], root)
+    body = empty('body', (0, 0, 0.012 * math.sin(p)), root)
+    rock, glow, hot = P['soot'], P['lava'], P['lava_hot']
+    part('torso', sphere(1, scale=(0.44, 0.3, 0.44), loc=(0, 0, 0.32)), rock, body)
+    for k, (x, z, rz) in enumerate(((-0.12, 0.45, 0.5), (0.1, 0.3, -0.4), (-0.05, 0.18, 0.2), (0.18, 0.52, 0.9))):
+        part('crack', box(scale=(0.18, 0.02, 0.025), rot=(0, rz, 0), loc=(x, -0.29, z)), hot if k % 2 else glow, body,
+             smooth=False, outline=False, emission=True)
+    for sx in (-1, 1):
+        part('shoulder', sphere(0.19, loc=(sx * 0.42, 0, 0.6)), P['basalt'], body)
+        part('spike', cyl(0.06, 0.0, 0.16, seg=6, rot=(0, sx * 0.5, 0), loc=(sx * 0.5, 0, 0.76)), rock, body, smooth=False)
+    # Left arm on the hip, right arm raising the burning sword.
+    armL = empty('armL', (-0.5, 0, 0.55), body)
+    armL.rotation_euler = (0, 0.5, 0)
+    part('upper', sphere(1, scale=(0.12, 0.12, 0.24), loc=(0, 0, -0.17)), rock, armL)
+    part('fist', sphere(0.13, loc=(0, 0, -0.4)), P['basalt'], armL)
+    armR = empty('armR', (0.5, 0, 0.6), body)
+    armR.rotation_euler = (0.1 * math.sin(p), -2.5, 0)
+    part('upper', sphere(1, scale=(0.12, 0.12, 0.24), loc=(0, 0, -0.17)), rock, armR)
+    part('fist', sphere(0.13, loc=(0, 0, -0.4)), P['basalt'], armR)
+    part('guard', box(scale=(0.28, 0.06, 0.05), loc=(0, 0, -0.5)), P['gold'], armR, smooth=False, bevel=0.01)
+    part('blade', box(scale=(0.09, 0.03, 0.75), loc=(0, 0, -0.9)), hot, armR, smooth=False, emission=True)
+    for k in range(5):
+        f = 0.5 + 0.5 * math.sin(p * 2 + k)
+        part('flame', cyl(0.07, 0.0, 0.18 + 0.08 * f, seg=8, rot=(0, 0.3 * math.sin(k), 0), loc=(0.07 * math.sin(k * 2.3), 0, -0.6 - 0.16 * k)),
+             glow, armR, smooth=False, outline=False, emission=True)
+    head = empty('head', (0, 0, 0.84), body)
+    head.rotation_euler = (0.04 * math.sin(p), 0, 0.05 * math.sin(p + 1))
+    part('skull', sphere(0.23, scale=(1, 0.95, 1.05)), P['basalt'], head)
+    part('jaw', sphere(1, scale=(0.18, 0.14, 0.1), loc=(0, -0.08, -0.15)), rock, head)
+    part('mouth', box(scale=(0.16, 0.02, 0.03), loc=(0, -0.21, -0.1)), hot, head, smooth=False, outline=False, emission=True)
+    for sx in (-1, 1):
+        part('eye', sphere(0.045, seg=12, rings=8, scale=(1.3, 1, 0.7), loc=(sx * 0.09, -0.2, 0.03)), hot, head, emission=True, outline=False)
+        part('horn', cyl(0.06, 0.0, 0.26, seg=8, rot=(0, sx * 0.7, 0), loc=(sx * 0.24, 0, 0.18)), P['ash'], head, smooth=False)
+    for k in range(6):  # hair of fire
+        f = 0.5 + 0.5 * math.sin(p * 2 + k * 1.3)
+        x = -0.15 + 0.06 * k
+        part('fire', cyl(0.07, 0.0, 0.2 + 0.1 * f, seg=8, rot=(0.2, 0.25 * (x / 0.15), 0), loc=(x, 0.06, 0.28)),
+             hot if k % 2 else glow, head, smooth=False, outline=False, emission=True)
+    return root
+
+
+BOSS_BUILDERS = {'serpent': build_serpent, 'ulvhild': build_ulvhild, 'ymer': build_ymer, 'surt': build_surt}
+# Camera target height and ortho scale per boss (the serpent and Surt's sword are tall).
+BOSS_CAMERA = {'serpent': (0, 0.55, 2.0), 'ulvhild': (0, 0.72, 1.85), 'ymer': (0, 0.6, 1.9), 'surt': (0.15, 0.75, 2.5)}
+BOSS_PORTRAIT = {'serpent': (0, 1.05, 0.75), 'ulvhild': (0, 1.2, 0.85), 'ymer': (0, 1.0, 0.95), 'surt': (0, 0.95, 0.95)}
+BOSS_FRAME, BOSS_FRAMES = 240, 4
+
+
+def render_boss(key, manifest):
+    frames = []
+    for f in range(BOSS_FRAMES):
+        reset_scene()
+        OUTLINE_W[0] = 0.014
+        BOSS_BUILDERS[key](f / BOSS_FRAMES)
+        x, z, ortho = BOSS_CAMERA[key]
+        camera((x, 0, z), ortho, (BOSS_FRAME, BOSS_FRAME), elev=14)
+        path = os.path.join(TMP, 'bosses', f'{key}_{f:02d}.png')
+        render_to(path)
+        frames.append(path)
+    rel = f'assets/bosses/{key}.webp'
+    pack(frames, BOSS_FRAME, BOSS_FRAME, BOSS_FRAMES, os.path.join(PUBLIC, rel))
+    # Portrait: the head, nearly frontal.
+    reset_scene()
+    OUTLINE_W[0] = 0.012
+    BOSS_BUILDERS[key](0)
+    x, z, ortho = BOSS_PORTRAIT[key]
+    camera((x, 0, z), ortho, (160, 160), elev=6)
+    tmp = os.path.join(TMP, 'bosses', f'{key}_portrait.png')
+    render_to(tmp)
+    prel = f'assets/bosses/{key}-portrait.webp'
+    pack([tmp], 160, 160, 1, os.path.join(PUBLIC, prel))
+    manifest.setdefault('bosses', {})[key] = {
+        'sheet': rel, 'portrait': prel, 'frameWidth': BOSS_FRAME, 'frameHeight': BOSS_FRAME,
+        'anims': {'idle': {'start': 0, 'end': BOSS_FRAMES - 1, 'fps': 4}},
+    }
 
 
 # ---------------------------------------------------------------- longship (ui-settings.md §4)
@@ -1207,7 +1401,7 @@ def write_manifest(manifest):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'boats', 'island', 'island-snow', 'island-lava', 'raven'}
+    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'boats', 'island', 'island-snow', 'island-lava', 'raven', 'bosses'}
     if 'harald' in want:
         want |= {'harald-red', 'harald-blue', 'harald-yellow'}
     manifest = {'vikings': {}, 'loot': None, 'ship': None, 'island': None}
@@ -1239,6 +1433,10 @@ def main():
     if 'raven' in want:
         render_raven(manifest)
         print('[viking-loot] rendered raven')
+    for key in BOSS_BUILDERS:
+        if key in want or 'bosses' in want:
+            render_boss(key, manifest)
+            print(f'[viking-loot] rendered boss {key}')
     if 'icons' in want and argv:  # only on request: icons are not part of the game manifest
         render_icons()
         print('[viking-loot] rendered icons')

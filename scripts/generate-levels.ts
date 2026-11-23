@@ -26,14 +26,24 @@ const SPECS: Spec[] = [
   { label: '47', heights: [4, 5, 4, 5], kegs: 1, stones: 1, ice: 1, cages: 1, houses: 1, tides: 1, min: 0.12, max: 0.28, seed: 47, tries: 60000 },
   { label: '48', heights: [5, 4, 4, 5], kegs: 1, stones: 2, tides: 1, cages: 1, raven: 4, jarls: 1, houses: 1, hidden: true, scouts: 1, min: 0.05, max: 0.2, seed: 48, tries: 80000 },
 ]
+// The four boss raids (0.5 phase 4), one per world, using only that world's mechanics plus a twist.
+// Run with `npm run generate-levels -- --bosses [label ...]`.
+const BOSS_SPECS: Spec[] = [
+  { label: 'serpent', heights: [4, 4, 4, 4], mainSlots: 2, houses: 1, stones: 1, min: 0.15, max: 0.35, seed: 101, tries: 40000 },
+  { label: 'ulvhild', heights: [4, 4, 5, 4], onlySpecial: true, hidden: true, stones: 1, min: 0.1, max: 0.3, seed: 102, tries: 40000 },
+  { label: 'ymer', heights: [4, 5, 4, 5], ice: 9, keys: 1, colourShip: 2, min: 0.08, max: 0.25, seed: 103, tries: 60000 },
+  { label: 'surt', heights: [5, 4, 4, 5], kegs: 2, stones: 2, tides: 1, cages: 1, raven: 4, min: 0.05, max: 0.2, seed: 104, tries: 80000 },
+]
 const DEFAULT_TRIES = 20000
 const KEEP = 6 // candidates collected per spec
 const fmtQueue = (q: QueueEntry[]) => q.map(e =>
   typeof e === 'string' ? e[0].toUpperCase()
     : e.kind === 'jarl' ? `jarl(${e.color[0].toUpperCase()})` : e.kind === 'wild' ? 'WILD' : 'SCOUT').join(', ')
 
-const wanted = process.argv.slice(2)
-for (const spec of SPECS.filter(s => !wanted.length || wanted.includes(s.label))) {
+const args = process.argv.slice(2)
+const bosses = args.includes('--bosses')
+const wanted = args.filter(a => a !== '--bosses')
+for (const spec of (bosses ? BOSS_SPECS : SPECS).filter(s => !wanted.length || wanted.includes(s.label))) {
   const rand = rng(spec.seed)
   const found: Found[] = []
   const tries = spec.tries ?? DEFAULT_TRIES

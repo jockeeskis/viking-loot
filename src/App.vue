@@ -5,7 +5,10 @@ import { RaidScene, type RaidUpdate } from './game/RaidScene'
 import { levels, worlds, type Level } from './game/levels'
 import { WAITING_SLOTS } from './game/engine'
 import { isMuted, setMuted, unlockAudio, isMusicOn, setMusicOn } from './game/sfx'
-import { loadProgress, saveProgress, recordWin, starsFor } from './game/progress'
+import { loadProgress, saveProgress, recordWin, recordBossWin, bossUnlocked, seeStory, starsFor } from './game/progress'
+import { bosses, bossOf } from './game/bosses'
+import { STORY, storyCard, worldStory, bossStory, type StoryId } from './game/story'
+import StoryCard from './components/StoryCard.vue'
 import { INTROS, mechanicsOf, type Mechanic } from './game/intros'
 import {
   dateKey, tierFor, type Tier, loadModes, saveModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound,
@@ -19,7 +22,7 @@ import { shipSheet } from './game/assets'
 import LevelMap from './components/LevelMap.vue'
 import SettingsPanel from './components/Settings.vue'
 import {
-  t as tt, tn as ttn, tr as ttr, getLang, setLang, detectLang, levelName, levelHint, worldName, dayLabel,
+  t as tt, tn as ttn, tr as ttr, getLang, setLang, detectLang, levelName, levelHint, worldName, dayLabel, bossName, bossHint,
 } from './game/i18n'
 import { loadSettings, saveSettings, type Lang } from './game/settings'
 import { setVibration, haptics } from './game/haptics'
@@ -59,6 +62,7 @@ const tr = (sv: string, enKey: string, params?: Record<string, string | number>)
 const dayLbl = (d: string) => { void lang.value; return dayLabel(d) }
 const lvlName = (i: number) => { void lang.value; return levelName(i) }
 const wName = (i: number) => { void lang.value; return worldName(i) }
+const bName = (w: number) => { void lang.value; return bossName(w) }
 const showSettings = ref(false)
 function changeSetting(key: 'vibration' | 'colorMarks', on: boolean) {
   settings.value = { ...settings.value, [key]: on }
@@ -91,8 +95,9 @@ if (!savedMeta.migrated) {
 const tier = computed(() => tierFor(worlds.map(w => (progress.value.stars[w.last] ?? 0) > 0)))
 
 // ---------- what is being played ----------
-type Mode = 'campaign' | 'daily' | 'endless'
+type Mode = 'campaign' | 'daily' | 'endless' | 'boss'
 const mode = ref<Mode>('campaign')
+const bossWorld = ref(0) // the boss being fought (mode 'boss')
 const active = shallowRef<Level>(levels[current.value])
 const today = ref(dateKey(new Date()))
 const playingDay = ref('') // the day of the Dagens räd being played
@@ -111,6 +116,7 @@ const lastStars = ref(0)
 const dailyCounted = ref(true) // false when today's raid was already won before (replay)
 const lossText = computed(() => t(info.value.lossReason === 'slots-full' ? 'loss.full' : 'loss.stuck'))
 const par = computed(() => active.value.par)
+const mainSlots = computed(() => active.value.ships?.[0]?.slots ?? WAITING_SLOTS)
 const waitsText = (n: number) => tn('waits', n)
 const roundsText = (n: number) => tn('rounds', n)
 const isEndless = computed(() => mode.value === 'endless')
@@ -129,8 +135,18 @@ function update(d: RaidUpdate) {
     lastStars.value = starsFor(d.waits, active.value.par)
     const shipsBefore = unlockedShips(progress.value)
     if (mode.value === 'campaign') {
+      const openBefore = bosses.filter(b => bossUnlocked(progress.value, worlds[b.world].last)).length
       progress.value = recordWin(progress.value, current.value, lastStars.value, levels.length)
       saveProgress(progress.value)
+      const boss = bosses.find(b => worlds[b.world].last === current.value)
+      if (boss && bosses.filter(b => bossUnlocked(progress.value, worlds[b.world].last)).length > openBefore) {
+        toast(boss.icon, t('toast.boss', { name: bName(boss.world) }), t('toast.bossText'))
+      }
+    } else if (mode.value === 'boss') {
+      progress.value = recordBossWin(progress.value, bossWorld.value, lastStars.value)
+      saveProgress(progress.value)
+      queueStory(bossStory(bossWorld.value, 'after'))
+      if (bosses.every(b => (progress.value.bossStars[b.world] ?? 0) > 0)) queueStory('finale')
     } else if (mode.value === 'daily') {
       dailyCounted.value = !modes.value.daily.results[playingDay.value]
       modes.value = recordDailyWin(modes.value, playingDay.value, lastStars.value)
@@ -154,6 +170,26 @@ function update(d: RaidUpdate) {
   if (justLost && mode.value === 'endless') endless.value = { ...endless.value, over: true }
 }
 
+// ---------- the story (0.5) ----------
+// Cards wait in a queue; each is shown once (re-reading from Krönikan is always allowed).
+const storyQueue = ref<StoryId[]>([])
+const story = computed(() => storyCard(storyQueue.value[0] ?? '') ?? null)
+function queueStory(id: StoryId | null, again = false) {
+  if (!id || storyQueue.value.includes(id) || (!again && progress.value.seenStory.includes(id))) return
+  storyQueue.value = [...storyQueue.value, id]
+}
+function closeStory() {
+  const id = storyQueue.value[0]
+  if (!id) return
+  storyQueue.value = storyQueue.value.slice(1)
+  progress.value = seeStory(progress.value, id)
+  saveProgress(progress.value)
+  if (!storyQueue.value.length) scene?.bossEntrance()
+}
+const showChronicle = ref(false)
+const chronicle = computed(() => STORY.filter(c => progress.value.seenStory.includes(c.id)))
+function readAgain(id: StoryId) { showChronicle.value = false; queueStory(id, true) }
+
 // ---------- introductions for new mechanics ----------
 const intro = ref<Mechanic | null>(null)
 function maybeIntro() {
@@ -174,7 +210,7 @@ function show(level: Level, title: string, key: string) {
   hintFor = key
   hintsLeft.value = hintsUsed.has(key) ? 0 : HINTS_PER_LEVEL
   info.value = { ...info.value, status: 'playing', busy: false }
-  scene?.play(level, title)
+  scene?.play(level, title, mode.value === 'boss' ? bossOf(bossWorld.value)?.id : undefined)
   maybeIntro()
   document.querySelector('.game-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
@@ -186,7 +222,28 @@ function openLevel(i: number) {
   mode.value = 'campaign'
   current.value = i
   show(levels[i], currentTitle(), `c${i}`)
+  const w = worlds.findIndex(x => x.first === i)
+  if (w >= 0) queueStory(worldStory(w))
 }
+
+function openBoss(w: number) {
+  const boss = bossOf(w)
+  if (!boss || !bossUnlocked(progress.value, worlds[w].last)) return
+  ticket++
+  generating.value = false
+  mode.value = 'boss'
+  bossWorld.value = w
+  show(boss.level, currentTitle(), `b${w}`)
+  queueStory(bossStory(w, 'before'))
+  if (!story.value) scene?.bossEntrance()
+}
+/** After winning a world's last level, the result offers its boss. */
+const nextBoss = computed(() => {
+  if (mode.value !== 'campaign') return null
+  const b = bosses.find(x => worlds[x.world].last === current.value)
+  return b && bossUnlocked(progress.value, worlds[b.world].last) ? b : null
+})
+function toMap() { document.querySelector('.map-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
 
 /** Today's level is kept for the day, so it is only generated once. */
 const DAILY_CACHE = 'viking-loot-0.4-daily-cache'
@@ -265,12 +322,14 @@ function showHint() {
 function currentTitle(): string {
   if (mode.value === 'daily') return t('daily.name', { day: dayLabel(playingDay.value) })
   if (mode.value === 'endless') return t('endless.name', { n: endless.value.round })
+  if (mode.value === 'boss') return t('boss.title', { name: bossName(bossWorld.value) })
   return `${current.value + 1}. ${levelName(current.value)}`
 }
 const activeHint = computed(() => {
   void lang.value
   if (mode.value === 'daily') return t('daily.hint')
   if (mode.value === 'endless') return t('endless.hint')
+  if (mode.value === 'boss') return bossHint(bossWorld.value)
   return levelHint(current.value)
 })
 function next() { if (current.value < levels.length - 1) openLevel(current.value + 1) }
@@ -311,6 +370,10 @@ const shipName = (id: ShipId) => tr(SHIPS.find(x => x.id === id)!.name, `ship.${
 const introText = (m: Mechanic) => ({
   icon: INTROS[m].icon, title: tr(INTROS[m].title, `intro.${m}.title`), text: tr(INTROS[m].text, `intro.${m}.text`),
 })
+const bossCards = computed(() => bosses.map(b => ({
+  world: b.world, icon: b.icon, name: bName(b.world), stars: progress.value.bossStars[b.world] ?? 0,
+  open: bossUnlocked(progress.value, worlds[b.world].last), current: mode.value === 'boss' && bossWorld.value === b.world,
+})))
 const earnedCount = computed(() => achievementView.value.filter(a => a.earned).length)
 const stars = computed(() => totalStars(progress.value))
 function chooseShip(id: ShipId) {
@@ -331,7 +394,7 @@ const statRows = computed(() => {
     ['✨', t('stat.perfect'), s.perfectRaids],
     ['🗝️', t('stat.chests'), s.chestsOpened],
     ['💥', t('stat.kegs'), s.kegsBlown],
-    ['⭐', t('stat.stars'), `${stars.value}/${levels.length * 3}`],
+    ['⭐', t('stat.stars'), `${stars.value}/${(levels.length + bosses.length) * 3}`],
     ['📅', t('stat.daily'), s.dailyWins],
     ['🔥', t('stat.streak'), `${streak.value} (${modes.value.daily.bestStreak})`],
     ['♾️', t('stat.endless'), roundsText(modes.value.endless.best)],
@@ -364,6 +427,7 @@ onMounted(() => {
     scene?.setColorMarks(settings.value.colorMarks)
     scene?.play(levels[current.value], currentTitle())
   })
+  queueStory('start')
   maybeIntro()
 })
 onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisible); game?.destroy(true) })
@@ -383,7 +447,7 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
     <div class="stats">
       <span>🪙 {{ t('stats.left') }}: <strong>{{ info.remaining }}</strong></span>
       <span>🛡️ {{ t('stats.queue') }}: <strong>{{ info.queue }}</strong></span>
-      <span :class="{ risk: info.waiting >= WAITING_SLOTS - 1 }">⛵ {{ t('stats.waiting') }}: <strong>{{ info.waiting }}/{{ WAITING_SLOTS }}</strong></span>
+      <span :class="{ risk: info.waiting >= mainSlots - 1 }">⛵ {{ t('stats.waiting') }}: <strong>{{ info.waiting }}/{{ mainSlots }}</strong></span>
       <span :title="t('stats.parTitle')">⭐ <strong>{{ info.waits }}</strong>/{{ par }}</span>
     </div>
     <p class="hint">💡 {{ hintMsg || activeHint }}</p>
@@ -415,7 +479,7 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
         </div>
         <!-- Campaign and the daily raid -->
         <div v-else class="result">
-          <h2>{{ won ? t('result.win') : t('result.lose') }}</h2>
+          <h2>{{ won ? (mode === 'boss' ? t('boss.won', { name: bName(bossWorld) }) : t('result.win')) : t('result.lose') }}</h2>
           <div v-if="won" class="result-stars" :aria-label="t('stars.aria', { n: lastStars })">
             <i v-for="s in 3" :key="s" :class="{ on: s <= lastStars }" :style="{ animationDelay: `${s * 0.18}s` }">★</i>
           </div>
@@ -427,20 +491,33 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
               <br /><strong v-if="dailyCounted">{{ t('result.dailyDone', { days: tn('days', streak) }) }}</strong>
               <small v-else>{{ t('result.dailyReplay') }}</small>
             </template>
-            <template v-else-if="current === levels.length - 1"><br /><strong>{{ t('result.allDone', { n: levels.length }) }}</strong></template>
+            <template v-else-if="mode === 'campaign' && current === levels.length - 1"><br /><strong>{{ t('result.allDone', { n: levels.length }) }}</strong></template>
           </p>
           <p v-else>{{ lossText }}</p>
+          <button v-if="won && nextBoss" @click="openBoss(nextBoss.world)">{{ t('result.boss', { name: bName(nextBoss.world) }) }}</button>
           <button v-if="won && mode === 'campaign' && current < levels.length - 1" @click="next">{{ t('result.next') }}</button>
+          <button v-if="won && mode === 'boss'" @click="toMap">{{ t('result.map') }}</button>
           <button v-if="lost && info.canUndo" @click="undo">{{ t('actions.undo') }}</button>
           <button @click="restart">{{ won ? t('result.again') : t('result.retry') }}</button>
         </div>
       </div>
-      <div v-if="intro && !generating" class="overlay">
+      <div v-if="intro && !generating && !story" class="overlay">
         <div class="result intro">
           <div class="intro-icon">{{ introText(intro).icon }}</div>
           <h2>{{ introText(intro).title }}</h2>
           <p>{{ introText(intro).text }}</p>
           <button @click="closeIntro">{{ t('intro.ok') }}</button>
+        </div>
+      </div>
+      <StoryCard v-if="story" :key="story.id" :card="story" :lang="lang" :t="t" @close="closeStory" />
+      <div v-if="showChronicle" class="overlay" @click.self="showChronicle = false">
+        <div class="result chronicle">
+          <h2>{{ t('chronicle.title') }}</h2>
+          <p><small>{{ chronicle.length ? t('chronicle.text') : t('chronicle.empty') }}</small></p>
+          <ul>
+            <li v-for="c in chronicle" :key="c.id"><button @click="readAgain(c.id)">{{ c.icon }} {{ c.title[lang] }}</button></li>
+          </ul>
+          <button class="close-btn" @click="showChronicle = false">{{ t('story.close') }}</button>
         </div>
       </div>
       <SettingsPanel
@@ -476,11 +553,12 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
         </span>
       </button>
     </div>
-    <h2 class="section-title">{{ t('section.map') }}</h2>
+    <h2 class="section-title map-title">{{ t('section.map') }} <button class="chronicle-btn" @click="showChronicle = true">{{ t('map.chronicle') }}</button></h2>
     <LevelMap
       :worlds="worlds.map((w, i) => ({ ...w, name: wName(i) }))"
       :names="levels.map((_, i) => lvlName(i))" :stars="progress.stars" :unlocked="unlocked"
-      :current="mode === 'campaign' ? current : -1" :t="t" @select="openLevel"
+      :current="mode === 'campaign' ? current : -1" :t="t"
+      :bosses="bossCards" @select="openLevel" @boss="openBoss"
     />
     <h2 class="section-title">{{ t('section.shipyard') }} <small>★ {{ stars }}</small></h2>
     <div class="shipyard">

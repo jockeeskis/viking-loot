@@ -11,7 +11,7 @@ import {
 } from './art'
 import {
   preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, hasBoats, lootAsset, shipAsset,
-  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, shipKey, shipAnimKey, hasRaven, RAVEN_KEY, ravenAsset, type IslandStyle,
+  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, shipKey, shipAnimKey, ensureBoss, bossKey, bossAsset, hasRaven, RAVEN_KEY, ravenAsset, type IslandStyle,
   type VikingAnim, type VikingAsset,
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, explosion, wave, CAMERA_ZOOM } from './fx'
@@ -54,6 +54,9 @@ const PREVIEW_MAX = 6
 const CARD = { y: 584, w: 108, h: 100 }
 const cardX = (i: number) => 62 + i * 118
 const ROW_H = 80 // vertical distance between loot rows
+// Bosses (0.5): a small figure right of the title, and big over the island when the raid starts or ends.
+const BOSS_HOME = { x: 332, y: 30, size: 62 }
+const BOSS_BIG = { x: 180, y: 220, size: 220 }
 // Display scales for the rendered sprites (frame sizes come from the manifest).
 // On-screen widths in logical px; the scale follows from the rendered frame size.
 const VIKING_W = 92
@@ -87,7 +90,14 @@ export class RaidScene extends Phaser.Scene {
   private level = 0 // campaign index, only used before create() has run
   private levelData!: Level
   private titleText = ''
-  private pending?: { data: Level; title: string } // a level asked for before the assets were loaded
+  private pending?: { data: Level; title: string; boss?: string } // a level asked for before the assets were loaded
+  // Boss raids (0.5): the boss in the sea at the top right and a bar for how much of its hoard is left.
+  private bossId?: string
+  private bossSprite?: Phaser.GameObjects.Sprite | Phaser.GameObjects.Text
+  private bossBar?: Phaser.GameObjects.Graphics
+  private bossLeft = 0
+  private bossTotal = 0
+  private entrance: 'none' | 'waiting' | 'wanted' = 'none' // the boss's entrance waits for the story card
   private busy = false
   private generation = 0
   private lootSprites = new Map<string, Sprite>()
@@ -127,7 +137,7 @@ export class RaidScene extends Phaser.Scene {
     this.drawEnvironment()
     this.ready = true
     if (this.shipId !== 'ormen') this.setShip(this.shipId)
-    if (this.pending) { const p = this.pending; this.pending = undefined; this.play(p.data, p.title) } else this.reset(this.level)
+    if (this.pending) { const p = this.pending; this.pending = undefined; this.play(p.data, p.title, p.boss) } else this.reset(this.level)
   }
 
   setUpdate(fn: (u: RaidUpdate) => void) { this.onUpdate = fn }
@@ -187,10 +197,11 @@ export class RaidScene extends Phaser.Scene {
   }
 
   /** Start any level: a campaign level, Dagens räd or a round of the endless raid. */
-  play(data: Level, title: string) {
+  play(data: Level, title: string, boss?: string) {
     // Before create() has run (assets still loading) just remember the level; create() will draw it.
-    if (!this.ready) { this.pending = { data, title }; return }
+    if (!this.ready) { this.pending = { data, title, boss }; return }
     this.levelData = data
+    this.bossId = boss
     this.titleText = title
     this.history = []
     this.title?.setText(title)
@@ -205,7 +216,7 @@ export class RaidScene extends Phaser.Scene {
 
   /** Play the current level again from the start. */
   restart() {
-    if (this.ready && this.levelData) this.play(this.levelData, this.titleText)
+    if (this.ready && this.levelData) { this.play(this.levelData, this.titleText, this.bossId); this.bossEntrance() }
   }
 
   /** Draw any state of the current level from scratch, without animation (restart and undo). */
@@ -222,7 +233,111 @@ export class RaidScene extends Phaser.Scene {
     this.drawLootSprites()
     this.drawBoat()
     this.layout(false)
+    this.placeBoss(state)
     this.notify()
+  }
+
+  // ---------- Bosses (0.5) ----------
+
+  /** Put the boss (if any) in the sea at the top right, bobbing, with its hoard bar under the title. */
+  private placeBoss(state: GameState) {
+    this.bossSprite?.destroy(); this.bossSprite = undefined
+    this.bossBar?.destroy(); this.bossBar = undefined
+    const id = this.bossId
+    // The raven's countdown moves to the left side so the boss has the corner.
+    this.ravenText?.setPosition(id ? 38 : 322, id && state.tides.length ? 54 : 26)
+    if (!id) return
+    this.bossTotal = state.loot.filter(l => l.kind === 'loot').length
+    this.bossLeft = state.loot.filter(l => l.kind === 'loot' && !l.collected).length
+    this.bossBar = this.add.graphics().setDepth(41)
+    this.drawBossBar()
+    const fresh = state.moves === 0
+    const gen = this.generation
+    const show = () => {
+      if (this.bossId !== id || this.bossSprite || gen !== this.generation) return
+      const a = bossAsset(id)
+      const key = bossKey(id)
+      const sprite = a && this.textures.exists(key)
+        ? this.add.sprite(BOSS_HOME.x, BOSS_HOME.y, key).play(`${key}-idle`)
+        : this.add.text(BOSS_HOME.x, BOSS_HOME.y, '👹', { fontSize: '52px' }).setOrigin(0.5)
+      const base = a ? 1 / a.frameWidth : 1 / 60
+      sprite.setData('small', BOSS_HOME.size * base).setData('big', BOSS_BIG.size * base)
+      sprite.setDepth(41).setScale(BOSS_HOME.size * base)
+      this.bossSprite = sprite
+      if (!fresh) { this.bobBoss(); return }
+      sprite.setAlpha(0)
+      if (this.entrance === 'wanted') { this.entrance = 'none'; void this.bossIntro(sprite) }
+    }
+    this.entrance = fresh ? 'waiting' : 'none'
+    ensureBoss(this, id, show)
+  }
+
+  /** Let the boss make its entrance (the app calls this once any story card is closed). */
+  bossEntrance() {
+    if (this.entrance === 'none') return
+    if (this.bossSprite) { this.entrance = 'none'; void this.bossIntro(this.bossSprite) } else this.entrance = 'wanted'
+  }
+
+  /** The boss rises big over the island with a roar, then shrinks to its corner by the title. */
+  private async bossIntro(b: Phaser.GameObjects.Sprite | Phaser.GameObjects.Text) {
+    const gen = this.generation
+    b.setDepth(45).setPosition(BOSS_BIG.x, BOSS_BIG.y + 50).setScale(b.getData('big')).setAlpha(0)
+    sfx.bossRoar()
+    await this.tween({ targets: b, y: BOSS_BIG.y, alpha: 1, duration: 550, ease: 'Back.easeOut' })
+    await this.tween({ targets: b, scale: b.getData('big') * 1.08, duration: 220, yoyo: true, ease: 'Sine.easeInOut' })
+    await this.delay(350)
+    if (gen !== this.generation) return
+    await this.tween({ targets: b, x: BOSS_HOME.x, y: BOSS_HOME.y, scale: b.getData('small'), duration: 480, ease: 'Sine.easeInOut' })
+    if (gen !== this.generation) return
+    b.setDepth(41)
+    this.bobBoss()
+  }
+
+  private bobBoss() {
+    if (!this.bossSprite) return
+    this.tweens.add({ targets: this.bossSprite, y: BOSS_HOME.y + 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+  }
+
+  private drawBossBar() {
+    const g = this.bossBar
+    if (!g) return
+    const x = 120, y = 46, w = 120, h = 9
+    const share = this.bossTotal ? this.bossLeft / this.bossTotal : 0
+    g.clear()
+    g.fillStyle(0x2a190c, 0.9); g.fillRoundedRect(x - 2, y - 2, w + 4, h + 4, 6)
+    if (share > 0) { g.fillStyle(0xe0392b); g.fillRoundedRect(x, y, Math.max(h, w * share), h, 4) }
+    g.lineStyle(2, 0xffd45a, 0.9); g.strokeRoundedRect(x - 2, y - 2, w + 4, h + 4, 6)
+  }
+
+  /** A piece of the boss's hoard is taken: the bar shrinks and the boss flinches. */
+  private bossHit() {
+    if (!this.bossId) return
+    this.bossLeft = Math.max(0, this.bossLeft - 1)
+    this.drawBossBar()
+    const b = this.bossSprite
+    if (!b) return
+    sfx.bossHit()
+    if (b instanceof Phaser.GameObjects.Sprite) { b.setTint(0xff8a80); this.time.delayedCall(140, () => b.clearTint()) }
+    this.tweens.add({ targets: b, angle: { from: -6, to: 6 }, duration: 70, yoyo: true, repeat: 1, onComplete: () => b.setAngle(0) })
+  }
+
+  /** The end of a boss raid: the boss sinks (won) or rises up and roars (lost). */
+  private async bossEnd(won: boolean) {
+    const b = this.bossSprite
+    if (!this.bossId || !b) return
+    this.tweens.killTweensOf(b)
+    b.setDepth(45).setAngle(0)
+    await this.tween({ targets: b, x: BOSS_BIG.x, y: BOSS_BIG.y, scale: b.getData('big'), duration: 420, ease: 'Sine.easeOut' })
+    if (won) {
+      // Beaten: it sinks into the sea.
+      sfx.bossDefeat()
+      wave(this, b.x, b.y + 20, b.y + 90)
+      await this.tween({ targets: b, y: b.y + 90, alpha: 0, angle: 10, duration: 1000, ease: 'Sine.easeIn' })
+    } else {
+      // The raid is lost: it laughs and roars, and stays.
+      sfx.bossRoar()
+      await this.tween({ targets: b, scale: b.getData('big') * 1.15, duration: 260, yoyo: true, repeat: 1, ease: 'Sine.easeOut' })
+    }
   }
 
   /** Take back the latest move (one step only). Allowed after a loss too, but not while a move is animating. */
@@ -825,9 +940,11 @@ export class RaidScene extends Phaser.Scene {
     this.playEvents(before, after.events, gen).then(async () => {
       if (gen !== this.generation) return
       if (after.status === 'won') {
+        void this.bossEnd(true)
         victory(this); sfx.win(); haptics.win(); this.celebrate()
         await this.delay(1100)
       } else if (after.status === 'lost') {
+        void this.bossEnd(false)
         sfx.lose(); haptics.lose()
         this.actors.forEach(a => this.animate(a, 'fail'))
         await this.delay(900)
@@ -1073,6 +1190,7 @@ export class RaidScene extends Phaser.Scene {
         if (rig.getByName('body')) await this.animate(actor, 'attack')
         else await this.tween({ targets: rig, angle: 20, duration: 90, yoyo: true })
         this.animate(actor, 'idle')
+        if (e.type === 'collect') this.bossHit()
         if (e.type === 'hit') {
           // The house is broken open but still standing; the next hit takes the loot.
           const left = view.loot.find(l => l.id === e.lootId)!.hitsLeft - 1

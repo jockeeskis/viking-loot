@@ -6,6 +6,9 @@ import { levels, worlds } from './levels.ts'
 import { INTROS } from './intros.ts'
 import { ACHIEVEMENTS, SHIPS } from './achievements.ts'
 import { parseSettings, defaultSettings } from './settings.ts'
+import { STORY } from './story.ts'
+import { bosses } from './bosses.ts'
+import { BOSS_EN } from './levelTexts.ts'
 
 test('Swedish and English have the same UI texts, none empty', () => {
   assert.deepEqual(Object.keys(EN).sort(), Object.keys(SV).sort())
@@ -22,6 +25,18 @@ test('every level, intro, achievement and ship has an English text', () => {
   for (const m of Object.keys(INTROS)) for (const f of ['title', 'text']) assert.ok(DATA_EN[`intro.${m}.${f}`], `intro ${m} ${f}`)
   for (const a of ACHIEVEMENTS) for (const f of ['title', 'text']) assert.ok(DATA_EN[`ach.${a.id}.${f}`], `achievement ${a.id} ${f}`)
   for (const s of SHIPS) for (const f of ['name', 'text']) assert.ok(DATA_EN[`ship.${s.id}.${f}`], `ship ${s.id} ${f}`)
+  assert.equal(BOSS_EN.length, bosses.length)
+  for (const b of BOSS_EN) assert.ok(b.name && b.hint)
+})
+
+test('every story card has both languages on every page', () => {
+  assert.equal(new Set(STORY.map(c => c.id)).size, STORY.length)
+  for (const c of STORY) {
+    assert.ok(c.title.sv && c.title.en, c.id)
+    assert.ok(c.pages.length >= 1 && c.pages.length <= 4, `${c.id} has 1–4 pages`)
+    for (const p of c.pages) assert.ok(p.sv.trim() && p.en.trim(), c.id)
+  }
+  for (const b of bosses) for (const when of ['before', 'after']) assert.ok(STORY.some(c => c.id === `boss-${b.world}-${when}`), `boss ${b.id} ${when}`)
 })
 
 test('texts follow the chosen language and fill in their parameters', () => {

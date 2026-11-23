@@ -249,6 +249,21 @@ export const sfx = {
     tone(620, 0.16, { type: 'sawtooth', vol: 0.06, slide: 380, lowpass: 1800 })
     tone(560, 0.2, { type: 'sawtooth', vol: 0.06, slide: 320, lowpass: 1800, at: 0.22 })
   },
+  /** A boss roars (when a raid starts and when it is lost). */
+  bossRoar() {
+    tone(110, 0.7, { type: 'sawtooth', vol: 0.12, slide: 70, lowpass: 700, attack: 0.08 })
+    tone(165, 0.6, { type: 'sawtooth', vol: 0.06, slide: 90, lowpass: 900, attack: 0.08, at: 0.05 })
+    noise(0.5, 300, 0.25, 0.05)
+  },
+  /** The boss flinches as its loot is taken. */
+  bossHit() {
+    tone(220, 0.14, { type: 'square', vol: 0.05, slide: 140, lowpass: 1200 })
+  },
+  /** The boss is beaten and sinks into the sea. */
+  bossDefeat() {
+    tone(196, 0.9, { type: 'sawtooth', vol: 0.09, slide: 55, lowpass: 800 })
+    noise(0.9, 500, 0.35, 0.3)
+  },
   /** The scout looks over the island. */
   scout() {
     tone(659, 0.25, { type: 'triangle', vol: 0.08 })

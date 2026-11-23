@@ -3,6 +3,7 @@
 import { computed } from 'vue'
 
 type World = { name: string; first: number; last: number }
+type BossCard = { world: number; icon: string; name: string; stars: number; open: boolean; current: boolean }
 const props = defineProps<{
   worlds: World[]
   names: string[] // level names (only levels that exist)
@@ -10,8 +11,9 @@ const props = defineProps<{
   unlocked: number
   current: number
   t: (key: string, params?: Record<string, string | number>) => string
+  bosses?: BossCard[]
 }>()
-const emit = defineEmits<{ select: [index: number] }>()
+const emit = defineEmits<{ select: [index: number]; boss: [world: number] }>()
 
 const COLS = 4
 
@@ -25,10 +27,12 @@ const view = computed(() => props.worlds.map(w => {
     const col = row % 2 === 0 ? k % COLS : COLS - 1 - (k % COLS)
     return { index, row, col }
   })
+  const world = props.worlds.indexOf(w)
   const path = nodes.map(n => `${n.col + 0.5},${n.row + 0.42}`).join(' ')
   const earned = indices.reduce((sum, i) => sum + (props.stars[i] ?? 0), 0)
   const status = !indices.length ? 'soon' : w.first > props.unlocked ? 'locked' : 'open'
-  return { ...w, nodes, rows, path, earned, max: indices.length * 3, status }
+    const boss = props.bosses?.find(b => b.world === world)
+  return { ...w, nodes, rows, path, earned: earned + (boss?.stars ?? 0), max: (indices.length + (boss ? 1 : 0)) * 3, status, boss }
 }))
 </script>
 
@@ -58,6 +62,19 @@ const view = computed(() => props.worlds.map(w => {
         </span>
       </button>
     </div>
+    <button
+      v-if="w.boss && w.status === 'open'" class="boss-node" :class="{ locked: !w.boss.open, current: w.boss.current, done: w.boss.stars > 0 }"
+      :disabled="!w.boss.open" @click="emit('boss', w.boss.world)"
+    >
+      <span class="boss-icon">{{ w.boss.open ? w.boss.icon : '🔒' }}</span>
+      <span class="boss-text">
+        <strong>{{ t('map.boss', { name: w.boss.name }) }}</strong>
+        <small v-if="!w.boss.open">{{ t('map.bossLocked', { world: w.name }) }}</small>
+        <span v-else class="stars" :aria-label="t('stars.aria', { n: w.boss.stars })">
+          <i v-for="s in 3" :key="s" :class="{ on: s <= w.boss.stars }">★</i>
+        </span>
+      </span>
+    </button>
   </section>
 </template>
 
@@ -80,4 +97,13 @@ const view = computed(() => props.worlds.map(w => {
 .stars i{font-style:normal;font-size:13px;color:#00000055;text-shadow:0 1px 0 #ffffff22}
 .stars i.on{color:#ffd45a;text-shadow:0 1px 0 #b86b12,0 0 1px #3b2414}
 .node:disabled{opacity:1}
+.boss-node{display:flex;align-items:center;gap:12px;width:100%;margin-top:8px;padding:8px 12px;text-align:left;border-radius:16px;background:linear-gradient(#6b2a1c,#3f1810);border:3px solid #3b2414;box-shadow:inset 0 2px 0 #b5543a,0 4px 0 #2a120a}
+.boss-node.current{outline:3px solid #ffd45a;outline-offset:2px}
+.boss-node.locked{filter:grayscale(.7) brightness(.8);cursor:not-allowed}
+.boss-node:disabled{opacity:1}
+.boss-icon{display:grid;place-items:center;width:46px;height:46px;flex:none;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ff9d5c,#c2412b 70%);border:3px solid #3b2414;font-size:24px}
+.boss-text{display:flex;flex-direction:column;gap:2px;color:#fff}
+.boss-text strong{font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;font-size:14px;color:#ffd45a;text-shadow:0 2px 0 #3b2414}
+.boss-text small{color:#ffe3a8;font-size:12px}
+.boss-text .stars{margin-top:0}
 </style>

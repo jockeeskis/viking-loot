@@ -53,3 +53,11 @@ export const LEVEL_EN: { name: string; hint: string }[] = [
   { name: 'The Volcano', hint: 'Ice in the fire, a powder keg, a cage and the tide – all on one island.' },
   { name: 'Surtr\'s Forge', hint: 'The last raid: everything you have learned, in the fire giant\'s forge.' },
 ]
+
+/** English names and hints of the boss raids, by world (0.5). */
+export const BOSS_EN: { name: string; hint: string }[] = [
+  { name: 'The Sea Serpent', hint: 'The serpent has crushed one of the ship\'s seats – only two are left, and the second one sinks the raid.' },
+  { name: 'Jarl Ulvhild', hint: 'Ulvhild has lured away every ordinary viking. Only jarls and Ylva come along – and the loot is hidden.' },
+  { name: 'Ymer the Frost Giant', hint: 'The giant has frozen almost everything. The ice breaks in waves – count the moves and use the red ship.' },
+  { name: 'Surtr the Fire Giant', hint: 'Powder kegs, the tide, a prisoner and the raven every fourth move – Surtr\'s final trial.' },
+]

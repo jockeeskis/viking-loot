@@ -42,6 +42,10 @@ test('each achievement is unlocked by its own event', () => {
   const all = earned(ctx({ progress: progressWith(Array(levels.length).fill(3)) }))
   for (const id of ['kusten', 'fjordarna', 'isriket', 'muspelheim', 'gold-coast', 'all-gold']) assert.ok(all.includes(id), id)
   assert.ok(after(recordRaid(emptyStats(), win({ kegs: 25 }))).includes('kegs-25'))
+  const bossesWon = (b: number[]) => earned(ctx({ progress: { ...emptyProgress(), bossStars: b } }))
+  assert.ok(!bossesWon([1, 1, 1]).includes('boss-hunter'))
+  assert.ok(bossesWon([1, 1, 1, 1]).includes('boss-hunter') && !bossesWon([1, 1, 1, 1]).includes('ragnarok'))
+  assert.ok(bossesWon([3, 3, 3, 3]).includes('ragnarok'))
 
   let m = emptyModes()
   for (let d = 1; d <= 7; d++) m = recordDailyWin(m, `2026-12-0${d}`, 2)
@@ -72,6 +76,7 @@ test('ships unlock with total stars', () => {
   assert.deepEqual(unlockedShips(progressWith(Array(10).fill(3))), ['ormen', 'havsorn'])
   assert.deepEqual(unlockedShips(progressWith(Array(48).fill(3))), SHIPS.map(s => s.id))
   assert.ok(!unlockedShips(progressWith(Array(36).fill(3))).includes('surt'), 'Surtsglöd needs 130 stars')
+  assert.equal(totalStars({ ...progressWith([3, 2]), bossStars: [3, 1] }), 9, 'boss stars count too')
 })
 
 test('0.3 progress is migrated into the statistics once', () => {

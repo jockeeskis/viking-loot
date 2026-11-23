@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { starsFor, parseProgress, recordWin, emptyProgress } from './progress.ts'
+import { starsFor, parseProgress, recordWin, emptyProgress, recordBossWin, bossUnlocked, seeStory } from './progress.ts'
 import { mechanicsOf } from './intros.ts'
 import { levels, house, stone, jarl, WILD, startGame } from './levels.ts'
 import { createGame } from './engine.ts'
@@ -24,7 +24,29 @@ test('progress parsing tolerates junk and migrates 0.2 unlocks', () => {
   assert.equal(migrated.unlocked, 4)
   assert.deepEqual(migrated.stars, [1, 1, 1, 1])
   const p = parseProgress(JSON.stringify({ unlocked: 2, stars: [3, 9, 'x'], seenIntros: ['house', 7] }), '11')
-  assert.deepEqual(p, { unlocked: 2, stars: [3, 3, 0], seenIntros: ['house'] }, 'the 0.3 key wins over the old one')
+  assert.deepEqual(p, { unlocked: 2, stars: [3, 3, 0], seenIntros: ['house'], bossStars: [], seenStory: [] }, 'the 0.3 key wins over the old one')
+  // 0.5 fields: missing in old saves, junk is cleaned.
+  const q = parseProgress(JSON.stringify({ unlocked: 1, stars: [2], bossStars: [3, 'x', 7], seenStory: ['start', 5] }), null)
+  assert.deepEqual(q.bossStars, [3, 0, 3])
+  assert.deepEqual(q.seenStory, ['start'])
+})
+
+test('boss wins keep the best stars and never move the level unlocks', () => {
+  let p = recordBossWin(emptyProgress(), 2, 2)
+  assert.deepEqual(p.bossStars, [0, 0, 2])
+  p = recordBossWin(p, 2, 1)
+  assert.deepEqual(p.bossStars, [0, 0, 2], 'a worse win does not lower the stars')
+  p = recordBossWin(p, 0, 3)
+  assert.deepEqual(p.bossStars, [3, 0, 2])
+  assert.equal(p.unlocked, 0)
+  assert.ok(!bossUnlocked(emptyProgress(), 11))
+  assert.ok(bossUnlocked(recordWin(emptyProgress(), 11, 1, levels.length), 11), 'open once the world\'s last level is won')
+})
+
+test('story cards are remembered once', () => {
+  const p = seeStory(emptyProgress(), 'start')
+  assert.deepEqual(p.seenStory, ['start'])
+  assert.equal(seeStory(p, 'start'), p)
 })
 
 test('recordWin keeps the best stars and unlocks the next level', () => {

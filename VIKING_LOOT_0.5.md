@@ -1,6 +1,6 @@
 # Viking Loot 0.5 – Muspelheim, bossar, baneditor och engelska
 
-> **Status (2026-11-22):** Fas 1–3 är klara: inställningar och tillgänglighet, regelmotorn för de fyra mekanikerna och Muspelheim med bana 37–48. Nästa: fas 4 (berättelse och bossar).
+> **Status (2026-11-23):** Fas 1–4 är klara: inställningar och tillgänglighet, regelmotorn för de fyra mekanikerna, Muspelheim med bana 37–48 och berättelsen med de fyra bossarna. Nästa: fas 5 (baneditor och delning).
 
 ## Syfte
 
@@ -132,6 +132,21 @@ En vulkanö med svart sten, lavapölar, basaltspiror och små eldflammor. Varje 
   | Isriket | Frostjätten Ymer | nästan allt är fruset |
   | Muspelheim | Eldjätten Surt | kedjor av krutfat och korp |
 
+**Så blev det (fas 4):**
+
+| Boss | Bana | Regel | Vinstchans | Par |
+|---|---|---|---|---|
+| 🐍 Havsormen | efter Kusten | huvudskeppet har bara två platser (`ships: [{ slots: 2 }]`) | ca 27 % | 1 |
+| 🐺 Jarl Ulvhild | efter Fjordarna | bara jarlar och Ylva i kön, nästan allt dolt | ca 20 % | 2 |
+| 🧊 Frostjätten Ymer | efter Isriket | nio skatter frusna i vågor, nyckel och kista, rött färgskepp | ca 14 % | 5 |
+| 🔥 Eldjätten Surt | efter Muspelheim | krutfat, tidvatten, en bur och korpen var fjärde drag | ca 16 % | 1 |
+
+- Bossarna bygger bara på mekaniker som redan finns, så regelmotorn är oförändrad. De ligger i `src/game/bosses.ts` och togs fram med `npm run generate-levels -- --bosses` (generatorn fick `mainSlots` och `onlySpecial`).
+- Bossens stjärnor sparas för sig (`bossStars`), så banornas nummer flyttas inte. En boss låses upp när världens sista bana är vunnen men spärrar inte nästa värld. Bossstjärnorna räknas in i stjärnorna för Skeppsvarvet.
+- **I spelet:** bossen reser sig stort över ön och vrålar när räden börjar, och flyttar sedan till hörnet bredvid titeln. En röd mätare under titeln visar hur mycket av bossens skatt som är kvar, och bossen rycker till för varje skatt. Vinner man sjunker bossen i havet, och förlorar man vrålar den.
+- **Berättelsen:** 13 kort på svenska och engelska (`src/game/story.ts`) med Ragnars porträtt, och bossens porträtt på bosskorten. Krönikan (📜 på kartan) listar de kort man har sett.
+- **Grafik (Blender):** fyra bossfigurer med fyra bildrutor vardera, plus ett porträtt per boss.
+- **Prestationer:** "Bossjägare" (besegra alla fyra) och "Ragnarök" (tre stjärnor på alla fyra).
 ## 5. Baneditor och delning
 
 - **Bygga:** man bygger en ö med 3–5 högar, väljer föremål och egenskaper och sätter ihop kön.
@@ -154,7 +169,7 @@ En vulkanö med svart sten, lavapölar, basaltspiror och små eldflammor. Varje 
 - [x] Färgblindläget visar en symbol överallt där en färg betyder något (skatter, nycklar, hänglås, kort, kö, väntande vikingar och färgskepp).
 - [x] Banorna 1–36 ger samma siffror från lösaren som i 0.4 (regressionstest i `engine.test.ts`).
 - [x] Varje ny mekanik har tester och en introbana som inte går att förlora (`progress.test.ts`).
-- [ ] Alla 48 banor och de fyra bossarna är vinnbara, och `par` stämmer med lösaren.
+- [x] Alla 48 banor och de fyra bossarna är vinnbara, och `par` stämmer med lösaren (`progress.test.ts`, `bosses.test.ts`).
 - [ ] En delad länk öppnar samma ö hos mottagaren. Trasiga eller för stora koder avvisas.
 - [ ] Testat på Android.
 

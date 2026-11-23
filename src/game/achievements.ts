@@ -31,7 +31,8 @@ export const SHIPS: { id: ShipId; name: string; stars: number; text: string }[] 
   { id: 'ymer', name: 'Ymers drake', stars: 100, text: 'Svart och guld, med en röd drake som vaknat ur isen.' },
   { id: 'surt', name: 'Surtsglöd', stars: 130, text: 'Ett segel som glöder som lava och en drake svart som sot.' },
 ]
-export const totalStars = (p: Progress) => p.stars.reduce((a, b) => a + (b ?? 0), 0)
+/** Stars from levels and bosses together (they unlock the ships). */
+export const totalStars = (p: Progress) => [...p.stars, ...(p.bossStars ?? [])].reduce((a, b) => a + (b ?? 0), 0)
 export const shipUnlocked = (id: ShipId, p: Progress) => totalStars(p) >= (SHIPS.find(s => s.id === id)?.stars ?? Infinity)
 export const unlockedShips = (p: Progress) => SHIPS.filter(s => shipUnlocked(s.id, p)).map(s => s.id)
 
@@ -44,6 +45,7 @@ const wonAll = (p: Progress, first: number, last: number, stars = 1) => {
 const countIn = (p: Progress, first: number, last: number, stars = 1) =>
   p.stars.slice(first, last + 1).filter(s => (s ?? 0) >= stars).length
 const [KUSTEN, FJORDARNA, ISRIKET, MUSPELHEIM] = worlds
+const bossesBeaten = (p: Progress, stars = 1) => (p.bossStars ?? []).filter(s => (s ?? 0) >= stars).length
 const LAST = levels.length - 1
 
 export type Achievement = {
@@ -78,6 +80,14 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'all-gold', icon: '👑', title: 'Hela Norden i guld', text: `Tre stjärnor på alla ${levels.length} banor.`,
     done: c => wonAll(c.progress, 0, LAST, 3), progress: c => [countIn(c.progress, 0, LAST, 3), levels.length],
+  },
+  {
+    id: 'boss-hunter', icon: '⚔️', title: 'Bossjägare', text: 'Besegra alla fyra bossarna.',
+    done: c => bossesBeaten(c.progress) >= 4, progress: c => [bossesBeaten(c.progress), 4],
+  },
+  {
+    id: 'ragnarok', icon: '🌅', title: 'Ragnarök', text: 'Tre stjärnor på alla fyra bossarna.',
+    done: c => bossesBeaten(c.progress, 3) >= 4, progress: c => [bossesBeaten(c.progress, 3), 4],
   },
   {
     id: 'loot-100', icon: '🪙', title: 'Hundra skatter', text: 'Plundra 100 skatter.',
@@ -131,7 +141,7 @@ export function unlock(meta: Meta, ids: string[], day: string): Meta {
 // ---------------------------------------------------------------- statistics
 
 export type RaidResult = {
-  mode: 'campaign' | 'daily' | 'endless'
+  mode: 'campaign' | 'daily' | 'endless' | 'boss'
   stars: number
   par: number
   loot: number // items plundered (every item is taken on a win)

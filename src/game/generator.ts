@@ -30,6 +30,9 @@ export type Spec = {
   tides?: number // tide piles
   cages?: number // cages, each with a prisoner who joins the queue
   raven?: number // the raven comes every N-th move; adds one spare viking
+  // Bosses (0.5)
+  mainSlots?: number // seats on the main ship (default 3)
+  onlySpecial?: boolean // the queue holds only jarls and wild vikings (as many jarls as the colours allow)
 }
 // Note: total hits (loot + 1 extra per house) minus 3 per jarl must be even, or no queue fits.
 
@@ -124,6 +127,18 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
     hits[c] -= 2
     queue.push({ kind: 'wild' })
   }
+  if (spec.onlySpecial) {
+    // As many jarls as possible; the even rest of each colour goes to wild vikings.
+    for (const c of COLORS) {
+      let j = Math.floor(hits[c] / 3)
+      if ((hits[c] - 3 * j) % 2) j--
+      if (j < 0) return null
+      for (let k = 0; k < j; k++) queue.push({ kind: 'jarl', color: c })
+      hits[c] -= 3 * j
+      for (let k = 0; k < hits[c] / 2; k++) queue.push({ kind: 'wild' })
+      hits[c] = 0
+    }
+  }
   for (const c of COLORS) {
     if (hits[c] % 2) return null
     for (let k = 0; k < hits[c] / 2; k++) queue.push(c)
@@ -149,10 +164,11 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
   }).join(''))
   // 6. A colour ship for one of the colours in the queue.
   let ships: ShipSpec[] | undefined
+  const main = spec.mainSlots ?? 3
   if (spec.colourShip) {
     const used = COLORS.filter(c => queue.some(q => q === c || (typeof q !== 'string' && q.kind === 'jarl' && q.color === c)))
-    ships = [{ slots: 3 }, { slots: spec.colourShip, color: used[Math.floor(rand() * used.length)] }]
-  }
+    ships = [{ slots: main }, { slots: spec.colourShip, color: used[Math.floor(rand() * used.length)] }]
+  } else if (main !== 3) ships = [{ slots: main }]
   return { columns, queue: shuffle(queue, rand), ships, ...(spec.raven ? { raven: spec.raven } : {}) }
 }
 
@@ -173,8 +189,8 @@ export function evaluate(spec: Spec, cand: Candidate): Found | string {
   // Puzzles (0 < min < 1) must not be solved by always sending the front viking.
   if (spec.min > 0 && spec.min < 1 && !naiveLoses(cand)) return 'front-first wins'
   // A colour ship must matter: without it the level has to be clearly harder (or lose outright).
-  if (cand.ships) {
-    const bare = solve(startGame({ loot, queue: cand.queue, raven: cand.raven }))
+  if (cand.ships && cand.ships.length > 1) {
+    const bare = solve(startGame({ loot, queue: cand.queue, ships: [cand.ships[0]], raven: cand.raven }))
     const bareRate = bare.winningLines / (bare.winningLines + bare.losingLines)
     if (bareRate > rate - (spec.min === 1 ? 0.15 : 0.1)) return 'ship does not matter'
   }

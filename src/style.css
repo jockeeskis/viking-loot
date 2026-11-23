@@ -28,6 +28,10 @@ button:disabled{cursor:not-allowed;opacity:.4}
 .result small{color:#ffe3a8}
 .intro{max-width:290px}
 .intro-icon{font-size:46px;line-height:1;margin-bottom:4px}
+.chronicle{max-width:300px;max-height:80%;overflow:auto}
+.chronicle ul{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.chronicle li button{width:100%;margin:0;text-align:left}
+.chronicle-btn{float:right;margin:-4px 0 0;padding:5px 10px;font-size:13px}
 @media (prefers-reduced-motion:reduce){.result-stars i.on{animation:none}}
 .update-banner{position:sticky;top:8px;z-index:10;display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px 8px 14px;border-radius:14px;background:linear-gradient(#2f6a82,#193a4b);border:3px solid #3b2414;box-shadow:0 8px 20px #0007;font-size:14px;font-weight:700}
 .update-banner span{flex:1}.update-banner button{padding:6px 12px;font-size:13px}.update-banner .close{padding:6px 9px;background:#ffffff22;color:#fff3dc;border-color:#ffffff33;box-shadow:none}

@@ -504,5 +504,59 @@
         "fps": 12
       }
     }
+  },
+  "bosses": {
+    "serpent": {
+      "sheet": "assets/bosses/serpent.webp",
+      "portrait": "assets/bosses/serpent-portrait.webp",
+      "frameWidth": 240,
+      "frameHeight": 240,
+      "anims": {
+        "idle": {
+          "start": 0,
+          "end": 3,
+          "fps": 4
+        }
+      }
+    },
+    "ulvhild": {
+      "sheet": "assets/bosses/ulvhild.webp",
+      "portrait": "assets/bosses/ulvhild-portrait.webp",
+      "frameWidth": 240,
+      "frameHeight": 240,
+      "anims": {
+        "idle": {
+          "start": 0,
+          "end": 3,
+          "fps": 4
+        }
+      }
+    },
+    "ymer": {
+      "sheet": "assets/bosses/ymer.webp",
+      "portrait": "assets/bosses/ymer-portrait.webp",
+      "frameWidth": 240,
+      "frameHeight": 240,
+      "anims": {
+        "idle": {
+          "start": 0,
+          "end": 3,
+          "fps": 4
+        }
+      }
+    },
+    "surt": {
+      "sheet": "assets/bosses/surt.webp",
+      "portrait": "assets/bosses/surt-portrait.webp",
+      "frameWidth": 240,
+      "frameHeight": 240,
+      "anims": {
+        "idle": {
+          "start": 0,
+          "end": 3,
+          "fps": 4
+        }
+      }
+    }
   }
 }

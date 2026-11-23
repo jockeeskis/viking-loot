@@ -28,10 +28,13 @@ export type AssetManifest = {
   islandLava?: IslandInfo | null
   /** The raven that carries off waiting vikings (0.5). */
   raven?: (SheetInfo & { anims: { fly: AnimRange } }) | null
+  /** The four bosses (0.5): idle frames plus a portrait for the story cards. */
+  bosses?: Record<string, BossAsset>
   /** Small colour ships, one frame per colour. */
   boats?: (SheetInfo & { frames: Record<LootColor, number> }) | null
 }
 export type ShipAsset = SheetInfo & { anims: { bob: AnimRange } }
+export type BossAsset = { sheet: string; portrait: string; frameWidth: number; frameHeight: number; anims: { idle: AnimRange } }
 export type IslandInfo = { image: string; x: number; y: number; width: number; height: number }
 
 export const sheetKey = (a: VikingAsset) => `viking-${a.name}`
@@ -71,6 +74,26 @@ export function ensureShip(scene: Phaser.Scene, id: string, done: () => void) {
   if (!a || scene.textures.exists(key)) { createAnims(scene); done(); return }
   scene.load.spritesheet(key, a.sheet, { frameWidth: a.frameWidth, frameHeight: a.frameHeight })
   scene.load.once(Phaser.Loader.Events.COMPLETE, () => { createAnims(scene); done() })
+  scene.load.start()
+}
+export const bossAsset = (id: string) => MANIFEST.bosses?.[id] ?? null
+export const bossKey = (id: string) => `boss-${id}`
+/** Load a boss the first time it is fought, then create its idle animation. */
+export function ensureBoss(scene: Phaser.Scene, id: string, done: () => void) {
+  const a = bossAsset(id)
+  const key = bossKey(id)
+  const ready = () => {
+    if (a && scene.textures.exists(key) && !scene.anims.exists(`${key}-idle`)) {
+      scene.anims.create({
+        key: `${key}-idle`, frameRate: a.anims.idle.fps, repeat: -1, yoyo: true,
+        frames: scene.anims.generateFrameNumbers(key, { start: a.anims.idle.start, end: a.anims.idle.end }),
+      })
+    }
+    done()
+  }
+  if (!a || scene.textures.exists(key)) { ready(); return }
+  scene.load.spritesheet(key, a.sheet, { frameWidth: a.frameWidth, frameHeight: a.frameHeight })
+  scene.load.once(Phaser.Loader.Events.COMPLETE, ready)
   scene.load.start()
 }
 export const islandAsset = () => MANIFEST.island ?? null

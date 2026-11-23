@@ -3,7 +3,8 @@
 // looked up by id. A test checks that both languages have every text.
 import type { Lang } from './settings.ts'
 import { levels } from './levels.ts'
-import { LEVEL_EN } from './levelTexts.ts'
+import { LEVEL_EN, BOSS_EN } from './levelTexts.ts'
+import { bossOf } from './bosses.ts'
 
 let lang: Lang = 'sv'
 const listeners = new Set<(l: Lang) => void>()
@@ -113,8 +114,26 @@ export const SV: Dict = {
   'toast.achievement': 'Prestation: {t}',
   'toast.ship': 'Nytt skepp: {name}',
   'toast.shipText': 'Välj det i Skeppsvarvet.',
+  'toast.boss': 'En boss väntar: {name}',
+  'toast.bossText': 'Du hittar den på kartan, efter världens sista ö.',
+  'result.boss': 'Möt {name} ⚔️',
   'foot': 'Vikingar, skatter, skepp och ö är 3D-renderade i Blender. Ljud och musik är syntetiserade i webbläsaren.',
   'map.soon': '🌊 Nya banor seglar in snart.',
+  'map.boss': 'Boss: {name}',
+  'map.bossLocked': '🔒 Vinn hela {world} för att möta bossen.',
+  'map.chronicle': '📜 Krönikan',
+  'boss.title': '{name}',
+  'boss.won': '⚔️ {name} är besegrad!',
+  'boss.health': 'Bossens skatt',
+  'result.map': 'Till kartan',
+  'story.next': 'Nästa ›',
+  'story.done': 'Till räden!',
+  'story.close': 'Stäng',
+  'story.skip': 'Hoppa över',
+  'story.page': '{n} av {total}',
+  'chronicle.title': '📜 Krönikan',
+  'chronicle.empty': 'Inga berättelser än – börja segla!',
+  'chronicle.text': 'Ragnars berättelser från resan. Tryck på en för att läsa den igen.',
   'map.locked': '🔒 Vinn bana {n} för att segla vidare hit.',
   'scene.queue': 'VIKINGAKÖ',
   'scene.seats': 'VÄNTPLATSER',
@@ -220,8 +239,26 @@ export const EN: Dict = {
   'toast.achievement': 'Achievement: {t}',
   'toast.ship': 'New ship: {name}',
   'toast.shipText': 'Choose it in the Shipyard.',
+  'toast.boss': 'A boss awaits: {name}',
+  'toast.bossText': 'Find it on the map, after the world\'s last island.',
+  'result.boss': 'Face {name} ⚔️',
   'foot': 'Vikings, loot, ships and island are rendered in 3D with Blender. Sound and music are synthesized in the browser.',
   'map.soon': '🌊 New levels are sailing in soon.',
+  'map.boss': 'Boss: {name}',
+  'map.bossLocked': '🔒 Win all of {world} to face the boss.',
+  'map.chronicle': '📜 Chronicle',
+  'boss.title': '{name}',
+  'boss.won': '⚔️ {name} is defeated!',
+  'boss.health': 'Boss\'s hoard',
+  'result.map': 'Back to the map',
+  'story.next': 'Next ›',
+  'story.done': 'To the raid!',
+  'story.close': 'Close',
+  'story.skip': 'Skip',
+  'story.page': '{n} of {total}',
+  'chronicle.title': '📜 Chronicle',
+  'chronicle.empty': 'No stories yet – start sailing!',
+  'chronicle.text': 'Ragnar\'s tales from the voyage. Tap one to read it again.',
   'map.locked': '🔒 Win level {n} to sail on to here.',
   'scene.queue': 'VIKING QUEUE',
   'scene.seats': 'SEATS',
@@ -279,6 +316,10 @@ export const DATA_EN: Dict = {
   'ach.muspelheim.text': 'Win every level in Muspelheim.',
   'ach.kegs-25.title': 'Powder monkey',
   'ach.kegs-25.text': 'Blow up 25 powder kegs.',
+  'ach.boss-hunter.title': 'Boss hunter',
+  'ach.boss-hunter.text': 'Defeat all four bosses.',
+  'ach.ragnarok.title': 'Ragnarök',
+  'ach.ragnarok.text': 'Three stars on all four bosses.',
   'ach.gold-coast.title': 'Golden Coast',
   'ach.gold-coast.text': 'Three stars on every level on the Coast.',
   'ach.all-gold.title': 'The whole North in gold',
@@ -338,6 +379,8 @@ export function tr(sv: string, enKey: string, params?: Record<string, string | n
 export const levelName = (i: number) => (lang === 'en' ? LEVEL_EN[i]?.name : undefined) ?? levels[i]?.name ?? ''
 export const levelHint = (i: number) => (lang === 'en' ? LEVEL_EN[i]?.hint : undefined) ?? levels[i]?.hint ?? ''
 export const worldName = (i: number) => t(`world.${i}`)
+export const bossName = (world: number) => (lang === 'en' ? BOSS_EN[world]?.name : undefined) ?? bossOf(world)?.level.name ?? ''
+export const bossHint = (world: number) => (lang === 'en' ? BOSS_EN[world]?.hint : undefined) ?? bossOf(world)?.level.hint ?? ''
 
 const MONTHS: Record<Lang, string[]> = {
   sv: ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'],
