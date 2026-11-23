@@ -2,7 +2,7 @@
 
 Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3.
 
-- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) , `VIKING_LOOT_0.3.md` (klar) och `VIKING_LOOT_0.4.md` (pågår)
+- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) , `VIKING_LOOT_0.3.md` (klar), `VIKING_LOOT_0.4.md` (klar) och `VIKING_LOOT_0.5.md` (väntar på test på Android)
 - Visuell stil, UI och plan för 3D-assets: `ui-settings.md`
 
 Repo: https://github.com/jockeeskis/viking-loot
@@ -119,5 +119,5 @@ Kräver Blender 4.2+ (testat med 5.3). `npm run render-art` hittar Blender autom
 - Version 0.4.0 är klar och testad på Android (se `VIKING_LOOT_0.4.md`). Fas 1–3 (Isriket med bana 25–36): regelmotorn har nycklar/kistor (`!r`, `#r`), is (`~3r`), färgskepp (`ships` på banan) och spejaren (`SCOUT`), och spelet är en installerbar app (PWA via `vite-plugin-pwa`) som fungerar offline och visar "Ny version finns" när en uppdatering väntar. Service workern registreras bara i produktionsbygget (`npm run build` + `npx vite preview`).
 - Fas 4 är klar: **Dagens räd** (samma ö för alla med samma klarade världar, sparas för dagen, svit med dagar i rad) och **oändlig räd** (svårare för varje runda, ingen ångra eller tips, rekord sparas). Banorna genereras i en Web Worker och kontrolleras av lösaren.
 - Fas 5 är klar: statistik, 15 prestationer med notiser och Skeppsvarvet med fyra långskepp som låses upp av stjärnor.
-- Version 0.5 pågår (se `VIKING_LOOT_0.5.md`). Fas 1 är klar: ⚙️ inställningar med musik, ljud, vibration, färgblindläge (▲ ● ■ på färgerna) och språk (svenska/engelska, `src/game/i18n.ts`). Fas 2 är klar: regelmotorn har krutfat (`*r`), tidvattenhögar (`≈…`), burar med fångar (`&rb`) och korpen (`raven: N` på banan). Fas 3 är klar: Muspelheim, bana 37–48, med vulkanö, ny grafik och ett femte skepp (Surtsglöd). Fas 4 är klar: Ragnar berättar på berättelsekort (📜 Krönikan på kartan), och efter varje värld väntar en boss: Havsormen, Jarl Ulvhild, Frostjätten Ymer och Eldjätten Surt (`src/game/bosses.ts`).
+- Version 0.5.0 (se `VIKING_LOOT_0.5.md`) väntar på test på Android. Baneditorn och delning av egna öar är flyttade till en senare version. Fas 1 är klar: ⚙️ inställningar med musik, ljud, vibration, färgblindläge (▲ ● ■ på färgerna) och språk (svenska/engelska, `src/game/i18n.ts`). Fas 2 är klar: regelmotorn har krutfat (`*r`), tidvattenhögar (`≈…`), burar med fångar (`&rb`) och korpen (`raven: N` på banan). Fas 3 är klar: Muspelheim, bana 37–48, med vulkanö, ny grafik och ett femte skepp (Surtsglöd). Fas 4 är klar: Ragnar berättar på berättelsekort (📜 Krönikan på kartan), och efter varje värld väntar en boss: Havsormen, Jarl Ulvhild, Frostjätten Ymer och Eldjätten Surt (`src/game/bosses.ts`).
 - Ångra tar bara tillbaka det senaste draget; efter en ångring måste man göra ett nytt drag innan man kan ångra igen. Man får ett tips per bana (det kommer inte tillbaka vid omstart).

@@ -1,6 +1,6 @@
-# Viking Loot 0.5 – Muspelheim, bossar, baneditor och engelska
+# Viking Loot 0.5 – Muspelheim, bossar och engelska
 
-> **Status (2026-11-23):** Fas 1–4 är klara: inställningar och tillgänglighet, regelmotorn för de fyra mekanikerna, Muspelheim med bana 37–48 och berättelsen med de fyra bossarna. Nästa: fas 5 (baneditor och delning).
+> **Status (2026-11-23):** Version 0.5.0 – fas 1–4 är klara: inställningar och tillgänglighet, regelmotorn för de fyra mekanikerna, Muspelheim med bana 37–48 och berättelsen med de fyra bossarna. Baneditorn och delning av egna öar flyttas till en senare version. Väntar på test på Android.
 
 ## Syfte
 
@@ -8,7 +8,7 @@
 
 - en fjärde värld, *Muspelheim* (bana 37–48), med fyra nya pusselelement,
 - en kort berättelse och en bossräd per värld,
-- en baneditor där man bygger egna öar och delar dem med en länk,
+- ~~en baneditor där man bygger egna öar och delar dem med en länk~~ (flyttad till en senare version),
 - färgblindläge, vibration och engelska.
 
 Grundprinciperna gäller fortfarande:
@@ -147,7 +147,9 @@ En vulkanö med svart sten, lavapölar, basaltspiror och små eldflammor. Varje 
 - **Berättelsen:** 13 kort på svenska och engelska (`src/game/story.ts`) med Ragnars porträtt, och bossens porträtt på bosskorten. Krönikan (📜 på kartan) listar de kort man har sett.
 - **Grafik (Blender):** fyra bossfigurer med fyra bildrutor vardera, plus ett porträtt per boss.
 - **Prestationer:** "Bossjägare" (besegra alla fyra) och "Ragnarök" (tre stjärnor på alla fyra).
-## 5. Baneditor och delning
+## 5. Baneditor och delning (flyttad till senare version)
+
+Ingår inte i 0.5.0. Idén ligger kvar här till nästa version.
 
 - **Bygga:** man bygger en ö med 3–5 högar, väljer föremål och egenskaper och sätter ihop kön.
 - **Kontrollera:** lösaren visar om ön går att vinna, hur stor andel av vägarna som vinner, vilket par den har och om "alltid främsta" förlorar.
@@ -160,8 +162,8 @@ En vulkanö med svart sten, lavapölar, basaltspiror och små eldflammor. Varje 
 2. Regelmotor för de fyra mekanikerna
 3. Muspelheim: banor, grafik och introduktioner
 4. Berättelse och bossar
-5. Baneditor och delning
-6. Avslut: 0.5.0 och test på Android
+5. ~~Baneditor och delning~~ (flyttad till senare version)
+6. Avslut: 0.5.0 och test på Android (pågår)
 
 ## 7. Acceptanskriterier
 
@@ -170,11 +172,13 @@ En vulkanö med svart sten, lavapölar, basaltspiror och små eldflammor. Varje 
 - [x] Banorna 1–36 ger samma siffror från lösaren som i 0.4 (regressionstest i `engine.test.ts`).
 - [x] Varje ny mekanik har tester och en introbana som inte går att förlora (`progress.test.ts`).
 - [x] Alla 48 banor och de fyra bossarna är vinnbara, och `par` stämmer med lösaren (`progress.test.ts`, `bosses.test.ts`).
-- [ ] En delad länk öppnar samma ö hos mottagaren. Trasiga eller för stora koder avvisas.
 - [ ] Testat på Android.
+
+Kriteriet om delade länkar flyttades med baneditorn till en senare version.
 
 ## 8. Utanför scope för 0.5
 
+- baneditor och delning av egna öar (nästa version)
 - topplistor eller konton på en server
 - flerspelarläge
 - köp i appen
