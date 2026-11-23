@@ -1,0 +1,147 @@
+# Viking Loot 0.6 – Asgård, säsonger och en bättre start
+
+> **Status (2026-11-23):** Planerad. Ingen fas är påbörjad. Användaren startar varje fas själv.
+
+## Syfte
+
+0.5 gav spelet Muspelheim, fyra bossar, en berättelse, engelska och tillgänglighet. 0.6 ska göra spelet **lättare att komma in i, roligare att återvända till och större**:
+
+- en bättre start för nya spelare, tydligare återkoppling och bättre prestanda,
+- en femte värld, *Asgård* (bana 49–60), med tre nya mekaniker och en femte boss, Loke,
+- kosmetika och ett samlaralbum,
+- veckans utmaning och tidsbegränsade händelser under året.
+
+Baneditorn och delning av egna öar (från 0.5) ingår inte heller i 0.6.
+
+Grundprinciperna gäller fortfarande:
+- Regelmotorn är ren, testad och skickar ut händelser.
+- Varje bana kontrolleras av lösaren.
+- Scenen spelar bara upp regelmotorns händelser.
+
+Varje fas avslutas med `npm test`, `npm run check-levels`, `npm run build`, kontroll i Chrome och sedan commit + push.
+
+## 1. Känsla och onboarding
+
+- **Guidad första räd på bana 1**
+  - En pekande hand och korta pratbubblor från Ragnar visar de tre första dragen: välj en viking, se den hämta skatt och se platsen på skeppet.
+  - Den visas bara för nya spelare och kan hoppas över.
+  - Steg och villkor ligger i `src/game/tutorial.ts`, och scenen visar handen med `RaidScene.pointAt(target)`.
+- **Tydligare förlust**
+  - Resultatrutan förklarar *varför* räden gick förlorad, till exempel "Skeppet blev fullt: tre vikingar väntade på gult".
+  - "Visa draget" pekar ut det första draget efter vilket alla vägar förlorar. Lösaren tar fram det, och visningen använder samma teknik som tipsen.
+- **Återkoppling**
+  - Valbara vikingar som inte kan ta något just nu får en svag markering.
+  - Den som trycker på en låst skatt får en kort förklaring, till exempel "Is: 2 drag kvar" eller "Låst: behöver röd nyckel".
+- **Rörelse och prestanda**
+  - Inställningen *Mindre rörelse* följer också `prefers-reduced-motion`. Den ger färre skakningar, mindre konfetti och ingen gungning hela tiden.
+  - Inställningen *Spara batteri* stänger av antialias, ger färre partiklar och kör i 30 fps.
+  - Bildfrekvensen mäts med Chrome Performance, med 4× CPU-begränsning.
+- **Svårighetskurvan**
+  - `check-levels` sammanfattar vinstandelen per bana.
+  - Banor som sticker ut (till exempel för svåra tidigt) justeras eller tas fram på nytt med generatorn.
+
+## 2. Asgårds mekaniker
+
+Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 och bossarna ger samma siffror från lösaren som i 0.5.
+
+| Mekanik | I `stacks()` | Regel | Händelse |
+|---|---|---|---|
+| **Gyllene skatten** | `$` | Kostar en bärplats och kan tas av **vilken färg som helst**. Pusslet blir vem som ska ta guldet. | `collect` (med guld) |
+| **Valhalls port** | `%3r` | Ett lås som öppnas när **3 röda skatter** har plundrats någonstans på ön. Det fungerar som en nyckel med räkneverk. | `unlock` (med port) |
+| **Valkyrian** | `VALK` i kön | Tar ingen skatt. Hon lyfter den viking som väntat längst på huvudskeppet och ställer den **sist i kön** med lasten kvar. Det frigör en plats, men vikingen kommer tillbaka. | `valkyrie` |
+
+- **Kontroll av banan:** `validateLevelGraph` ser till att varje port kan öppnas, alltså att det finns tillräckligt många skatter i portens färg som inte ligger bakom porten. Den kontrollerar också att guldet går ihop med bärplatserna.
+- **Generatorn** får fälten `gold`, `gates` och `valkyries`.
+- **Lösaren:** vikingarnas last i kön blir en del av lösarens memo-nyckel, eftersom valkyrian gör att kön bär tillstånd. Kontrollera att lösaren inte blir långsammare för de gamla banorna.
+- **Introduktioner:** tre nya, på svenska och engelska.
+- **Genererade lägen:** Dagens räd och den oändliga räden får nivå 4 med Asgårds mekaniker efter klarad värld.
+
+## 3. Asgård (bana 49–60) och Loke
+
+- **Ön:** guld, vita marmorpelare och regnbågsbron Bifrost. Den är renderad i Blender.
+
+| Banor | Innehåll |
+|---|---|
+| 49–50 | gyllene skatten |
+| 51–52 | Valhalls port |
+| 53–54 | valkyrian |
+| 55–59 | blandningar med äldre mekaniker |
+| 60 | finalen "Valhalls portar" |
+
+  Introbanorna går inte att förlora. Pusslen går från cirka 40 till 8 % vinstandel.
+- **Boss: Loke** (efter Asgård), "Lokes lögner". Kön blandar guld, portar och valkyrian, och nästan allt är dolt. Han bygger bara på mekaniker som redan finns.
+- **Berättelsen:** nya kort när man kommer till Asgård, före och efter Loke, och en ny final.
+- **Grafik (Blender):**
+  - Asgård-ön
+  - guldskatten
+  - portlåset med siffra
+  - valkyrian (en viking med vingar)
+  - Loke med porträtt
+- **Scenen:**
+  - guldet glittrar
+  - porten visar räknaren (2/3) och öppnas med ljus
+  - valkyrian dyker ner och flyger med vikingen till slutet av kön
+- **Följdändringar:**
+  - Prestationen *Asgårds herre*.
+  - Bossjägare och Ragnarök kräver alla fem bossar.
+  - Ett sjätte skepp, *Gyllene Draken*, för ★ 165. Max blir 195 ★.
+  - "Hela Norden i guld" räknar alla 60 banor. Den som redan har den behåller den.
+
+## 4. Kosmetika och samlaralbum
+
+- **Segel:** mönster och färg ovanpå skeppet.
+- **Sköldrad:** färgerna på sköldarna längs relingen.
+- **Var man väljer:** i Skeppsvarvet, som får flikarna Skepp, Segel och Sköldar.
+- **Data:** kosmetikan finns i `src/game/cosmetics.ts`. Vad man äger och har valt sparas i meta, och gamla sparningar migreras.
+- **Samlaralbum 🏺:** reliker från händelser och veckosviter, i `src/game/relics.ts`. Albumet nås från kartan, bredvid Krönikan.
+- **Belöningar:** kosmetika får man från prestationer, veckans utmaning och händelser.
+
+## 5. Veckans utmaning och händelser
+
+- **Veckans utmaning**
+  - Tre öar med stigande svårighet, samma för alla under samma vecka. Seedet tas från ISO-veckan och nivån.
+  - De genereras i samma worker som Dagens räd.
+  - Den som klarar alla tre får veckans segel eller relik.
+- **Händelser**
+  - Händelserna är tidsbegränsade. De styrs av telefonens datum och fungerar därför offline. Datan ligger i `src/game/events.ts`.
+
+    | Händelse | Tid | Tema |
+    |---|---|---|
+    | Midvinterblot | 1 dec – 6 jan | snö och julbock |
+    | Vårblot | mars–april | – |
+    | Midsommar | juni | midsommarstång |
+    | Alvablot | oktober–november | dimma och lyktor |
+
+  - Varje händelse har fem genererade öar och en handgjord final, och alla kontrolleras av lösaren.
+  - Belöningen är en relik, ett segel och en prestation.
+  - Dekoren är egna figurer ovanpå ön.
+  - I utvecklingsläget kan en händelse tvingas fram med `?event=<id>`.
+
+## 6. Faser
+
+1. Känsla och onboarding
+2. Regelmotorn för Asgårds tre mekaniker
+3. Asgård (bana 49–60), Loke, berättelse och grafik
+4. Kosmetika och samlaralbum
+5. Veckans utmaning och händelser
+6. Avslut: 0.6.0 och test på Android
+
+## 7. Acceptanskriterier
+
+- [ ] En ny spelare tar sig igenom bana 1 med guidning och kan hoppa över den.
+- [ ] Varje förlust förklaras, och "Visa draget" stämmer med lösaren.
+- [ ] Mindre rörelse och Spara batteri fungerar och sparas.
+- [ ] Banorna 1–48 och bossarna ger samma siffror från lösaren som i 0.5 (regressionstest).
+- [ ] Varje ny mekanik har tester och en introbana som inte går att förlora.
+- [ ] Alla 60 banor och de fem bossarna är vinnbara, och `par` stämmer med lösaren.
+- [ ] Veckans utmaning är samma för samma vecka och går alltid att vinna.
+- [ ] Händelsernas datum fungerar, även över nyår, och belöningar delas bara ut en gång.
+- [ ] Kosmetika och album sparas, och gamla sparningar migreras.
+- [ ] Testat på Android.
+
+## 8. Utanför scope för 0.6
+
+- baneditor och delning av egna öar (senare version)
+- topplistor eller konton på en server
+- flerspelarläge
+- köp i appen

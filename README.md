@@ -2,7 +2,7 @@
 
 Mobilanpassat pusselspel med Vue 3, TypeScript och Phaser 3.
 
-- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) , `VIKING_LOOT_0.3.md` (klar), `VIKING_LOOT_0.4.md` (klar) och `VIKING_LOOT_0.5.md` (klar)
+- Spelregler och acceptanskriterier: `VIKING_LOOT_0.2.md` (klar) , `VIKING_LOOT_0.3.md` (klar), `VIKING_LOOT_0.4.md` (klar) och `VIKING_LOOT_0.5.md` (klar) och `VIKING_LOOT_0.6.md` (planerad)
 - Visuell stil, UI och plan för 3D-assets: `ui-settings.md`
 
 Repo: https://github.com/jockeeskis/viking-loot
