@@ -1,6 +1,6 @@
 # Viking Loot 0.5 – Muspelheim, bossar och engelska
 
-> **Status (2026-11-23):** Version 0.5.0 – fas 1–4 är klara: inställningar och tillgänglighet, regelmotorn för de fyra mekanikerna, Muspelheim med bana 37–48 och berättelsen med de fyra bossarna. Baneditorn och delning av egna öar flyttas till en senare version. Väntar på test på Android.
+> **Status (2026-11-23):** Version 0.5.0 – fas 1–4 är klara: inställningar och tillgänglighet, regelmotorn för de fyra mekanikerna, Muspelheim med bana 37–48 och berättelsen med de fyra bossarna. Baneditorn och delning av egna öar flyttas till en senare version. Allt är testat, även på Android.
 
 ## Syfte
 
@@ -163,7 +163,7 @@ Ingår inte i 0.5.0. Idén ligger kvar här till nästa version.
 3. Muspelheim: banor, grafik och introduktioner
 4. Berättelse och bossar
 5. ~~Baneditor och delning~~ (flyttad till senare version)
-6. Avslut: 0.5.0 och test på Android (pågår)
+6. Avslut: 0.5.0 och test på Android (klar)
 
 ## 7. Acceptanskriterier
 
@@ -172,7 +172,7 @@ Ingår inte i 0.5.0. Idén ligger kvar här till nästa version.
 - [x] Banorna 1–36 ger samma siffror från lösaren som i 0.4 (regressionstest i `engine.test.ts`).
 - [x] Varje ny mekanik har tester och en introbana som inte går att förlora (`progress.test.ts`).
 - [x] Alla 48 banor och de fyra bossarna är vinnbara, och `par` stämmer med lösaren (`progress.test.ts`, `bosses.test.ts`).
-- [ ] Testat på Android.
+- [x] Testat på Android: engelska, färgblindläge, vibration, Muspelheim, bossar, Krönikan och notisen om ny version.
 
 Kriteriet om delade länkar flyttades med baneditorn till en senare version.
 
