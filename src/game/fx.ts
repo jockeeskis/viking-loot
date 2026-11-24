@@ -133,11 +133,11 @@ export function floatText(scene: Phaser.Scene, x: number, y: number, text: strin
 }
 
 /** Confetti rain and a small camera punch when the village is plundered. */
-export function victory(scene: Phaser.Scene) {
+export function victory(scene: Phaser.Scene, opts: { few?: boolean; calm?: boolean } = {}) {
   const e = scene.add.particles(0, -10, CONFETTI, {
     x: { min: 10, max: 350 }, speedY: { min: 90, max: 190 }, speedX: { min: -40, max: 40 },
     gravityY: 60, lifespan: 2600, rotate: { start: 0, end: 540 }, scale: { min: 0.45, max: 0.7 },
-    tint: [COLORS.red, COLORS.blue, COLORS.yellow, GOLD, 0xffffff], frequency: 18, quantity: 2,
+    tint: [COLORS.red, COLORS.blue, COLORS.yellow, GOLD, 0xffffff], frequency: opts.few ? 45 : 18, quantity: opts.few ? 1 : 2,
   }).setDepth(DEPTH)
   scene.time.delayedCall(900, () => e.stop())
   scene.time.delayedCall(3600, () => e.destroy())
@@ -146,6 +146,7 @@ export function victory(scene: Phaser.Scene) {
   const cam = scene.cameras.main
   scene.tweens.killTweensOf(cam)
   cam.setZoom(CAMERA_ZOOM)
+  if (opts.calm) return
   scene.tweens.add({ targets: cam, zoom: CAMERA_ZOOM * 1.04, duration: 130, yoyo: true, hold: 40, ease: 'Sine.easeOut',
     onComplete: () => cam.setZoom(CAMERA_ZOOM) })
 }

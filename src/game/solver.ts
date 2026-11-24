@@ -57,6 +57,21 @@ export function solve(start: GameState): SolveReport {
   }
 }
 
+/** Whether the raid can still be won from here. Stops at the first win, so it is much cheaper than solve(). */
+export function winnable(start: GameState): boolean {
+  const memo = new Map<string, boolean>()
+  const go = (s: GameState): boolean => {
+    if (s.status !== 'playing') return s.status === 'won'
+    const k = key(s)
+    const cached = memo.get(k)
+    if (cached !== undefined) return cached
+    const r = getSelectableVikings(s).some(v => go(selectViking(s, v.id)))
+    memo.set(k, r)
+    return r
+  }
+  return go(start)
+}
+
 /**
  * A move that still leads to a win, preferring the one with the fewest waits from here.
  * Returns null when the raid can no longer be won.

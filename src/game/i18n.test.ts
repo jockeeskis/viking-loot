@@ -62,6 +62,9 @@ test('texts follow the chosen language and fill in their parameters', () => {
 test('settings tolerate junk', () => {
   assert.deepEqual(parseSettings(null), defaultSettings())
   assert.deepEqual(parseSettings('{bad'), defaultSettings())
-  assert.deepEqual(parseSettings(JSON.stringify({ vibration: false, colorMarks: true, lang: 'en' })), { vibration: false, colorMarks: true, lang: 'en' })
+  assert.deepEqual(parseSettings(JSON.stringify({ vibration: false, colorMarks: true, lang: 'en' })), { ...defaultSettings(), vibration: false, colorMarks: true, lang: 'en' })
+  // 0.6: motion and battery saver; old saves follow the phone for motion.
+  assert.deepEqual(parseSettings(JSON.stringify({ reducedMotion: true, batterySaver: true })), { ...defaultSettings(), reducedMotion: true, batterySaver: true })
+  assert.equal(parseSettings(JSON.stringify({ reducedMotion: 'x', batterySaver: 1 })).reducedMotion, null)
   assert.deepEqual(parseSettings(JSON.stringify({ vibration: 'yes', lang: 'fi' })), defaultSettings())
 })

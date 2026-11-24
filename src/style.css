@@ -84,3 +84,13 @@ button:disabled{cursor:not-allowed;opacity:.4}
 .lang-buttons{display:flex;gap:6px}.lang-buttons button{padding:5px 8px;font-size:12px;margin:0;background:#ffffff22;color:#fff3dc;border-color:#ffffff33;box-shadow:none}
 .lang-buttons button.on{background:linear-gradient(#ffd45a,#e5a628);color:#3b2414;border-color:#3b2414}
 .settings .done{display:block;margin:14px auto 0}
+/* 0.6: explanations after a loss and the guided first raid */
+.result small.wrong{display:inline-block;margin-top:6px;color:#fff4dc;line-height:1.4}
+.result button.soft,.tutorial .skip{background:#00000033;box-shadow:none;color:#ffe3a8;border-color:#3b241488}
+.tutorial{position:absolute;left:8px;right:8px;top:8%;display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:linear-gradient(#8a5a33,#5b3a20);border:3px solid #3b2414;border-radius:16px;box-shadow:inset 0 2px 0 #c9925a,0 8px 20px #0008;z-index:4;animation:tutorial-in .35s ease-out both}
+.tutorial p{margin:0 0 6px;font-size:14px;line-height:1.4;color:#fff4dc}
+.tutorial-face{width:46px;height:46px;flex:none;border-radius:50%;background:#2a190c;border:3px solid #3b2414;box-shadow:0 0 0 2px #c9925a;object-fit:cover}
+.tutorial-buttons{display:flex;justify-content:flex-end;gap:6px}
+.tutorial-buttons button{padding:6px 12px;font-size:13px}
+@keyframes tutorial-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.tutorial{animation:none}}

@@ -9,12 +9,16 @@ defineProps<{
   sound: boolean
   vibration: boolean
   colorMarks: boolean
+  reducedMotion: boolean
+  batterySaver: boolean
 }>()
 const emit = defineEmits<{
   music: []
   sound: []
   vibration: [on: boolean]
   colorMarks: [on: boolean]
+  reducedMotion: [on: boolean]
+  batterySaver: [on: boolean]
   lang: [lang: Lang]
   close: []
 }>()
@@ -39,6 +43,14 @@ const emit = defineEmits<{
       <label class="setting">
         <span>{{ t('settings.colorMarks') }}<small>{{ t('settings.colorMarksNote') }}</small></span>
         <input type="checkbox" :checked="colorMarks" @change="emit('colorMarks', ($event.target as HTMLInputElement).checked)" />
+      </label>
+      <label class="setting">
+        <span>{{ t('settings.motion') }}<small>{{ t('settings.motionNote') }}</small></span>
+        <input type="checkbox" :checked="reducedMotion" @change="emit('reducedMotion', ($event.target as HTMLInputElement).checked)" />
+      </label>
+      <label class="setting">
+        <span>{{ t('settings.saver') }}<small>{{ t('settings.saverNote') }}</small></span>
+        <input type="checkbox" :checked="batterySaver" @change="emit('batterySaver', ($event.target as HTMLInputElement).checked)" />
       </label>
       <div class="setting">
         <span>{{ t('settings.lang') }}</span>

@@ -17,8 +17,10 @@ import {
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, explosion, wave, CAMERA_ZOOM } from './fx'
 import { sfx } from './sfx'
 import { haptics } from './haptics'
-import { t } from './i18n'
+import { t, say } from './i18n'
 import { hint } from './solver'
+import { lossExplanation, fatalMove, blockReason, findsNothing, whoOf, type Text, type Who } from './feedback'
+import type { TutorialTarget } from './tutorial'
 
 export type RaidUpdate = {
   busy: boolean // an animation is playing; undo and hints wait for it
@@ -112,6 +114,13 @@ export class RaidScene extends Phaser.Scene {
   private ready = false
   // The state before the latest move. Only one step can be undone; then a new move is needed first.
   private history: GameState[] = []
+  // 0.6: every state before a move this attempt (undo pops it too), to find where the raid was lost.
+  private trail: { state: GameState; id: string }[] = []
+  private reduced = false // less motion: no shaking, no endless bobbing, less confetti
+  private saver = false // battery saver: fewer particles (the frame rate is set by the app)
+  private tip?: Phaser.GameObjects.Text // the explanation shown when an item is tapped
+  private pointTarget: TutorialTarget = null
+  private pointer?: Phaser.GameObjects.Text
   private hintGfx?: Phaser.GameObjects.Graphics
   private onUpdate?: (u: RaidUpdate) => void
   private islandImg?: Phaser.GameObjects.Image
@@ -141,6 +150,72 @@ export class RaidScene extends Phaser.Scene {
   }
 
   setUpdate(fn: (u: RaidUpdate) => void) { this.onUpdate = fn }
+
+  /** Less motion and the battery saver (0.6). Redraws a resting board so endless bobbing starts or stops. */
+  setMotion(reduced: boolean, saver: boolean) {
+    const changed = reduced !== this.reduced
+    this.reduced = reduced
+    this.saver = saver
+    if (changed && this.ready && this.levelData && !this.busy) this.rebuild(this.state)
+  }
+
+  /** Why the raid was lost (null while playing or after a win). */
+  explainLoss(): Text | null { return this.ready && this.state ? lossExplanation(this.state) : null }
+
+  /**
+   * The move after which the raid could no longer be won: its number (from 1), who was sent and
+   * whether it was the latest move (then Undo takes exactly it back). Null when there is none.
+   */
+  whereWrong(): { move: number; who: Who; last: boolean } | null {
+    if (!this.ready || this.state.status !== 'lost') return null
+    const i = fatalMove([...this.trail.map(x => x.state), this.state])
+    if (i === null) return null
+    const step = this.trail[i]
+    const v = step.state.queue.find(x => x.id === step.id)
+    return v ? { move: i + 1, who: whoOf(v), last: i === this.trail.length - 1 } : null
+  }
+
+  /** The guided first raid points at a card (the move the hint would make) or at the ship's seats. */
+  pointAt(target: TutorialTarget) {
+    this.pointTarget = target
+    this.drawPointer()
+  }
+
+  private drawPointer() {
+    this.pointer?.destroy(); this.pointer = undefined
+    if (!this.ready || !this.pointTarget || this.busy || this.state.status !== 'playing') return
+    let x = slotPos(1).x, y = PANEL_Y - 18
+    if (this.pointTarget === 'card') {
+      const id = hint(this.state)
+      const index = Math.max(0, this.state.queue.findIndex(v => v.id === id))
+      if (!this.cards[index]) return
+      x = this.cards[index].x; y = CARD.y - CARD.h / 2 - 22
+    }
+    const p = this.add.text(x, y, '👇', { fontSize: '34px', resolution: 2 }).setOrigin(0.5).setDepth(60)
+    if (!this.reduced) this.tweens.add({ targets: p, y: y + 10, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    this.pointer = p
+  }
+
+  private shake() {
+    if (this.reduced) return
+    this.cameras.main.shake(260, 0.012)
+  }
+
+  /** Tapping an item says what keeps it (ice, lock, something in front) or who can take it. */
+  private explainItem(id: string) {
+    if (this.busy || this.state.status !== 'playing') return
+    const why = blockReason(this.state, id)
+    const sprite = this.lootSprites.get(id)
+    if (!why || !sprite) return
+    this.tip?.destroy()
+    const y = Math.max(70, sprite.y - 48)
+    const tip = this.add.text(Phaser.Math.Clamp(sprite.x, 110, 250), y, say(why), {
+      ...cartoonText(12), backgroundColor: '#2a190cee', padding: { x: 8, y: 6 }, align: 'center', wordWrap: { width: 200 },
+    }).setOrigin(0.5, 1).setDepth(55)
+    this.tip = tip
+    this.tweens.add({ targets: tip, alpha: 0, delay: 2200, duration: 300, onComplete: () => { tip.destroy(); if (this.tip === tip) this.tip = undefined } })
+    sfx.click()
+  }
 
   /** Where the items of a tide pile stand: the remaining items fill the pile's back slots in tide order. */
   private placeTidePile(state: GameState, pile: number, animate: boolean) {
@@ -204,6 +279,7 @@ export class RaidScene extends Phaser.Scene {
     this.bossId = boss
     this.titleText = title
     this.history = []
+    this.trail = []
     this.title?.setText(title)
     // Isriket is a winter island and Muspelheim a volcano – and so are generated raids that use their mechanics.
     if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(islandStyleOf(data)))
@@ -230,6 +306,7 @@ export class RaidScene extends Phaser.Scene {
     this.lootSprites.forEach(s => s.destroy()); this.lootSprites.clear()
     this.actors.forEach(s => s.destroy()); this.actors.clear()
     this.decor.forEach(d => d.destroy()); this.decor = []
+    this.tip?.destroy(); this.tip = undefined
     this.drawLootSprites()
     this.drawBoat()
     this.layout(false)
@@ -294,7 +371,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private bobBoss() {
-    if (!this.bossSprite) return
+    if (!this.bossSprite || this.reduced) return
     this.tweens.add({ targets: this.bossSprite, y: BOSS_HOME.y + 2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
   }
 
@@ -343,6 +420,7 @@ export class RaidScene extends Phaser.Scene {
   /** Take back the latest move (one step only). Allowed after a loss too, but not while a move is animating. */
   undo() {
     if (!this.ready || this.busy || !this.history.length || this.state.status === 'won') return
+    this.trail.pop()
     this.rebuild(this.history.pop()!)
   }
 
@@ -501,7 +579,7 @@ export class RaidScene extends Phaser.Scene {
     boat.setDepth(1)
     const marks = this.mark(color, 0, 0, 8)
     if (marks.length) boat = this.add.container(BOAT.x, BOAT.y, [boat.setPosition(0, 0), ...marks]).setDepth(1)
-    this.tweens.add({ targets: boat, y: BOAT.y + 2, angle: 1.5, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    if (!this.reduced) this.tweens.add({ targets: boat, y: BOAT.y + 2, angle: 1.5, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
     this.boat = boat
   }
 
@@ -601,6 +679,10 @@ export class RaidScene extends Phaser.Scene {
       if (item.frozenLeft > 0) overlays.push(this.makeIce(), this.makeIceCounter(item.frozenLeft))
       const c = this.add.container(x, y, [art, shadeG, lock, ...overlays]).setScale(scale).setDepth(2 + depth * 0.01)
       c.setData('kind', kind).setData('color', p.color).setData('stone', !!p.stone)
+      c.setSize(66, 62).setInteractive()
+      c.on('pointerup', (ptr: Phaser.Input.Pointer) => {
+        if (!ptr.wasCanceled && ptr.getDistance() < TAP_SLOP && ptr.getDuration() < 900) this.explainItem(p.id)
+      })
       if (item.hitsLeft < (p.hits ?? 1)) this.markOpened(c)
       this.lootSprites.set(p.id, c)
     })
@@ -867,6 +949,12 @@ export class RaidScene extends Phaser.Scene {
         })
         card.on('pointerover', () => { if (!this.busy) card.setScale(1.04) })
         card.on('pointerout', () => card.setScale(1))
+        // A viking that would find nothing right now is dimmed and shows the seat it would take.
+        if (findsNothing(this.state, v.id)) {
+          const veil = this.add.graphics()
+          veil.fillStyle(0x0b1a22, 0.32); veil.fillRoundedRect(-CARD.w / 2, -CARD.h / 2, CARD.w, CARD.h, 16)
+          card.add([veil, this.add.text(CARD.w / 2 - 14, CARD.h / 2 - 14, '⛵', { fontSize: '15px', resolution: 2 }).setOrigin(0.5)])
+        }
       }
       if (animate) {
         card.setAlpha(0).setY(CARD.y + 16)
@@ -912,6 +1000,7 @@ export class RaidScene extends Phaser.Scene {
     })
     this.drawSlots()
     this.updateCountdowns(this.state)
+    this.drawPointer()
   }
 
   /** How many vikings can be sent before the tide turns / the raven comes (it happens as the N-th is sent). */
@@ -930,7 +1019,10 @@ export class RaidScene extends Phaser.Scene {
     if (after === before) return
     // The outcome is decided here; the animation only replays the engine's events.
     this.history = [before]
+    this.trail.push({ state: before, id: vikingId })
     this.state = after
+    this.tip?.destroy(); this.tip = undefined
+    this.pointer?.destroy(); this.pointer = undefined
     this.busy = true
     this.clearHint()
     this.cards.forEach(c => c.disableInteractive().setScale(1))
@@ -941,7 +1033,7 @@ export class RaidScene extends Phaser.Scene {
       if (gen !== this.generation) return
       if (after.status === 'won') {
         void this.bossEnd(true)
-        victory(this); sfx.win(); haptics.win(); this.celebrate()
+        victory(this, { few: this.saver || this.reduced, calm: this.reduced }); sfx.win(); haptics.win(); this.celebrate()
         await this.delay(1100)
       } else if (after.status === 'lost') {
         void this.bossEnd(false)
@@ -1090,7 +1182,7 @@ export class RaidScene extends Phaser.Scene {
         const p = at ? this.lootPos(at) : { x: 180, y: ISLAND_CY }
         sfx.explode(); haptics.overflow()
         explosion(this, p.x, p.y)
-        this.cameras.main.shake(260, 0.012)
+        this.shake()
         await this.delay(220)
         continue
       }
@@ -1238,8 +1330,8 @@ export class RaidScene extends Phaser.Scene {
       } else if (e.type === 'overflow') {
         // The viking has just taken the last seat (the preceding `wait` event put it there).
         sfx.overflow(); haptics.overflow()
-        this.cameras.main.shake(260, 0.012)
-        this.cameras.main.flash(220, 160, 30, 20)
+        this.shake()
+        if (!this.reduced) this.cameras.main.flash(220, 160, 30, 20)
         await this.tween({ targets: actor, angle: { from: -12, to: 12 }, duration: 70, yoyo: true, repeat: 3 })
       }
     }

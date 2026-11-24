@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, shallowRef, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, shallowRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import Phaser from 'phaser'
 import { RaidScene, type RaidUpdate } from './game/RaidScene'
 import { levels, worlds, type Level } from './game/levels'
@@ -22,9 +22,11 @@ import { shipSheet } from './game/assets'
 import LevelMap from './components/LevelMap.vue'
 import SettingsPanel from './components/Settings.vue'
 import {
-  t as tt, tn as ttn, tr as ttr, getLang, setLang, detectLang, levelName, levelHint, worldName, dayLabel, bossName, bossHint,
+  t as tt, tn as ttn, tr as ttr, getLang, setLang, detectLang, levelName, levelHint, worldName, dayLabel, bossName, bossHint, say as tsay, whoText,
 } from './game/i18n'
-import { loadSettings, saveSettings, type Lang } from './game/settings'
+import { loadSettings, saveSettings, motionReduced, type Lang } from './game/settings'
+import type { Text as FeedbackText } from './game/feedback'
+import { wantsTutorial, nextStep, TARGET, TUTORIAL_ID, type TutorialStep } from './game/tutorial'
 import { setVibration, haptics } from './game/haptics'
 import { registerSW } from 'virtual:pwa-register'
 
@@ -49,6 +51,7 @@ const updateSW = registerSW({
   },
 })
 function reloadApp() { updateSW(true) }
+const base = import.meta.env.BASE_URL
 
 // ---------- settings and language (0.5) ----------
 const settings = ref(loadSettings())
@@ -64,11 +67,24 @@ const lvlName = (i: number) => { void lang.value; return levelName(i) }
 const wName = (i: number) => { void lang.value; return worldName(i) }
 const bName = (w: number) => { void lang.value; return bossName(w) }
 const showSettings = ref(false)
-function changeSetting(key: 'vibration' | 'colorMarks', on: boolean) {
+function changeSetting(key: 'vibration' | 'colorMarks' | 'reducedMotion' | 'batterySaver', on: boolean) {
   settings.value = { ...settings.value, [key]: on }
   saveSettings(settings.value)
   if (key === 'vibration') { setVibration(on); if (on) haptics.test() }
-  else scene?.setColorMarks(on)
+  else if (key === 'colorMarks') scene?.setColorMarks(on)
+  else applyMotion()
+}
+const reduced = computed(() => motionReduced(settings.value))
+/** Less motion and the battery saver (0.6). The frame rate changes at once; smoothing on the next start. */
+function applyMotion() {
+  scene?.setMotion(reduced.value, settings.value.batterySaver)
+  const loop = game?.loop as unknown as { fpsLimit: number; hasFpsLimit: boolean; _limitRate: number; sleep(): void; wake(seamless?: boolean): void } | undefined
+  if (!loop) return
+  const limit = settings.value.batterySaver ? 30 : 0
+  if (loop.fpsLimit === limit) return
+  loop.sleep()
+  loop.fpsLimit = limit; loop.hasFpsLimit = limit > 0; loop._limitRate = limit ? 1000 / limit : 0
+  loop.wake(true)
 }
 function changeLang(l: Lang) {
   settings.value = { ...settings.value, lang: l }
@@ -114,7 +130,21 @@ const won = computed(() => info.value.status === 'won' && !info.value.busy)
 const lost = computed(() => info.value.status === 'lost' && !info.value.busy)
 const lastStars = ref(0)
 const dailyCounted = ref(true) // false when today's raid was already won before (replay)
-const lossText = computed(() => t(info.value.lossReason === 'slots-full' ? 'loss.full' : 'loss.stuck'))
+// 0.6: the loss is explained (which colours the waiting vikings wanted, or how much loot was left),
+// and "Var gick det fel?" names the move after which the raid could no longer be won.
+const lossWhy = shallowRef<FeedbackText | null>(null)
+const say = (x: FeedbackText) => { void lang.value; return tsay(x) }
+const lossText = computed(() => (lossWhy.value ? say(lossWhy.value) : t(info.value.lossReason === 'slots-full' ? 'loss.full' : 'loss.stuck')))
+const wrong = shallowRef<ReturnType<RaidScene['whereWrong']> | 'none' | null>(null)
+const wrongText = computed(() => {
+  void lang.value
+  const w = wrong.value
+  if (!w) return ''
+  if (w === 'none') return t('fatal.none')
+  const text = t('fatal.text', { n: w.move, who: whoText(w.who) })
+  return w.last && !isEndless.value ? `${text} ${t('fatal.undo')}` : text
+})
+function whereWrong() { wrong.value = scene?.whereWrong() ?? 'none' }
 const par = computed(() => active.value.par)
 const mainSlots = computed(() => active.value.ships?.[0]?.slots ?? WAITING_SLOTS)
 const waitsText = (n: number) => tn('waits', n)
@@ -131,6 +161,10 @@ function update(d: RaidUpdate) {
   const justLost = d.status === 'lost' && info.value.status !== 'lost'
   info.value = d
   hintMsg.value = ''
+  if (d.status !== 'lost') { lossWhy.value = null; wrong.value = null }
+  if (justLost) lossWhy.value = scene?.explainLoss() ?? null
+  if (tutorial.value === 'send' && d.moves > 0) advanceTutorial('moved')
+  if (tutorial.value && d.status !== 'playing') endTutorial()
   if (justWon) {
     lastStars.value = starsFor(d.waits, active.value.par)
     const shipsBefore = unlockedShips(progress.value)
@@ -202,6 +236,30 @@ function closeIntro() {
   maybeIntro() // a level may introduce more than one thing
 }
 
+// ---------- the guided first raid (0.6) ----------
+const tutorial = ref<TutorialStep | null>(null)
+/** Starts once the story card and any intro are closed, on level 1 for a new player. */
+function maybeTutorial() {
+  if (tutorial.value || story.value || intro.value) return
+  if (!wantsTutorial(progress.value, mode.value === 'campaign' ? current.value : null)) return
+  tutorial.value = 'send'
+  scene?.pointAt(TARGET.send)
+}
+function advanceTutorial(input: 'moved' | 'ok') {
+  if (!tutorial.value) return
+  const n = nextStep(tutorial.value, input)
+  if (n === null) { endTutorial(); return }
+  tutorial.value = n
+  scene?.pointAt(TARGET[n])
+}
+function endTutorial() {
+  tutorial.value = null
+  scene?.pointAt(null)
+  progress.value = seeStory(progress.value, TUTORIAL_ID)
+  saveProgress(progress.value)
+}
+watch([() => story.value, () => intro.value], () => maybeTutorial())
+
 // ---------- starting raids ----------
 /** Show a level. `key` identifies it for the one-hint rule (titles change with the language). */
 function show(level: Level, title: string, key: string) {
@@ -210,8 +268,10 @@ function show(level: Level, title: string, key: string) {
   hintFor = key
   hintsLeft.value = hintsUsed.has(key) ? 0 : HINTS_PER_LEVEL
   info.value = { ...info.value, status: 'playing', busy: false }
+  if (tutorial.value) { tutorial.value = null; scene?.pointAt(null) } // leaving level 1 ends the tour for now
   scene?.play(level, title, mode.value === 'boss' ? bossOf(bossWorld.value)?.id : undefined)
   maybeIntro()
+  maybeTutorial()
   document.querySelector('.game-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
@@ -413,7 +473,8 @@ onMounted(() => {
   game = new Phaser.Game({
     type: Phaser.AUTO, parent: 'game', width: 720, height: 1280, backgroundColor: '#193a4b',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    render: { pixelArt: false, antialias: true }, scene: [scene],
+    render: { pixelArt: false, antialias: !settings.value.batterySaver }, scene: [scene],
+    fps: settings.value.batterySaver ? { limit: 30 } : {},
     // Let the page scroll when a swipe starts on the game (taps are told apart in RaidScene).
     input: { touch: { capture: false } },
   })
@@ -425,10 +486,13 @@ onMounted(() => {
     scene?.setUpdate(update)
     scene?.setShip(meta.value.ship)
     scene?.setColorMarks(settings.value.colorMarks)
+    scene?.setMotion(reduced.value, settings.value.batterySaver)
     scene?.play(levels[current.value], currentTitle())
+    if (tutorial.value) scene?.pointAt(TARGET[tutorial.value])
   })
   queueStory('start')
   maybeIntro()
+  maybeTutorial()
 })
 onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisible); game?.destroy(true) })
 </script>
@@ -473,7 +537,9 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
             <strong>{{ t('endless.survived', { r: roundsText(endless.round - 1) }) }}</strong><br />
             <small v-if="endless.round - 1 > endless.bestBefore">{{ t('endless.newRecord') }}</small>
             <small v-else>{{ t('endless.record', { r: roundsText(modes.endless.best) }) }}</small>
+            <template v-if="wrongText"><br /><small class="wrong">{{ wrongText }}</small></template>
           </p>
+          <button v-if="lost && !wrong" class="soft" @click="whereWrong">{{ t('fatal.button') }}</button>
           <button v-if="won" @click="nextRound">{{ t('endless.next') }}</button>
           <button v-else @click="startEndless">{{ t('endless.new') }}</button>
         </div>
@@ -493,7 +559,8 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
             </template>
             <template v-else-if="mode === 'campaign' && current === levels.length - 1"><br /><strong>{{ t('result.allDone', { n: levels.length }) }}</strong></template>
           </p>
-          <p v-else>{{ lossText }}</p>
+          <p v-else>{{ lossText }}<template v-if="wrongText"><br /><small class="wrong">{{ wrongText }}</small></template></p>
+          <button v-if="lost && !wrong" class="soft" @click="whereWrong">{{ t('fatal.button') }}</button>
           <button v-if="won && nextBoss" @click="openBoss(nextBoss.world)">{{ t('result.boss', { name: bName(nextBoss.world) }) }}</button>
           <button v-if="won && mode === 'campaign' && current < levels.length - 1" @click="next">{{ t('result.next') }}</button>
           <button v-if="won && mode === 'boss'" @click="toMap">{{ t('result.map') }}</button>
@@ -507,6 +574,16 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
           <h2>{{ introText(intro).title }}</h2>
           <p>{{ introText(intro).text }}</p>
           <button @click="closeIntro">{{ t('intro.ok') }}</button>
+        </div>
+      </div>
+      <div v-if="tutorial && !story && !intro && !generating && !won && !lost" class="tutorial" role="status">
+        <img class="tutorial-face" :src="`${base}assets/characters/ragnar/portrait.webp`" alt="Ragnar" />
+        <div>
+          <p>{{ t(`tutorial.${tutorial}`) }}</p>
+          <div class="tutorial-buttons">
+            <button class="skip" @click="endTutorial">{{ t('tutorial.skip') }}</button>
+            <button v-if="tutorial !== 'send'" @click="advanceTutorial('ok')">{{ tutorial === 'goal' ? t('tutorial.done') : t('tutorial.ok') }}</button>
+          </div>
         </div>
       </div>
       <StoryCard v-if="story" :key="story.id" :card="story" :lang="lang" :t="t" @close="closeStory" />
@@ -523,6 +600,8 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
       <SettingsPanel
         v-if="showSettings" :t="t" :lang="lang" :music="music" :sound="!muted"
         :vibration="settings.vibration" :color-marks="settings.colorMarks"
+        :reduced-motion="reduced" :battery-saver="settings.batterySaver"
+        @reduced-motion="changeSetting('reducedMotion', $event)" @battery-saver="changeSetting('batterySaver', $event)"
         @music="toggleMusic" @sound="toggleSound" @vibration="changeSetting('vibration', $event)"
         @color-marks="changeSetting('colorMarks', $event)" @lang="changeLang" @close="showSettings = false"
       />

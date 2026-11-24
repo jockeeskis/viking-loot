@@ -5,6 +5,7 @@ import type { Lang } from './settings.ts'
 import { levels } from './levels.ts'
 import { LEVEL_EN, BOSS_EN } from './levelTexts.ts'
 import { bossOf } from './bosses.ts'
+import type { Text as FeedbackText, Who } from './feedback.ts'
 
 let lang: Lang = 'sv'
 const listeners = new Set<(l: Lang) => void>()
@@ -36,6 +37,42 @@ export const SV: Dict = {
   'stats.parTitle': 'Väntningar hittills / par för tre stjärnor',
   'loss.full': 'En viking hittade inget byte och fick ta skeppets sista väntplats.',
   'loss.stuck': 'Kön är slut och ingen väntande viking kan plundra något mer.',
+  'loss.fullWant': 'Skeppet blev fullt. De väntande vikingarna ville ha {colors}, men inget sådant byte gick att nå.',
+  'loss.fullNone': 'Skeppet blev fullt – en viking hittade inget byte och fick ta sista platsen.',
+  'loss.stuckLeft.one': 'Kön tog slut med {n} skatt kvar på ön.',
+  'loss.stuckLeft.other': 'Kön tog slut med {n} skatter kvar på ön.',
+  'color.red': 'rött',
+  'color.blue': 'blått',
+  'color.yellow': 'gult',
+  'colorA.red': 'röd',
+  'colorA.blue': 'blå',
+  'colorA.yellow': 'gul',
+  'list.and': 'och',
+  'who.normal': 'en {c} viking',
+  'who.jarl': 'en {c} jarl',
+  'who.wild': 'Ylva',
+  'who.scout': 'Sigrid',
+  'fatal.button': '🔎 Var gick det fel?',
+  'fatal.text': 'Räden gick att vinna fram till drag {n}. Där skickades {who} – efter det fanns ingen väg till seger.',
+  'fatal.undo': 'Det var sista draget, så Ångra tar tillbaka just det.',
+  'fatal.none': 'Den här ön gick inte att vinna härifrån.',
+  'block.stone': '🪨 En sten – den rasar när en skatt bredvid plundras.',
+  'block.ice': '❄️ Fruset – tinar om {n} drag.',
+  'block.tide': '🌊 Tidvatten – bara den främsta i högen kan tas.',
+  'block.under': '⛔ Något ligger framför – plundra det först.',
+  'block.lock': '🔒 Låst – plundra nyckeln först.',
+  'block.free': '✅ Kan tas nu av {who}.',
+  'settings.motion': '🌀 Mindre rörelse',
+  'settings.motionNote': 'Inga skakningar, mindre konfetti och stillare skepp.',
+  'settings.saver': '🔋 Spara batteri',
+  'settings.saverNote': '30 bilder per sekund och färre effekter. Kantutjämningen stängs av vid nästa start.',
+  'tutorial.send': 'Välkommen ombord! Tryck på en viking längst ner för att skicka iväg den på räd.',
+  'tutorial.carry': 'Bra! Varje viking bär två skatter i sin egen färg och tar dem framifrån i högarna. Med full last går den hem.',
+  'tutorial.seats': 'Hittar en viking inget att ta sätter den sig här på skeppet och väntar. Blir alla tre platserna fulla är räden förlorad!',
+  'tutorial.goal': 'Plundra alla skatter på ön så vinner du. Fastnar du finns ett tips per bana. Lycka till!',
+  'tutorial.ok': 'Okej',
+  'tutorial.done': 'Nu kör vi!',
+  'tutorial.skip': 'Hoppa över',
   'waits.one': '{n} väntning',
   'waits.other': '{n} väntningar',
   'rounds.one': '{n} runda',
@@ -161,6 +198,42 @@ export const EN: Dict = {
   'stats.parTitle': 'Waits so far / par for three stars',
   'loss.full': 'A viking found nothing to take and had to use the ship\'s last seat.',
   'loss.stuck': 'The queue is empty and no waiting viking can plunder anything else.',
+  'loss.fullWant': 'The ship is full. The waiting vikings wanted {colors}, but no such loot could be reached.',
+  'loss.fullNone': 'The ship is full – a viking found nothing to take and had to use the last seat.',
+  'loss.stuckLeft.one': 'The queue ran out with {n} treasure left on the island.',
+  'loss.stuckLeft.other': 'The queue ran out with {n} treasures left on the island.',
+  'color.red': 'red',
+  'color.blue': 'blue',
+  'color.yellow': 'yellow',
+  'colorA.red': 'red',
+  'colorA.blue': 'blue',
+  'colorA.yellow': 'yellow',
+  'list.and': 'and',
+  'who.normal': 'a {c} viking',
+  'who.jarl': 'a {c} jarl',
+  'who.wild': 'Ylva',
+  'who.scout': 'Sigrid',
+  'fatal.button': '🔎 Where did it go wrong?',
+  'fatal.text': 'The raid could still be won until move {n}. Then {who} was sent – after that no path led to victory.',
+  'fatal.undo': 'That was the last move, so Undo takes back exactly that one.',
+  'fatal.none': 'This island could not be won from here.',
+  'block.stone': '🪨 A stone – it crumbles when a treasure next to it is plundered.',
+  'block.ice': '❄️ Frozen – thaws in {n} moves.',
+  'block.tide': '🌊 Tide – only the front item of the pile can be taken.',
+  'block.under': '⛔ Something is in front – plunder that first.',
+  'block.lock': '🔒 Locked – plunder the key first.',
+  'block.free': '✅ Can be taken now by {who}.',
+  'settings.motion': '🌀 Reduce motion',
+  'settings.motionNote': 'No shaking, less confetti and calmer ships.',
+  'settings.saver': '🔋 Battery saver',
+  'settings.saverNote': '30 frames per second and fewer effects. Smoothing turns off on the next start.',
+  'tutorial.send': 'Welcome aboard! Tap a viking at the bottom to send it on a raid.',
+  'tutorial.carry': 'Good! Every viking carries two treasures of its own colour and takes them from the front of the piles. With a full load it goes home.',
+  'tutorial.seats': 'A viking that finds nothing to take sits down here on the ship and waits. If all three seats fill up, the raid is lost!',
+  'tutorial.goal': 'Plunder every treasure on the island to win. If you get stuck, there is one hint per level. Good luck!',
+  'tutorial.ok': 'OK',
+  'tutorial.done': 'Let\'s go!',
+  'tutorial.skip': 'Skip',
   'waits.one': '{n} wait',
   'waits.other': '{n} waits',
   'rounds.one': '{n} round',
@@ -374,6 +447,24 @@ export function tn(key: string, n: number, params?: Record<string, string | numb
 /** Game data defined in Swedish: the Swedish text, or the English text with the given id. */
 export function tr(sv: string, enKey: string, params?: Record<string, string | number>): string {
   return fill(lang === 'sv' ? sv : DATA_EN[enKey] ?? sv, params)
+}
+
+/** A Text from feedback.ts in the current language: colour lists and vikings are filled in. */
+export function say(x: FeedbackText): string {
+  const params: Record<string, string | number> = { ...x.params }
+  if (x.colors) {
+    const names = x.colors.map(c => t(`color.${c}`))
+    params.colors = names.length > 1 ? `${names.slice(0, -1).join(', ')} ${t('list.and')} ${names[names.length - 1]}` : names[0] ?? ''
+    if (!names.length) return t('loss.fullNone')
+  }
+  if (x.who) params.who = whoText(x.who)
+  if (typeof params.n === 'number' && DICTS.sv[`${x.key}.one`]) return tn(x.key, params.n, params)
+  return t(x.key, params)
+}
+export function whoText(w: Who): string {
+  if (w.kind === 'wild' && !w.color) return t('who.wild')
+  if (w.kind === 'scout') return t('who.scout')
+  return t(w.kind === 'jarl' ? 'who.jarl' : 'who.normal', { c: t(`colorA.${w.color}`) })
 }
 
 export const levelName = (i: number) => (lang === 'en' ? LEVEL_EN[i]?.name : undefined) ?? levels[i]?.name ?? ''

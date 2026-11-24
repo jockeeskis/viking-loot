@@ -1,6 +1,6 @@
 # Viking Loot 0.6 – Asgård, säsonger och en bättre start
 
-> **Status (2026-11-23):** Planerad. Ingen fas är påbörjad. Användaren startar varje fas själv.
+> **Status (2026-11-24):** Fas 1 är klar: guidad första räd, förklarad förlust och "Var gick det fel?", förklaring när man trycker på en skatt, markerade vikingar som inte hittar något, Mindre rörelse och Spara batteri. Nästa: fas 2 (Asgårds mekaniker). Användaren startar varje fas själv.
 
 ## Syfte
 
@@ -39,6 +39,17 @@ Varje fas avslutas med `npm test`, `npm run check-levels`, `npm run build`, kont
 - **Svårighetskurvan**
   - `check-levels` sammanfattar vinstandelen per bana.
   - Banor som sticker ut (till exempel för svåra tidigt) justeras eller tas fram på nytt med generatorn.
+
+**Så blev det (fas 1):**
+
+- **Guidad första räd:** fyra steg (`src/game/tutorial.ts`). Ragnars pratbubbla ligger överst i spelet, så korten går att trycka på. En hand (👇) pekar på vikingen som tipset skulle välja och sedan på väntplatserna. Rundturen sparas i `seenStory` som `tutorial`, och visas inte för den som redan har vunnit bana 1.
+- **Förlusten förklaras** (`src/game/feedback.ts`): "Skeppet blev fullt. De väntande vikingarna ville ha rött och gult …" eller "Kön tog slut med 3 skatter kvar på ön."
+- **"🔎 Var gick det fel?"** pekar ut draget efter vilket räden inte längre gick att vinna, till exempel "drag 5: en röd viking". Det spolar *inte* tillbaka räden, så regeln att man bara får ångra ett steg gäller fortfarande. Om det var sista draget sägs att Ångra tar tillbaka just det. Sökningen går baklänges med `winnable()` i `solver.ts`, som slutar vid första vinsten.
+- **Tryck på en skatt:** en kort ruta förklarar vad som håller den (is, lås, något framför, tidvatten, sten) eller vilken viking som kan ta den nu.
+- **Vikingar som inte hittar något just nu** blir mörkare och visar ⛵ på kortet.
+- **Mindre rörelse** följer telefonens inställning tills man väljer själv. Den tar bort skakningar, blixtar, zoomen vid vinst och skeppens gungning, och ger mindre konfetti.
+- **Spara batteri:** 30 bilder per sekund direkt och färre partiklar. Kantutjämningen stängs av från nästa start.
+- **Svårighetskurvan:** `check-levels` skriver ut vinstandelen per värld och flaggar banor som sticker ut. Inga banor sticker ut, så inga banor har ändrats.
 
 ## 2. Asgårds mekaniker
 
@@ -128,9 +139,9 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
 
 ## 7. Acceptanskriterier
 
-- [ ] En ny spelare tar sig igenom bana 1 med guidning och kan hoppa över den.
-- [ ] Varje förlust förklaras, och "Visa draget" stämmer med lösaren.
-- [ ] Mindre rörelse och Spara batteri fungerar och sparas.
+- [x] En ny spelare tar sig igenom bana 1 med guidning och kan hoppa över den (`feedback.test.ts`, kontrollerat i Chrome).
+- [x] Varje förlust förklaras, och "Var gick det fel?" stämmer med lösaren (`feedback.test.ts`).
+- [x] Mindre rörelse och Spara batteri fungerar och sparas (`i18n.test.ts`, kontrollerat i Chrome).
 - [ ] Banorna 1–48 och bossarna ger samma siffror från lösaren som i 0.5 (regressionstest).
 - [ ] Varje ny mekanik har tester och en introbana som inte går att förlora.
 - [ ] Alla 60 banor och de fem bossarna är vinnbara, och `par` stämmer med lösaren.
