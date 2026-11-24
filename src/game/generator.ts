@@ -4,7 +4,8 @@
 //
 // Pile letters (see `stacks` in levels.ts): r b y loot, R B Y houses (two hits), s stone, ? hidden,
 // !r key, #r chest (locked by the keys of its colour), ~N ice (thaws when move N starts),
-// *r powder keg, &rb red cage with a blue prisoner, ≈ at the start of a pile: a tide pile.
+// *r powder keg, &rb red cage with a blue prisoner, ≈ at the start of a pile: a tide pile,
+// $ gold, %3r a red item behind a gate that opens after three other reds.
 import {
   createGame, selectViking, getSelectableVikings, validateLevelGraph,
   type LootColor, type QueueEntry, type ShipSpec,
@@ -30,6 +31,10 @@ export type Spec = {
   tides?: number // tide piles
   cages?: number // cages, each with a prisoner who joins the queue
   raven?: number // the raven comes every N-th move; adds one spare viking
+  // 0.6 (Asgård)
+  gold?: number // gold items: any viking may take them
+  gates?: number // Valhalla's gates (each opens after 2–3 other items of its colour)
+  valkyries?: number // valkyries in the queue
   // Bosses (0.5)
   mainSlots?: number // seats on the main ship (default 3)
   onlySpecial?: boolean // the queue holds only jarls and wild vikings (as many jarls as the colours allow)
@@ -72,7 +77,7 @@ export function naiveLoses(c: Candidate) {
   return s.status === 'lost'
 }
 
-type Kind = 'loot' | 'stone' | 'house' | 'key' | 'chest' | 'keg' | 'cage'
+type Kind = 'loot' | 'stone' | 'house' | 'key' | 'chest' | 'keg' | 'cage' | 'gold'
 
 /** One random candidate, or null when the colours cannot be split evenly over the vikings. */
 export function candidate(spec: Spec, rand: () => number): Candidate | null {
@@ -107,10 +112,29 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
     if (prisoners.length < (spec.cages ?? 0) && kind[i] === 'loot') { kind[i] = 'cage'; prisoners.push(COLORS[Math.floor(rand() * 3)]) }
   }
   if (prisoners.length < (spec.cages ?? 0)) return null
+  // 0.6: gold and gates. Only drawn when asked for, so older specs give the same levels as before.
+  const gate = slots.map(() => 0)
+  if (spec.gold) {
+    let gold = spec.gold
+    for (const i of shuffle([...order], rand)) if (gold > 0 && kind[i] === 'loot') { kind[i] = 'gold'; gold-- }
+    if (gold > 0) return null
+  }
+  if (spec.gates) {
+    let gates = spec.gates
+    for (const i of shuffle([...order], rand)) {
+      if (gates > 0 && kind[i] === 'loot' && !tidal[slots[i].c]) { gate[i] = 2 + Math.floor(rand() * 2); gates-- }
+    }
+    if (gates > 0) return null
+  }
   // 2. Colours, and how many hits each colour needs.
   const hits: Record<LootColor, number> = { red: 0, blue: 0, yellow: 0 }
-  slots.forEach((_, i) => { if (kind[i] !== 'stone') hits[color[i]] += kind[i] === 'house' ? 2 : 1 })
+  slots.forEach((_, i) => { if (kind[i] !== 'stone' && kind[i] !== 'gold') hits[color[i]] += kind[i] === 'house' ? 2 : 1 })
   if (COLORS.some(c => hits[c] === 0)) return null // every colour used
+  // Gold fills a carry slot of any colour: give it to a colour that is short of an even count.
+  for (let g = 0; g < kind.filter(k => k === 'gold').length; g++) {
+    const odd = COLORS.find(c => hits[c] % 2 === 1)
+    hits[odd ?? COLORS[Math.floor(rand() * 3)]]++
+  }
   // Each prisoner carries two of its colour, so the queue needs one viking less of that colour.
   for (const p of prisoners) { if (hits[p] < 2) return null; hits[p] -= 2 }
   // 3. Vikings that exactly cover those hits: a jarl carries 3, a wild viking covers 2 of any colour, the rest 2 each.
@@ -144,6 +168,7 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
     for (let k = 0; k < hits[c] / 2; k++) queue.push(c)
   }
   for (let s = 0; s < (spec.scouts ?? 0); s++) queue.push({ kind: 'scout' })
+  for (let v = 0; v < (spec.valkyries ?? 0); v++) queue.push({ kind: 'valkyrie' })
   // With the raven, one spare viking makes up for the one it may carry off.
   if (spec.raven) queue.push(COLORS[Math.floor(rand() * 3)])
   // 4. Ice: frozen items thaw somewhere in the first part of the raid, never after the last viking.
@@ -157,8 +182,8 @@ export function candidate(spec: Spec, rand: () => number): Candidate | null {
   const prisonerOf = slots.map((_, i) => (kind[i] === 'cage' ? prisoners[cageNo++] : null))
   const columns = spec.heights.map((h, c) => (tidal[c] ? '≈' : '') + slots.map((s, i) => ({ s, i })).filter(o => o.s.c === c).map(({ s, i }) => {
     if (kind[i] === 'stone') return 's'
-    const letter = kind[i] === 'house' ? LETTER[color[i]].toUpperCase() : LETTER[color[i]]
-    const prefix = (spec.hidden && s.row < h - 1 ? '?' : '') + (frozen[i] ? `~${frozen[i]}` : '') +
+    const letter = kind[i] === 'gold' ? '$' : kind[i] === 'house' ? LETTER[color[i]].toUpperCase() : LETTER[color[i]]
+    const prefix = (spec.hidden && s.row < h - 1 && !gate[i] ? '?' : '') + (frozen[i] ? `~${frozen[i]}` : '') + (gate[i] ? `%${gate[i]}` : '') +
       (kind[i] === 'key' ? '!' : kind[i] === 'chest' ? '#' : kind[i] === 'keg' ? '*' : '')
     return kind[i] === 'cage' ? `${prefix}&${letter}${LETTER[prisonerOf[i]!]}` : prefix + letter
   }).join(''))

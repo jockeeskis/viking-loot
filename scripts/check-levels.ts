@@ -1,5 +1,5 @@
 // Solvability report for every level: `npm run check-levels`.
-// Viking labels: colour letter, `+` jarl, `*` wild, `@` scout, `p-…` a prisoner freed from a cage.
+// Viking labels: colour letter, `+` jarl, `*` wild, `@` scout, `^` valkyrie, `p-…` a prisoner freed from a cage.
 import { levels, worlds, startGame } from '../src/game/levels.ts'
 import { bosses } from '../src/game/bosses.ts'
 import { validateLevelGraph } from '../src/game/engine.ts'
@@ -16,7 +16,7 @@ for (const { l, tag } of all) {
       const cage = l.loot.find(x => `p-${x.id}` === id)?.cage
       return id + (cage ? cage[0].toUpperCase() : '?')
     }
-    return id + (v.kind === 'wild' ? '*' : v.kind === 'scout' ? '@' : v.color![0].toUpperCase() + (v.kind === 'jarl' ? '+' : ''))
+    return id + (v.kind === 'wild' ? '*' : v.kind === 'scout' ? '@' : v.kind === 'valkyrie' ? '^' : v.color![0].toUpperCase() + (v.kind === 'jarl' ? '+' : ''))
   }
   const r = solve(g)
   const raven = l.raven ? `, raven every ${l.raven}` : ''

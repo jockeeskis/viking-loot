@@ -15,7 +15,9 @@ type Node = { win: string[] | null; loss: string[] | null; wins: number; losses:
 
 function key(s: GameState): string {
   const loot = s.loot.map(l => (l.collected ? '-' : l.hitsLeft)).join('')
-  const queue = s.queue.map(v => v.id).join(',')
+  // Since 0.6 the valkyrie puts seated vikings back in the queue with their load, so a queued
+  // viking that already carries something keys its load too (never the case in older levels).
+  const queue = s.queue.map(v => (v.collectedCount ? `${v.id}:${v.color ?? '?'}:${v.collectedCount}` : v.id)).join(',')
   // Ice and the raven need no entry of their own: they follow from how many vikings have been sent
   // (the queue and the opened cages tell). The order of a tide pile depends on when items were taken
   // relative to the tide, so it is part of the key.

@@ -1,7 +1,7 @@
 // Short introductions shown the first time a level uses a new mechanic.
 import type { Level } from './levels.ts'
 
-export type Mechanic = 'house' | 'stone' | 'jarl' | 'wild' | 'hidden' | 'key' | 'ice' | 'ships' | 'scout' | 'keg' | 'tide' | 'cage' | 'raven'
+export type Mechanic = 'house' | 'stone' | 'jarl' | 'wild' | 'hidden' | 'key' | 'ice' | 'ships' | 'scout' | 'keg' | 'tide' | 'cage' | 'raven' | 'gold' | 'gate' | 'valkyrie'
 
 export const INTROS: Record<Mechanic, { icon: string; title: string; text: string }> = {
   house: { icon: '🏠', title: 'Nytt: Hus', text: 'Ett hus tål två hugg. Varje hugg kostar vikingen en bärplats – två vikingar i samma färg kan dela på det.' },
@@ -17,6 +17,9 @@ export const INTROS: Record<Mechanic, { icon: string; title: string; text: strin
   tide: { icon: '🌊', title: 'Nytt: Tidvatten', text: 'Var tredje drag sköljer tidvattnet den främsta skatten i en våghög längst bak. Planera för vad som kommer fram.' },
   cage: { icon: '⛓️', title: 'Nytt: Fången i buren', text: 'Plundra buren så kliver fången fram först i kön – en extra viking som kan skickas direkt.' },
   raven: { icon: '🐦‍⬛', title: 'Nytt: Korpen', text: 'Korpen kommer var N:e drag och lyfter bort den viking som väntat längst. Det ger en plats tillbaka – men vikingens bärplatser försvinner.' },
+  gold: { icon: '🪙', title: 'Nytt: Gyllene skatten', text: 'Guldet har ingen färg – vilken viking som helst kan ta det, och det kostar en bärplats. Välj vem som ska ta det.' },
+  gate: { icon: '🚪', title: 'Nytt: Valhalls port', text: 'Porten öppnas först när tillräckligt många andra skatter i dess färg har plundrats, var som helst på ön. Siffran visar hur många som är kvar.' },
+  valkyrie: { icon: '🪽', title: 'Nytt: Valkyrian', text: 'Valkyrian bär ingenting. Hon lyfter den viking som väntat längst på skeppet och ställer den sist i kön – med lasten kvar. Platsen blir fri, men vikingen kommer tillbaka.' },
 }
 
 /** Mechanics used by a level, in the order they are introduced in Fjordarna. */
@@ -35,5 +38,8 @@ export function mechanicsOf(level: Level): Mechanic[] {
   if (level.loot.some(l => l.tidePile !== undefined)) found.push('tide')
   if (level.loot.some(l => l.cage)) found.push('cage')
   if (level.raven) found.push('raven')
+  if (level.loot.some(l => l.gold)) found.push('gold')
+  if (level.loot.some(l => l.gate)) found.push('gate')
+  if (level.queue.some(q => typeof q !== 'string' && q.kind === 'valkyrie')) found.push('valkyrie')
   return found
 }

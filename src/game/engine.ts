@@ -22,10 +22,16 @@
 //   TIDE_EVERY moves (at the start of the move); inside such a pile only the current front is reachable
 // - cages: loot with `cage: <colour>`; taking it frees a prisoner of that colour at the front of the queue
 // - the raven: with `raven: N`, at the start of every N-th move the longest-waiting viking is carried off
+//
+// 0.6 additions, Asgård (also optional, so earlier levels behave exactly as before):
+// - gold: loot with `gold: true` and no colour; any viking may take it (a wild viking keeps no colour from it)
+// - Valhalla's gate: `gate: N` keeps an item shut until N other items of its colour have been taken
+// - the valkyrie: a queue entry that carries nothing; she lifts the longest-waiting viking off the main
+//   ship and puts it last in the queue with its load
 
 export type LootColor = 'red' | 'blue' | 'yellow'
 export type ItemKind = 'loot' | 'stone'
-export type VikingKind = 'normal' | 'jarl' | 'wild' | 'scout'
+export type VikingKind = 'normal' | 'jarl' | 'wild' | 'scout' | 'valkyrie'
 
 export type LootItem = {
   id: string
@@ -43,6 +49,8 @@ export type LootItem = {
   blasts: string[] // stones, ice and tarps a keg clears
   cage: LootColor | null // a cage: taking it frees a prisoner of this colour
   tidePile: number // index in GameState.tides, -1 when not in a tide pile
+  gold: boolean // gold: no colour, any viking may take it
+  gate: number // Valhalla's gate: other items of this colour to take before it opens (0 = no gate)
 }
 
 export type Viking = {
@@ -67,7 +75,7 @@ export type GameEvent =
   | { type: 'collect'; vikingId: string; lootId: string; fromWaiting: boolean }
   | { type: 'crumble'; lootId: string } // a stone disappeared
   | { type: 'reveal'; lootId: string } // a hidden item became available and shows its colour
-  | { type: 'unlock'; lootId: string } // the last key of a chest was taken
+  | { type: 'unlock'; lootId: string; gate?: true } // the last key of a chest was taken, or a gate's count was reached
   | { type: 'thaw'; lootId: string } // the ice around an item melted
   | { type: 'scout'; vikingId: string } // a scout looked over the island (reveal events follow)
   | { type: 'return'; vikingId: string; fromWaiting: boolean }
@@ -77,6 +85,7 @@ export type GameEvent =
   | { type: 'tide'; pile: number; lootId: string } // the tide washed the front item to the back of its pile
   | { type: 'free'; lootId: string; vikingId: string } // a prisoner left its cage and joined the front of the queue
   | { type: 'raven'; vikingId: string } // the raven carried off a waiting viking
+  | { type: 'valkyrie'; vikingId: string; carriedId: string | null } // the valkyrie put a waiting viking last in the queue
 
 export type GameState = {
   loot: LootItem[]
@@ -115,10 +124,12 @@ export type LevelLoot = {
   blasts?: string[]
   cage?: LootColor
   tidePile?: number
+  gold?: boolean
+  gate?: number
 }
 /** Level-wide options (0.5). */
 export type GameOptions = { raven?: number }
-export type QueueEntry = LootColor | { kind: 'jarl'; color: LootColor } | { kind: 'wild' } | { kind: 'scout' }
+export type QueueEntry = LootColor | { kind: 'jarl'; color: LootColor } | { kind: 'wild' } | { kind: 'scout' } | { kind: 'valkyrie' }
 export type ShipSpec = { slots: number; color?: LootColor }
 /** One ship with WAITING_SLOTS seats, as in every level before 0.4. */
 export const DEFAULT_SHIPS: ShipSpec[] = [{ slots: WAITING_SLOTS }]
@@ -128,6 +139,7 @@ export function makeViking(entry: QueueEntry, index: number): Viking {
   if (typeof entry === 'string') return { ...base, kind: 'normal', color: entry, capacity: CAPACITY }
   if (entry.kind === 'jarl') return { ...base, kind: 'jarl', color: entry.color, capacity: JARL_CAPACITY }
   if (entry.kind === 'scout') return { ...base, kind: 'scout', color: null, capacity: 0 }
+  if (entry.kind === 'valkyrie') return { ...base, kind: 'valkyrie', color: null, capacity: 0 }
   return { ...base, kind: 'wild', color: null, capacity: CAPACITY }
 }
 
@@ -135,7 +147,7 @@ export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSp
   const items: LootItem[] = loot.map(l => ({
     id: l.id,
     kind: l.stone ? 'stone' : 'loot',
-    color: l.stone ? null : l.color ?? null,
+    color: l.stone || l.gold ? null : l.color ?? null,
     blockedBy: [...(l.blockedBy ?? [])],
     lockedBy: [...(l.lockedBy ?? [])],
     key: !!l.key,
@@ -148,6 +160,8 @@ export function createGame(loot: LevelLoot[], queue: QueueEntry[], ships: ShipSp
     blasts: [...(l.blasts ?? [])],
     cage: l.cage ?? null,
     tidePile: l.tidePile ?? -1,
+    gold: !!l.gold,
+    gate: l.gate ?? 0,
   }))
   // Tide piles keep the level order of their items (back→front).
   const tides: string[][] = []
@@ -179,8 +193,18 @@ export function isAvailable(state: GameState, item: LootItem): boolean {
     if (pile[pile.length - 1] !== item.id) return false
   }
   const gone = (id: string) => state.loot.find(l => l.id === id)?.collected ?? true
-  return item.blockedBy.every(gone) && item.lockedBy.every(gone)
+  return item.blockedBy.every(gone) && item.lockedBy.every(gone) && gateLeft(state, item) === 0
 }
+
+/** How many more items of its colour must be taken before a gate opens (0 = open or no gate). */
+export function gateLeft(state: GameState, item: LootItem): number {
+  if (!item.gate) return 0
+  const taken = state.loot.filter(l => l.id !== item.id && l.collected && l.kind === 'loot' && !l.gold && l.color === item.color).length
+  return Math.max(0, item.gate - taken)
+}
+
+/** Vikings that carry nothing: Sigrid the scout and the valkyrie. */
+export const carriesNothing = (v: Pick<Viking, 'kind'>) => v.kind === 'scout' || v.kind === 'valkyrie'
 
 /** Loot (not stones) that a viking could take right now. */
 export function getAvailableLoot(state: GameState): LootItem[] {
@@ -191,7 +215,7 @@ export function getSelectableVikings(state: GameState): Viking[] {
   return state.status === 'playing' ? state.queue.slice(0, SELECTABLE) : []
 }
 
-const canTake = (v: Viking, l: LootItem) => v.kind !== 'scout' && (v.color === null || l.color === v.color)
+const canTake = (v: Viking, l: LootItem) => !carriesNothing(v) && (l.gold || v.color === null || l.color === v.color)
 const isFull = (v: Viking) => v.collectedCount >= v.capacity
 
 /** Reveal hidden items that just became reachable. */
@@ -221,6 +245,15 @@ function settleBoard(state: GameState, takenId: string, events: GameEvent[]): Ga
   const gone = (id: string) => s.loot.find(l => l.id === id)?.collected ?? true
   for (const ch of s.loot) {
     if (!ch.collected && ch.lockedBy.includes(takenId) && ch.lockedBy.every(gone)) events.push({ type: 'unlock', lootId: ch.id })
+  }
+  // A gate opens on exactly the item that completes its count.
+  if (taken.kind === 'loot' && !taken.gold) {
+    for (const g of s.loot) {
+      const before = { ...s, loot: s.loot.map(l => (l.id === takenId ? { ...l, collected: false } : l)) }
+      if (g.gate && !g.collected && g.id !== takenId && g.color === taken.color && gateLeft(s, g) === 0 && gateLeft(before, g) === 1) {
+        events.push({ type: 'unlock', lootId: g.id, gate: true })
+      }
+    }
   }
   for (const st of s.loot) {
     if (st.kind === 'stone' && !st.collected && st.clearedBy.includes(takenId)) {
@@ -298,7 +331,7 @@ function collectInto(state: GameState, viking: Viking, fromWaiting: boolean, eve
   while (!isFull(v)) {
     const item = s.loot.find(l => l.kind === 'loot' && isAvailable(s, l) && canTake(v, l))
     if (!item) break
-    if (v.color === null) {
+    if (v.color === null && !item.gold) {
       v = { ...v, color: item.color }
       events.push({ type: 'color', vikingId: v.id, color: item.color! })
     }
@@ -360,6 +393,17 @@ export function selectViking(state: GameState, vikingId: string): GameState {
     events.push({ type: 'scout', vikingId })
     for (const l of s.loot) if (l.hidden) events.push({ type: 'reveal', lootId: l.id })
     s = { ...s, loot: s.loot.map(l => (l.hidden ? { ...l, hidden: false } : l)) }
+    events.push({ type: 'return', vikingId, fromWaiting: false })
+    s = { ...resolveWaiting(s, events), events } // thawed items may be waiting for a seated viking
+    return { ...s, ...statusFields(s) }
+  }
+
+  if (viking.kind === 'valkyrie') {
+    // The valkyrie lifts the viking that has waited longest on the main ship and puts it last in the
+    // queue with its load. It frees a seat, but the viking has to be sent again. She takes no seat.
+    const lifted = s.waiting.find(w => w.ship === 0) ?? null
+    events.push({ type: 'valkyrie', vikingId, carriedId: lifted?.id ?? null })
+    if (lifted) s = { ...s, waiting: s.waiting.filter(w => w !== lifted), queue: [...s.queue, { ...lifted, ship: 0 }] }
     events.push({ type: 'return', vikingId, fromWaiting: false })
     s = { ...resolveWaiting(s, events), events } // thawed items may be waiting for a seated viking
     return { ...s, ...statusFields(s) }
@@ -445,6 +489,9 @@ export function validateLevelGraph(loot: LevelLoot[], ships: ShipSpec[] = DEFAUL
         if (!ids.has(c)) throw new Error(`${l.id} cleared by unknown ${c}`)
         if (byId.get(c)!.stone) throw new Error(`Stone ${l.id} cannot be cleared by another stone`)
       }
+    } else if (l.gold) {
+      if (l.color) throw new Error(`Gold ${l.id} has no colour`)
+      if (l.key || l.lockedBy?.length || l.keg || l.cage || l.gate || (l.hits ?? 1) > 1) throw new Error(`Gold ${l.id} must be plain loot`)
     } else {
       if (!l.color) throw new Error(`${l.id} needs a colour`)
       if (l.clearedBy?.length) throw new Error(`Only stones use clearedBy (${l.id})`)
@@ -456,6 +503,12 @@ export function validateLevelGraph(loot: LevelLoot[], ships: ShipSpec[] = DEFAUL
     if (l.cage !== undefined) {
       if (!['red', 'blue', 'yellow'].includes(l.cage)) throw new Error(`Cage ${l.id} needs a prisoner colour`)
       if (l.stone || l.key || l.lockedBy?.length || (l.hits ?? 1) > 1) throw new Error(`Cage ${l.id} must be plain loot`)
+    }
+    if (l.gate !== undefined) {
+      if (!(Number.isInteger(l.gate) && l.gate > 0)) throw new Error(`Gate ${l.id} needs a whole number of items > 0`)
+      if (l.stone || l.gold) throw new Error(`Gate ${l.id} needs a colour`)
+      if (l.hidden) throw new Error(`Gate ${l.id} shows its colour, so it cannot be hidden`)
+      if (l.key || l.keg || l.cage || l.lockedBy?.length || l.tidePile !== undefined) throw new Error(`Gate ${l.id} must be plain loot outside the tide`)
     }
     if (l.tidePile !== undefined) {
       if (!(Number.isInteger(l.tidePile) && l.tidePile >= 0)) throw new Error(`${l.id} has a bad tide pile`)
@@ -482,6 +535,28 @@ export function validateLevelGraph(loot: LevelLoot[], ships: ShipSpec[] = DEFAUL
     (byId.get(id)!.blockedBy ?? []).some(b => b === target || behind(b, target))
   for (const st of loot.filter(l => l.stone)) {
     if (st.clearedBy!.every(c => behind(c, st.id))) throw new Error(`Stone ${st.id} blocks every item that clears it`)
+  }
+  // 0.6: every gate must be able to open. Grow the set of items that can ever be reached: an item
+  // needs everything in front of it and its keys (a stone needs one clearer), a gate also enough
+  // reachable items of its colour. A gate left out can never open (too few items, or they lie behind it).
+  if (loot.some(l => l.gate)) {
+    const reach = new Set<string>()
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const l of loot) {
+        if (reach.has(l.id)) continue
+        const deps = l.stone ? [...(l.blockedBy ?? [])] : [...(l.blockedBy ?? []), ...(l.lockedBy ?? [])]
+        if (!deps.every(d => reach.has(d))) continue
+        if (l.stone && !l.clearedBy!.some(c => reach.has(c))) continue
+        if (l.gate && loot.filter(o => o.id !== l.id && reach.has(o.id) && !o.stone && !o.gold && o.color === l.color).length < l.gate) continue
+        reach.add(l.id); grew = true
+      }
+    }
+    for (const g of loot.filter(l => l.gate)) if (!reach.has(g.id)) throw new Error(`Gate ${g.id} can never open`)
+  }
+  if (queue?.some(q => typeof q !== 'string' && q.kind === 'valkyrie') && queue.every(q => typeof q !== 'string' && (q.kind === 'valkyrie' || q.kind === 'scout'))) {
+    throw new Error('A valkyrie needs vikings to lift')
   }
   // Ships: the main ship comes first and has no colour; colour ships need a colour some viking can have.
   if (!ships.length || ships[0].color) throw new Error('The first ship must be the main ship (no colour)')

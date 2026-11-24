@@ -52,6 +52,7 @@ export const SV: Dict = {
   'who.jarl': 'en {c} jarl',
   'who.wild': 'Ylva',
   'who.scout': 'Sigrid',
+  'who.valkyrie': 'valkyrian',
   'fatal.button': '🔎 Var gick det fel?',
   'fatal.text': 'Räden gick att vinna fram till drag {n}. Där skickades {who} – efter det fanns ingen väg till seger.',
   'fatal.undo': 'Det var sista draget, så Ångra tar tillbaka just det.',
@@ -62,6 +63,9 @@ export const SV: Dict = {
   'block.under': '⛔ Något ligger framför – plundra det först.',
   'block.lock': '🔒 Låst – plundra nyckeln först.',
   'block.free': '✅ Kan tas nu av {who}.',
+  'block.gold': '🪙 Guld – vilken viking som helst kan ta det nu.',
+  'block.gate.one': '🚪 Valhalls port – plundra 1 skatt till i samma färg först.',
+  'block.gate.other': '🚪 Valhalls port – plundra {n} skatter till i samma färg först.',
   'settings.motion': '🌀 Mindre rörelse',
   'settings.motionNote': 'Inga skakningar, mindre konfetti och stillare skepp.',
   'settings.saver': '🔋 Spara batteri',
@@ -213,6 +217,7 @@ export const EN: Dict = {
   'who.jarl': 'a {c} jarl',
   'who.wild': 'Ylva',
   'who.scout': 'Sigrid',
+  'who.valkyrie': 'the valkyrie',
   'fatal.button': '🔎 Where did it go wrong?',
   'fatal.text': 'The raid could still be won until move {n}. Then {who} was sent – after that no path led to victory.',
   'fatal.undo': 'That was the last move, so Undo takes back exactly that one.',
@@ -223,6 +228,9 @@ export const EN: Dict = {
   'block.under': '⛔ Something is in front – plunder that first.',
   'block.lock': '🔒 Locked – plunder the key first.',
   'block.free': '✅ Can be taken now by {who}.',
+  'block.gold': '🪙 Gold – any viking can take it now.',
+  'block.gate.one': '🚪 Valhalla’s gate – plunder 1 more treasure of its colour first.',
+  'block.gate.other': '🚪 Valhalla’s gate – plunder {n} more treasures of its colour first.',
   'settings.motion': '🌀 Reduce motion',
   'settings.motionNote': 'No shaking, less confetti and calmer ships.',
   'settings.saver': '🔋 Battery saver',
@@ -372,6 +380,12 @@ export const DATA_EN: Dict = {
   'intro.keg.text': 'When a powder keg is plundered it goes off. Stones, ice and tarps right next to it are gone – the loot survives.',
   'intro.tide.title': 'New: The tide',
   'intro.tide.text': 'Every third move the tide washes the front loot of a wave pile to the back. Plan for what comes forward.',
+  'intro.gold.title': 'New: Golden treasure',
+  'intro.gold.text': 'Gold has no colour – any viking can take it, and it costs one carry slot. Choose who should take it.',
+  'intro.gate.title': 'New: Valhalla’s gate',
+  'intro.gate.text': 'The gate only opens when enough other treasures of its colour have been plundered, anywhere on the island. The number shows how many are left.',
+  'intro.valkyrie.title': 'New: The valkyrie',
+  'intro.valkyrie.text': 'The valkyrie carries nothing. She lifts the viking that has waited longest on the ship and puts it last in the queue – with its load. The seat is freed, but the viking comes back.',
   'intro.cage.title': 'New: The prisoner in the cage',
   'intro.cage.text': 'Plunder the cage and the prisoner steps up to the front of the queue – an extra viking you can send at once.',
   'intro.raven.title': 'New: The raven',
@@ -464,6 +478,7 @@ export function say(x: FeedbackText): string {
 export function whoText(w: Who): string {
   if (w.kind === 'wild' && !w.color) return t('who.wild')
   if (w.kind === 'scout') return t('who.scout')
+  if (w.kind === 'valkyrie') return t('who.valkyrie')
   return t(w.kind === 'jarl' ? 'who.jarl' : 'who.normal', { c: t(`colorA.${w.color}`) })
 }
 

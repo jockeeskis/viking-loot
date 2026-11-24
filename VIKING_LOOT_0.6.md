@@ -1,6 +1,6 @@
 # Viking Loot 0.6 – Asgård, säsonger och en bättre start
 
-> **Status (2026-11-24):** Fas 1 är klar: guidad första räd, förklarad förlust och "Var gick det fel?", förklaring när man trycker på en skatt, markerade vikingar som inte hittar något, Mindre rörelse och Spara batteri. Nästa: fas 2 (Asgårds mekaniker). Användaren startar varje fas själv.
+> **Status (2026-11-24):** Fas 1 och 2 är klara. Fas 1: guidad första räd, förklarad förlust och "Var gick det fel?", förklaring när man trycker på en skatt, markerade vikingar som inte hittar något, Mindre rörelse och Spara batteri. Fas 2: gyllene skatten, Valhalls port och valkyrian i regelmotorn, lösaren och generatorn. Nästa: fas 3 (Asgård, bana 49–60, och Loke). Användaren startar varje fas själv.
 
 ## Syfte
 
@@ -66,6 +66,19 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
 - **Lösaren:** vikingarnas last i kön blir en del av lösarens memo-nyckel, eftersom valkyrian gör att kön bär tillstånd. Kontrollera att lösaren inte blir långsammare för de gamla banorna.
 - **Introduktioner:** tre nya, på svenska och engelska.
 - **Genererade lägen:** Dagens räd och den oändliga räden får nivå 4 med Asgårds mekaniker efter klarad värld.
+
+**Så blev det (fas 2):**
+
+- **Gyllene skatten** `$` har ingen färg (`gold: true`). Vilken viking som helst kan ta den, och den kostar en bärplats. Ylva får ingen färg av guld, utan först av nästa färgade skatt. Guld kan vara dolt eller fruset, men inte nyckel, kista, krutfat, bur, hus eller port.
+- **Valhalls port** `%3r` är en röd skatt som öppnas när tre *andra* röda skatter har plundrats på ön (`gate: 3`). Guld och halvt huggna hus räknas inte. Porten har samma färg som skatten, som hänglåset har samma färg som nyckeln. Händelsen är `unlock` med `gate: true`, och den kommer direkt efter skatten som fyllde räkningen. En port kan inte vara dold eftersom den visar sin färg.
+- **Valkyrian** (`VALK` i kön, `kind: 'valkyrie'`) tar ingen skatt och ingen plats. Hon lyfter den viking som väntat längst på *huvudskeppet* och ställer den sist i kön med lasten kvar (`valkyrie`-händelsen med `carriedId`). Om ingen väntar där flyger hon bara hem. Vikingar på färgskepp lämnas kvar.
+- **Kontroll av banan:** `validateLevelGraph` räknar ut vilka skatter som någonsin går att nå och kastar fel om en port aldrig kan öppnas. Det gäller både för få skatter och portar som väntar på varandra. Den kastar också fel om kön bara består av valkyrior och spejare.
+- **Lösaren:** en viking i kön som redan bär något får sin last i memo-nyckeln. Inga gamla vikingar bär något i kön, så nyckeln och siffrorna för 0.5 är oförändrade.
+- **Generatorn:** fälten `gold`, `gates` och `valkyries` drar bara slumptal när de används. Dagens räd och den oändliga räden ger därför exakt samma öar som förut för nivå 0–3.
+- **Lägen:** nivå 4 (`tierFor` när värld 5 är klarad) lägger till de tre mekanikerna. Den nås först när Asgård finns (fas 3).
+- **Introduktioner och texter** på svenska och engelska: tre introkort, nya förklaringar när man trycker på guld och på en port, och "valkyrian" i "Var gick det fel?".
+- **Scenen** har ännu ingen egen grafik (fas 3). Guld ritas tills vidare som en gul tunna.
+- **Tester:** `asgard.test.ts` (15 tester), bland annat ett regressionstest för banorna 1–48 och de fyra bossarna mot siffrorna från 0.5.
 
 ## 3. Asgård (bana 49–60) och Loke
 
@@ -142,7 +155,7 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
 - [x] En ny spelare tar sig igenom bana 1 med guidning och kan hoppa över den (`feedback.test.ts`, kontrollerat i Chrome).
 - [x] Varje förlust förklaras, och "Var gick det fel?" stämmer med lösaren (`feedback.test.ts`).
 - [x] Mindre rörelse och Spara batteri fungerar och sparas (`i18n.test.ts`, kontrollerat i Chrome).
-- [ ] Banorna 1–48 och bossarna ger samma siffror från lösaren som i 0.5 (regressionstest).
+- [x] Banorna 1–48 och bossarna ger samma siffror från lösaren som i 0.5 (regressionstest i `asgard.test.ts`).
 - [ ] Varje ny mekanik har tester och en introbana som inte går att förlora.
 - [ ] Alla 60 banor och de fem bossarna är vinnbara, och `par` stämmer med lösaren.
 - [ ] Veckans utmaning är samma för samma vecka och går alltid att vinna.

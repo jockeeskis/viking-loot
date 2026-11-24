@@ -6,14 +6,16 @@ import type { Level } from './levels.ts'
 /** Mechanics by world. Kusten has none; the generated raids only use worlds the player has completed. */
 const WORLD_MECHANICS: Mechanic[][] = [
   [], ['house', 'stone', 'jarl', 'wild', 'hidden'], ['key', 'ice', 'ships', 'scout'], ['keg', 'tide', 'cage', 'raven'],
+  ['gold', 'gate', 'valkyrie'],
 ]
-export type Tier = 0 | 1 | 2 | 3
+export type Tier = 0 | 1 | 2 | 3 | 4
 
-/** 0 = only plain loot, 1 = + Fjordarna, 2 = + Isriket, 3 = + Muspelheim. `completed[w]` = world w's last level is won. */
+/** 0 = only plain loot, 1 = + Fjordarna, 2 = + Isriket, 3 = + Muspelheim, 4 = + Asgård. `completed[w]` = world w's last level is won. */
 export function tierFor(completed: boolean[]): Tier {
   if (!completed[1]) return 0
   if (!completed[2]) return 1
-  return completed[3] ? 3 : 2
+  if (!completed[3]) return 2
+  return completed[4] ? 4 : 3
 }
 export const mechanicsForTier = (tier: Tier): Mechanic[] => WORLD_MECHANICS.slice(0, tier + 1).flat()
 
@@ -32,6 +34,9 @@ function withMechanic(spec: Spec, m: Mechanic, rand: () => number): Spec {
     case 'tide': return { ...spec, tides: 1 }
     case 'cage': return { ...spec, cages: 1 }
     case 'raven': return { ...spec, raven: 3 + Math.floor(rand() * 2) }
+    case 'gold': return { ...spec, gold: 1 + Math.floor(rand() * 2) }
+    case 'gate': return { ...spec, gates: 1 }
+    case 'valkyrie': return { ...spec, valkyries: 1 }
   }
 }
 

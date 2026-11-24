@@ -627,7 +627,8 @@ export class RaidScene extends Phaser.Scene {
       const q = this.add.text(0, 0, '?', cartoonText(24, '#f5c542')).setOrigin(0.5)
       return this.add.container(0, 0, [g, q]).setName('art')
     }
-    return this.makeLootGraphic(p.kind ?? this.kindOf(p.id), p.color!)
+    // Gold has no colour; until it gets its own art (0.6 phase 3) it is drawn as a yellow barrel.
+    return this.makeLootGraphic(p.kind ?? this.kindOf(p.id), p.color ?? 'yellow')
   }
 
   /** A house that took its first hit: show the broken-open model (or cracks on drawn art). */

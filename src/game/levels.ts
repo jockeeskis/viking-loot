@@ -33,14 +33,16 @@ export const hidden = (l: LevelLootPlaced): LevelLootPlaced => ({ ...l, hidden: 
 export const jarl = (color: LootColor): QueueEntry => ({ kind: 'jarl', color })
 export const WILD: QueueEntry = { kind: 'wild' }
 export const SCOUT: QueueEntry = { kind: 'scout' }
+/** 0.6: the valkyrie puts the longest-waiting viking on the main ship last in the queue. */
+export const VALK: QueueEntry = { kind: 'valkyrie' }
 
 const code: Record<string, LootColor> = { r: R, b: B, y: Y }
 
-type Token = { ch: string; hidden: boolean; frozen: number; key: boolean; chest: boolean; keg: boolean; cage: LootColor | null }
-const fresh = (): Omit<Token, 'ch'> => ({ hidden: false, frozen: 0, key: false, chest: false, keg: false, cage: null })
+type Token = { ch: string; hidden: boolean; frozen: number; key: boolean; chest: boolean; keg: boolean; cage: LootColor | null; gate: number }
+const fresh = (): Omit<Token, 'ch'> => ({ hidden: false, frozen: 0, key: false, chest: false, keg: false, cage: null, gate: 0 })
 /**
  * Split a pile string into tokens. Prefixes (any order) apply to the next letter: `?` hidden, `~N` ice,
- * `!` key, `#` locked chest, `*` powder keg. `&rb` is a red cage holding a blue prisoner.
+ * `!` key, `#` locked chest, `*` powder keg, `%N` gate. `&rb` is a red cage holding a blue prisoner.
  * A leading `≈` marks a tide pile (handled by `stacks`).
  */
 function tokens(col: string): Token[] {
@@ -58,13 +60,15 @@ function tokens(col: string): Token[] {
       out.push({ ch: loot, ...t, cage: code[prisoner] })
       t = fresh()
       i += 2
-    } else if (c === '~') {
+    } else if (c === '~' || c === '%') {
       const m = /^\d+/.exec(col.slice(i + 1))
-      if (!m) throw new Error(`"~" needs a number of moves in "${col}"`)
-      t.frozen = Number(m[0])
+      if (!m) throw new Error(`"${c}" needs a number in "${col}"`)
+      if (c === '~') t.frozen = Number(m[0]); else t.gate = Number(m[0])
       i += m[0].length
     } else {
-      if (!/[rbyRBYs]/.test(c)) throw new Error(`Unknown pile letter "${c}" in "${col}"`)
+      if (!/[rbyRBYs$]/.test(c)) throw new Error(`Unknown pile letter "${c}" in "${col}"`)
+      if (c === '$' && (t.key || t.chest || t.keg || t.gate)) throw new Error(`Gold is plain loot ("${col}")`)
+      if (c === 's' && t.gate) throw new Error(`A stone cannot have a gate ("${col}")`)
       if ((t.key || t.chest || t.keg) && c !== c.toLowerCase()) throw new Error(`Keys, chests and kegs are ordinary loot, not houses ("${col}")`)
       out.push({ ch: c, ...t })
       t = fresh()
@@ -84,6 +88,8 @@ function tokens(col: string): Token[] {
  * 0.5: `*r` a red powder keg (clears stones, ice and tarps within a row of it, in its own and the
  * neighbouring piles) · `&rb` a red cage with a blue prisoner · a pile starting with `≈` is a tide pile
  * (no blocking inside it: the tide decides which item is in front).
+ * 0.6: `$` gold (any viking may take it) · `%3r` a red item behind Valhalla's gate, which opens when
+ * three other red items have been taken anywhere on the island.
  * A stone crumbles when an item next to it (in a neighbouring pile, at about the same
  * depth) is plundered. What stands behind a stone also stays behind the item in front of
  * the stone, so a pile is always emptied front to back.
@@ -111,7 +117,7 @@ export function stacks(columns: string[]): LevelLootPlaced[] {
     }
     return out
   }
-  return piles.flatMap((pile, c) => pile.map(({ ch, hidden, frozen, key, chest, keg, cage }, row) => {
+  return piles.flatMap((pile, c) => pile.map(({ ch, hidden, frozen, key, chest, keg, cage, gate }, row) => {
     const id = idOf(c, row)
     const at: [number, number] = [xOf(c), yOf(c, row)]
     // Blocked by everything in front up to and including the first non-stone item (not in a tide pile).
@@ -132,8 +138,16 @@ export function stacks(columns: string[]): LevelLootPlaced[] {
       }
       return stone(id, at, clearedBy, ...blockedBy)
     }
+    if (ch === '$') {
+      let g: LevelLootPlaced = { id, gold: true, at, blockedBy }
+      if (hidden) g = { ...g, hidden: true }
+      if (frozen) g = { ...g, frozen }
+      if (tidal[c]) g = { ...g, tidePile: tideIndex(c) }
+      return g
+    }
     const color = code[ch.toLowerCase()]
     let l = ch === ch.toUpperCase() ? house(id, color, at, ...blockedBy) : item(id, color, at, ...blockedBy)
+    if (gate) l = { ...l, gate }
     if (hidden) l = { ...l, hidden: true }
     if (frozen) l = { ...l, frozen }
     if (key) l = { ...l, key: true, kind: 'key' }
