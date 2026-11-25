@@ -264,6 +264,16 @@ export const sfx = {
     tone(196, 0.9, { type: 'sawtooth', vol: 0.09, slide: 55, lowpass: 800 })
     noise(0.9, 500, 0.35, 0.3)
   },
+  /** The valkyrie swoops down: a rising whoosh and two bright notes (0.6). */
+  valkyrie() {
+    noise(0.35, 1400, 0.12)
+    tone(784, 0.18, { type: 'triangle', vol: 0.07, at: 0.12 })
+    tone(1175, 0.28, { type: 'triangle', vol: 0.06, at: 0.24 })
+  },
+  /** Valhalla's gate opens: a bright chord (0.6). */
+  gate() {
+    ;[523, 784, 1047, 1319].forEach((f, i) => tone(f, 0.4, { type: 'sine', vol: 0.06, at: i * 0.06 }))
+  },
   /** The scout looks over the island. */
   scout() {
     tone(659, 0.25, { type: 'triangle', vol: 0.08 })

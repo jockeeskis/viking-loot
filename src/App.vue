@@ -180,7 +180,10 @@ function update(d: RaidUpdate) {
       progress.value = recordBossWin(progress.value, bossWorld.value, lastStars.value)
       saveProgress(progress.value)
       queueStory(bossStory(bossWorld.value, 'after'))
-      if (bosses.every(b => (progress.value.bossStars[b.world] ?? 0) > 0)) queueStory('finale')
+      // The first four bosses free Muspelheim ('finale'); all five, Loke too, end the story ('finale-2').
+      const beaten = (b: (typeof bosses)[number]) => (progress.value.bossStars[b.world] ?? 0) > 0
+      if (bosses.filter(b => b.world <= 3).every(beaten)) queueStory('finale')
+      if (bosses.every(beaten)) queueStory('finale-2')
     } else if (mode.value === 'daily') {
       dailyCounted.value = !modes.value.daily.results[playingDay.value]
       modes.value = recordDailyWin(modes.value, playingDay.value, lastStars.value)

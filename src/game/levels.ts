@@ -530,6 +530,92 @@ export const levels: Level[] = [
     raven: 4,
     loot: stacks(['?b?b?r?y&yb', '≈?b?*r?ry', '?y?b?Rs', '?r?rs?rb']),
   },
+  // ---------------------------------------------------------------- Asgård (0.6)
+  {
+    name: 'Guldstranden',
+    par: 0,
+    hint: 'Guldet har ingen färg – vilken viking som helst kan ta det. Det kostar en bärplats som allt annat.',
+    queue: [R, B, B, Y],
+    loot: stacks(['$yb', 'bb', 'brr']),
+  },
+  {
+    name: 'Skattkammaren',
+    par: 1,
+    hint: 'Två guldhögar. Vem ska ta guldet – och vem behöver platsen till sin egen färg?',
+    queue: [B, Y, B, R, Y, R, Y, B],
+    loot: stacks(['ybry', '$ybb', 'ybrb', 'rb$y']),
+  },
+  {
+    name: 'Portvakten',
+    par: 1,
+    hint: 'Valhalls port öppnas när två andra röda skatter har plundrats – var som helst på ön.',
+    queue: [B, Y, R, R],
+    loot: stacks(['y%2rb', 'br', 'rry']),
+  },
+  {
+    name: 'Einherjarnas gård',
+    par: 2,
+    hint: 'Två portar i olika färger. Plundra rätt färg i rätt ordning, så öppnas de i tid.',
+    queue: [Y, B, B, R, B, R, Y, Y],
+    loot: stacks(['%2yyby', 'brbb', 'y%3rby', 'rrby']),
+  },
+  {
+    name: 'Valkyrieklippan',
+    par: 1,
+    hint: 'Valkyrian bär ingenting. Hon lyfter den som väntat längst tillbaka till kön – med lasten kvar.',
+    queue: [Y, Y, R, VALK, B],
+    loot: stacks(['ybr', 'yy', 'yrb']),
+  },
+  {
+    name: 'Vingarnas fjord',
+    par: 2,
+    hint: 'Skicka valkyrian när skeppet börjar bli fullt – men vikingen hon lyfter kommer tillbaka.',
+    queue: [R, Y, VALK, Y, R, Y, R, B, B, B],
+    loot: stacks(['bbyr', 'ybrbr', 'ryry', 'yyrbb']),
+  },
+  {
+    name: 'Gyllene porten',
+    par: 0,
+    hint: 'Guld, en port och ett hus. Guldet räknas inte när porten räknar sin färg.',
+    queue: [R, R, Y, B, Y, Y, R, Y, B],
+    loot: stacks(['byyr', 'b$Rb', 'rryy', 'by%3yry']),
+  },
+  {
+    name: 'Vindarnas tinne',
+    par: 1,
+    hint: 'Korpen tar, valkyrian lyfter och isen smälter. Håll räkningen på dragen.',
+    queue: [R, VALK, R, Y, B, B, B, B, Y, B],
+    raven: 4,
+    loot: stacks(['rbbb', 'ybry', 'brb~5y', 'rbby']),
+  },
+  {
+    name: 'Dimmans port',
+    par: 2,
+    hint: 'Allt är dolt utom porten. Nyckeln, kistan och porten – i vilken ordning?',
+    queue: [R, Y, Y, Y, R, R, R, B],
+    loot: stacks(['?!y?y?rb', '?r?r%2r?rr', '?r?r?ys', '?b?y?#yy']),
+  },
+  {
+    name: 'Regnbågsvågen',
+    par: 1,
+    hint: 'Tidvatten, en fånge, guld och en valkyria. Vågen bestämmer vad som står främst.',
+    queue: [B, R, R, B, R, VALK, B, Y, Y],
+    loot: stacks(['≈rbbr', 'brby&ry', 'ybry', 'ryy$b']),
+  },
+  {
+    name: 'Bifrosts fäste',
+    par: 1,
+    hint: 'Jarlen, ett krutfat, guld, en port och valkyrian – nästan allt på en gång.',
+    queue: [B, Y, Y, VALK, jarl(B), R, B, B, R],
+    loot: stacks(['bbrbb', '$*yyb', 'bsry', '%2ybbbr']),
+  },
+  {
+    name: 'Valhalls portar',
+    par: 2,
+    hint: 'Den sista räden: två portar, guld, Ylva, Sigrid och valkyrian – och allt är dolt.',
+    queue: [Y, VALK, B, R, Y, SCOUT, Y, B, B, R, WILD, Y],
+    loot: stacks(['?b?y?b?br', '?y?r?b?$%2y', '?b?$?Y?y%3y', '?r?b?yb']),
+  },
 ]
 
 /** Worlds on the map. */
@@ -538,4 +624,5 @@ export const worlds = [
   { name: 'Fjordarna', first: 12, last: 23 },
   { name: 'Isriket', first: 24, last: 35 },
   { name: 'Muspelheim', first: 36, last: 47 },
+  { name: 'Asgård', first: 48, last: 59 },
 ]

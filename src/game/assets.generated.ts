@@ -160,8 +160,16 @@ export const MANIFEST: AssetManifest = {
       "keg-yellow": 23,
       "cage-red": 24,
       "cage-blue": 25,
-      "cage-yellow": 26
-    }
+      "cage-yellow": 26,
+      "gold": 27,
+      "gate-red": 28,
+      "gate-blue": 29,
+      "gate-yellow": 30
+    },
+    "gatePlaque": [
+      0.3876,
+      0.3997
+    ]
   },
   "ship": {
     "sheet": "assets/ships/longship.webp",
@@ -485,6 +493,20 @@ export const MANIFEST: AssetManifest = {
           "fps": 8
         }
       }
+    },
+    "gyllene": {
+      "sheet": "assets/ships/longship-gyllene.webp",
+      "frameWidth": 424,
+      "frameHeight": 272,
+      "originX": 0.4722,
+      "originY": 0.6977,
+      "anims": {
+        "bob": {
+          "start": 0,
+          "end": 11,
+          "fps": 8
+        }
+      }
     }
   },
   "islandLava": {
@@ -560,6 +582,72 @@ export const MANIFEST: AssetManifest = {
           "fps": 4
         }
       }
+    },
+    "loke": {
+      "sheet": "assets/bosses/loke.webp",
+      "portrait": "assets/bosses/loke-portrait.webp",
+      "frameWidth": 240,
+      "frameHeight": 240,
+      "anims": {
+        "idle": {
+          "start": 0,
+          "end": 3,
+          "fps": 4
+        }
+      }
     }
+  },
+  "valkyrie": {
+    "name": "valkyrie",
+    "sheet": "assets/characters/valkyrie/valkyrie.webp",
+    "portrait": "assets/characters/valkyrie/portrait.webp",
+    "frameWidth": 192,
+    "frameHeight": 192,
+    "originX": 0.5,
+    "originY": 0.8382,
+    "anims": {
+      "idle": {
+        "start": 0,
+        "end": 11,
+        "fps": 8
+      },
+      "run": {
+        "start": 12,
+        "end": 21,
+        "fps": 16
+      },
+      "attack": {
+        "start": 22,
+        "end": 31,
+        "fps": 18
+      },
+      "carry": {
+        "start": 32,
+        "end": 41,
+        "fps": 14
+      },
+      "victory": {
+        "start": 42,
+        "end": 51,
+        "fps": 12
+      },
+      "fail": {
+        "start": 52,
+        "end": 61,
+        "fps": 9
+      },
+      "fly": {
+        "start": 62,
+        "end": 69,
+        "fps": 14
+      }
+    }
+  },
+  "islandGold": {
+    "image": "assets/island/island-gold.webp",
+    "x": 0,
+    "y": 36,
+    "width": 360,
+    "height": 372
   }
 }

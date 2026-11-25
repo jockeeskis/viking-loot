@@ -1,6 +1,6 @@
 # Viking Loot 0.6 – Asgård, säsonger och en bättre start
 
-> **Status (2026-11-24):** Fas 1 och 2 är klara. Fas 1: guidad första räd, förklarad förlust och "Var gick det fel?", förklaring när man trycker på en skatt, markerade vikingar som inte hittar något, Mindre rörelse och Spara batteri. Fas 2: gyllene skatten, Valhalls port och valkyrian i regelmotorn, lösaren och generatorn. Nästa: fas 3 (Asgård, bana 49–60, och Loke). Användaren startar varje fas själv.
+> **Status (2026-11-25):** Fas 1–3 är klara. Fas 1: guidad första räd, förklarade förluster, Mindre rörelse och Spara batteri. Fas 2: gyllene skatten, Valhalls port och valkyrian i regelmotorn. Fas 3: Asgård (bana 49–60), bossen Loke, berättelsen och grafiken. Nästa: fas 4 (kosmetika och samlaralbum). Användaren startar varje fas själv.
 
 ## Syfte
 
@@ -111,6 +111,43 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
   - Ett sjätte skepp, *Gyllene Draken*, för ★ 165. Max blir 195 ★.
   - "Hela Norden i guld" räknar alla 60 banor. Den som redan har den behåller den.
 
+**Så blev det (fas 3):**
+
+- **Banorna 49–60** togs fram med generatorn (`npm run generate-levels`) och kontrolleras av lösaren. Varje mekanik introduceras på en bana som inte går att förlora och används sedan i ett pussel:
+
+  | Bana | Namn | Innehåll | Vinstandel |
+  |---|---|---|---|
+  | 49–50 | Guldstranden, Skattkammaren | guld | 100 %, 38 % |
+  | 51–52 | Portvakten, Einherjarnas gård | Valhalls port | 100 %, 26 % |
+  | 53–54 | Valkyrieklippan, Vingarnas fjord | valkyrian | 100 %, 38 % |
+  | 55–59 | Gyllene porten … Bifrosts fäste | blandningar med äldre mekaniker | 21 → 12 % |
+  | 60 | Valhalls portar | finalen: två portar, guld, Ylva, Sigrid och valkyrian, allt dolt | 10 % |
+
+  Svårighetskurvan är jämn enligt `check-levels`. I pusslen måste valkyrian göra skillnad: utan henne ska banan vara klart svårare. Det kravet gäller inte introbanorna, eftersom de inte kan förloras.
+- **Bossen Loke Lögnaren** (🎭, efter Asgård) har guld, två portar och en valkyria, och nästan allt är dolt. Vinstandelen är 13 % och par är 1.
+- **Berättelsen:**
+  - Nya kort: *Till Asgård*, *Lokes lögner* och *Masken faller*.
+  - Det gamla finalkortet heter nu *Muspelheim är fritt* och visas efter de fyra första bossarna, med en ny andra sida där regnbågen syns i norr.
+  - Det nya slutet *Hem till hallen* (`finale-2`) visas när alla fem bossar är besegrade.
+- **Grafiken** är renderad i Blender (`render_assets.py`):
+  - Asgård-ön med marmorpelare, guldpölar och Bifrost i hörnet längst bak.
+  - Guldskatten: en hög med staplade mynt och en röd ädelsten.
+  - Valhalls port: en marmorbåge i portens färg. Siffran står på plaketten, och var plaketten sitter sparas i manifestet som `gatePlaque`.
+  - Valkyrian: vingar, vingad hjälm, spjut och en egen animation `fly`.
+  - Loke: en tvåuddig narrluva, en guldmask och en grön trollflamma.
+  - Skeppet Gyllene Draken.
+- **Scenen:**
+  - Guldet glittrar då och då (inte med Mindre rörelse).
+  - Porten visar räknaren, till exempel 1/2. När den öppnas blir det ljus och ett ackord, och bågen lyfter.
+  - Valkyrian dyker ner, lyfter den som väntat längst och flyger med vikingen till slutet av kön. Ett kort för en viking som redan bär något visar lasten, till exempel 1/2.
+- **Följdändringar:**
+  - Prestationen *Asgårds herre* är ny.
+  - Bossjägare och Ragnarök kräver alla fem bossar.
+  - *Gyllene Draken* låses upp vid 165 ★, och max är nu 195 ★.
+  - "Hela Norden i guld" räknar alla 60 banor.
+  - Prestationer som redan är upplåsta ligger kvar i `meta.unlocked`, så ingen förlorar en prestation.
+  - Asgård finns på svenska och engelska.
+
 ## 4. Kosmetika och samlaralbum
 
 - **Segel:** mönster och färg ovanpå skeppet.
@@ -156,8 +193,8 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
 - [x] Varje förlust förklaras, och "Var gick det fel?" stämmer med lösaren (`feedback.test.ts`).
 - [x] Mindre rörelse och Spara batteri fungerar och sparas (`i18n.test.ts`, kontrollerat i Chrome).
 - [x] Banorna 1–48 och bossarna ger samma siffror från lösaren som i 0.5 (regressionstest i `asgard.test.ts`).
-- [ ] Varje ny mekanik har tester och en introbana som inte går att förlora.
-- [ ] Alla 60 banor och de fem bossarna är vinnbara, och `par` stämmer med lösaren.
+- [x] Varje ny mekanik har tester och en introbana som inte går att förlora (`asgard.test.ts`, `progress.test.ts`).
+- [x] Alla 60 banor och de fem bossarna är vinnbara, och `par` stämmer med lösaren (`engine.test.ts`, `bosses.test.ts`, `check-levels`).
 - [ ] Veckans utmaning är samma för samma vecka och går alltid att vinna.
 - [ ] Händelsernas datum fungerar, även över nyår, och belöningar delas bara ut en gång.
 - [ ] Kosmetika och album sparas, och gamla sparningar migreras.

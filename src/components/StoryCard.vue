@@ -16,7 +16,7 @@ const last = computed(() => page.value >= props.card.pages.length - 1)
 const base = import.meta.env.BASE_URL
 const ragnar = `${base}assets/characters/ragnar/portrait.webp`
 // Boss cards also show the boss (when its art exists).
-const bossId = computed(() => ['serpent', 'ulvhild', 'ymer', 'surt'][Number(/^boss-(\d)/.exec(props.card.id)?.[1] ?? -1)])
+const bossId = computed(() => ['serpent', 'ulvhild', 'ymer', 'surt', 'loke'][Number(/^boss-(\d)/.exec(props.card.id)?.[1] ?? -1)])
 const bossPic = computed(() => (bossId.value ? `${base}assets/bosses/${bossId.value}-portrait.webp` : ''))
 const bossOk = ref(true)
 // Cards before a raid end with "To the raid!", the others (after a boss, the finale) with "Close".

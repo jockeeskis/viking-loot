@@ -9,14 +9,17 @@ import { MANIFEST } from './assets.generated'
 
 export type AnimRange = { start: number; end: number; fps: number }
 export type SheetInfo = { sheet: string; frameWidth: number; frameHeight: number; originX: number; originY: number }
-export type VikingAnim = 'idle' | 'run' | 'attack' | 'carry' | 'victory' | 'fail' | 'look'
+export type VikingAnim = 'idle' | 'run' | 'attack' | 'carry' | 'victory' | 'fail' | 'look' | 'fly'
 export type VikingAsset = SheetInfo & { name: string; portrait: string; anims: Partial<Record<VikingAnim, AnimRange>> }
 export type AssetManifest = {
   vikings: Partial<Record<LootColor, VikingAsset>>
   jarls?: Partial<Record<LootColor, VikingAsset>>
   wild?: VikingAsset | null
   scout?: VikingAsset | null
-  loot: (SheetInfo & { frames: Record<string, number> }) | null
+  /** The valkyrie (0.6), with an extra 'fly' animation. */
+  valkyrie?: VikingAsset | null
+  /** `gatePlaque`: where the gate overlay's plaque sits in a frame (0..1), for the count written on it (0.6). */
+  loot: (SheetInfo & { frames: Record<string, number>; gatePlaque?: number[] }) | null
   ship: ShipAsset | null
   /** Every longship style by id ('ormen' is the default ship); the others are unlocked in Skeppsvarvet. */
   shipVariants?: Record<string, ShipAsset>
@@ -26,6 +29,8 @@ export type AssetManifest = {
   islandSnow?: IslandInfo | null
   /** The volcanic island used in Muspelheim (0.5). */
   islandLava?: IslandInfo | null
+  /** Asgård's island with marble pillars and the rainbow bridge (0.6). */
+  islandGold?: IslandInfo | null
   /** The raven that carries off waiting vikings (0.5). */
   raven?: (SheetInfo & { anims: { fly: AnimRange } }) | null
   /** The four bosses (0.5): idle frames plus a portrait for the story cards. */
@@ -45,8 +50,9 @@ export const SHIP_KEY = 'longship'
 export const ISLAND_KEY = 'island'
 export const ISLAND_SNOW_KEY = 'island-snow'
 export const ISLAND_LAVA_KEY = 'island-lava'
+export const ISLAND_GOLD_KEY = 'island-gold'
 export const RAVEN_KEY = 'raven'
-export type IslandStyle = 'grass' | 'snow' | 'lava'
+export type IslandStyle = 'grass' | 'snow' | 'lava' | 'gold'
 export const BOATS_KEY = 'boats'
 
 /** Animations that play once and stop on their last frame. */
@@ -57,6 +63,7 @@ export function assetFor(v: { kind: VikingKind; color: LootColor | null }): Viki
   if (v.kind === 'jarl' && v.color) return MANIFEST.jarls?.[v.color] ?? MANIFEST.vikings[v.color]
   if (v.kind === 'wild') return MANIFEST.wild ?? MANIFEST.vikings.yellow
   if (v.kind === 'scout') return MANIFEST.scout ?? MANIFEST.vikings.blue
+  if (v.kind === 'valkyrie') return MANIFEST.valkyrie ?? MANIFEST.scout ?? MANIFEST.vikings.yellow
   return v.color ? MANIFEST.vikings[v.color] : undefined
 }
 export const teamAsset = (c: LootColor) => MANIFEST.vikings[c]
@@ -101,13 +108,14 @@ export const islandAsset = () => MANIFEST.island ?? null
 export function islandKey(style: IslandStyle = 'grass') {
   if (style === 'snow' && MANIFEST.islandSnow) return ISLAND_SNOW_KEY
   if (style === 'lava' && MANIFEST.islandLava) return ISLAND_LAVA_KEY
+  if (style === 'gold' && MANIFEST.islandGold) return ISLAND_GOLD_KEY
   return ISLAND_KEY
 }
 export const ravenAsset = () => MANIFEST.raven ?? null
 export const boatsAsset = () => MANIFEST.boats ?? null
-export const lootFrame = (kind: LootKind | 'house-open' | 'padlock', color: LootColor) => MANIFEST.loot?.frames[`${kind}-${color}`]
-/** Colourless loot frames: 'stone', 'hidden' (loot under a tarp) and the 'ice' overlay. */
-export const namedLootFrame = (name: 'stone' | 'hidden' | 'ice') => MANIFEST.loot?.frames[name]
+export const lootFrame = (kind: LootKind | 'house-open' | 'padlock' | 'gate', color: LootColor) => MANIFEST.loot?.frames[`${kind}-${color}`]
+/** Colourless loot frames: 'stone', 'hidden' (loot under a tarp), the 'ice' overlay and Asgård's 'gold'. */
+export const namedLootFrame = (name: 'stone' | 'hidden' | 'ice' | 'gold') => MANIFEST.loot?.frames[name]
 
 function queueViking(scene: Phaser.Scene, a: VikingAsset) {
   if (!scene.textures.exists(sheetKey(a))) scene.load.spritesheet(sheetKey(a), a.sheet, { frameWidth: a.frameWidth, frameHeight: a.frameHeight })
@@ -124,6 +132,7 @@ export function preloadAssets(scene: Phaser.Scene) {
   if (island) scene.load.image(ISLAND_KEY, island.image)
   if (MANIFEST.islandSnow) scene.load.image(ISLAND_SNOW_KEY, MANIFEST.islandSnow.image)
   if (MANIFEST.islandLava) scene.load.image(ISLAND_LAVA_KEY, MANIFEST.islandLava.image)
+  if (MANIFEST.islandGold) scene.load.image(ISLAND_GOLD_KEY, MANIFEST.islandGold.image)
   const raven = MANIFEST.raven
   if (raven) scene.load.spritesheet(RAVEN_KEY, raven.sheet, { frameWidth: raven.frameWidth, frameHeight: raven.frameHeight })
   const boats = MANIFEST.boats
@@ -145,7 +154,7 @@ export function ensureVikings(scene: Phaser.Scene, assets: VikingAsset[], done: 
 /** Create animations for every loaded character (safe to call again after a lazy load). */
 export function createAnims(scene: Phaser.Scene) {
   const all = [
-    ...Object.values(MANIFEST.vikings), ...Object.values(MANIFEST.jarls ?? {}), MANIFEST.wild, MANIFEST.scout,
+    ...Object.values(MANIFEST.vikings), ...Object.values(MANIFEST.jarls ?? {}), MANIFEST.wild, MANIFEST.scout, MANIFEST.valkyrie,
   ].filter((a): a is VikingAsset => !!a)
   for (const a of all) {
     if (!scene.textures.exists(sheetKey(a))) continue

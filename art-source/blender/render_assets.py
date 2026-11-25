@@ -44,7 +44,11 @@ P = {
     # 0.5 – bosses
     'serpent': '#2E8C86', 'serpent_belly': '#CDE8B4', 'serpent_fin': '#E0573A', 'wolf': '#8C8790', 'wolf_dark': '#5E5962',
     'ulvhild': '#4B3A6B', 'hair_silver': '#C9C6D2', 'giant_ice': '#9FD3EA', 'giant_skin': '#CFE8F4', 'sea': '#5DB3E0',
+    # 0.6 – Asgård, the valkyrie and Loke
+    'marble': '#F4F0E8', 'marble_shade': '#D8D0C2', 'gold_dark': '#C9962A', 'valkyrie': '#9CC8E8', 'feather': '#FFFFFF',
+    'feather_shade': '#D6DEE8', 'hair_white': '#F4E3A1', 'loke': '#3E8E5A', 'loke_dark': '#1F4A33', 'magic': '#7CF0A0',
 }
+RAINBOW = ('#E5484D', '#F28C38', '#F5C542', '#5BBF5A', '#458FC4', '#6B5BC4')
 TEAM = {'ragnar': 'red', 'bjorn': 'blue', 'freja': 'yellow'}
 
 
@@ -310,7 +314,7 @@ def empty(name, loc=(0, 0, 0), parent=None):
 def build_viking(who, color=None):
     """who: ragnar, bjorn, freja, harald (the jarl, any team colour), ylva (the wild viking) or sigrid (the scout)."""
     team = P[color] if color else P['sail_cream'] if who == 'ylva' else P['cloak'] if who == 'sigrid' \
-        else P['ulvhild'] if who == 'ulvhild' else P[TEAM[who]]
+        else P['ulvhild'] if who == 'ulvhild' else P['valkyrie'] if who == 'valkyrie' else P['loke'] if who == 'loke' else P[TEAM[who]]
     sleeve = shade(team, -0.18)
     rig = {}
     root = rig['root'] = empty('root')
@@ -323,7 +327,20 @@ def build_viking(who, color=None):
         for z, c in ((0.07, 'red'), (0.17, 'blue'), (0.26, 'yellow')):
             r = 0.3 * math.sqrt(max(0.0, 1 - ((z - 0.16) / 0.27) ** 2)) + 0.004
             part('stripe', torus(r, 0.03, scale=(1, 0.88, 1), loc=(0, 0, z)), P[c], hips, outline=False)
-    if who in ('harald', 'sigrid', 'ulvhild'):  # the jarl's cape / the scout's travelling cloak, behind the torso
+    if who == 'valkyrie':  # big swan wings on her back (posed by pose_viking)
+        for side, sx in (('L', -1), ('R', 1)):
+            wing = rig['wing' + side] = empty('wing' + side, (sx * 0.16, 0.2, 0.4), hips)
+            # Five long feathers fanned from straight up to out sideways, so the wing reads above the shoulder.
+            for k in range(5):
+                a = 0.55 + 0.27 * k
+                length = 0.62 - 0.06 * k
+                d = (sx * math.sin(a), 0, math.cos(a))
+                part('feather', sphere(1, seg=16, rings=8, scale=(0.075, 0.03, length / 2), rot=(0, sx * a, 0),
+                                       loc=(d[0] * length / 2, 0.02 * k, d[2] * length / 2)),
+                     P['feather'] if k % 2 == 0 else P['feather_shade'], wing)
+            part('covert', sphere(1, seg=14, rings=8, scale=(0.13, 0.04, 0.12), loc=(sx * 0.08, -0.01, 0.06)), P['feather'], wing)
+        part('collar', torus(0.2, 0.035, scale=(1, 0.88, 1), loc=(0, 0, 0.36)), P['gold'], hips)
+    if who in ('harald', 'sigrid', 'ulvhild', 'loke'):  # the jarl's cape / the scout's travelling cloak, behind the torso
         part('cape', box(scale=(0.52, 0.05, 0.5), rot=(-0.12, 0, 0), loc=(0, 0.25, 0.08)), shade(team, -0.3), hips, smooth=False, bevel=0.03)
         part('clasp', sphere(0.045, loc=(0, -0.2, 0.33)), P['gold'], hips)
     part('belt', torus(0.285, 0.035, scale=(1, 0.88, 1), loc=(0, 0, 0.09)), P['wood_dark'], hips)
@@ -349,23 +366,27 @@ def build_viking(who, color=None):
         part('eye', sphere(0.045, seg=16, rings=10, scale=(1, 1, 1.15), loc=(x, -0.235, 0.215)), P['black'], head, outline=False)
         part('glint', sphere(0.015, seg=10, rings=6, loc=(x + 0.015, -0.275, 0.235)), P['white'], head, outline=False, emission=True)
 
-    if who in ('freja', 'ylva', 'sigrid', 'ulvhild'):
-        hair = {'freja': P['hair_blonde'], 'ylva': P['hair_dark'], 'sigrid': P['hair_red'], 'ulvhild': P['hair_silver']}[who]
+    if who in ('freja', 'ylva', 'sigrid', 'ulvhild', 'valkyrie'):
+        hair = {'freja': P['hair_blonde'], 'ylva': P['hair_dark'], 'sigrid': P['hair_red'], 'ulvhild': P['hair_silver'],
+                'valkyrie': P['hair_white']}[who]
         part('hair', sphere(0.285, loc=(0, 0.035, 0.19)), hair, head)
         for sx in (-1, 1):
             for k, (z, r) in enumerate(((0.06, 0.075), (-0.05, 0.068), (-0.15, 0.06))):
                 part('braid', sphere(r, loc=(sx * 0.245, -0.02, z)), shade(hair, -0.08 * k), head)
-            part('tie', sphere(0.035, loc=(sx * 0.245, -0.02, -0.21)), {'freja': P['red'], 'ylva': P['blue'], 'sigrid': P['gold'], 'ulvhild': P['gold']}[who], head, outline=False)
+            part('tie', sphere(0.035, loc=(sx * 0.245, -0.02, -0.21)), {'freja': P['red'], 'ylva': P['blue'], 'sigrid': P['gold'], 'ulvhild': P['gold'], 'valkyrie': P['gold']}[who], head, outline=False)
             part('cheek', sphere(0.042, seg=12, rings=8, scale=(1, 0.4, 0.7), loc=(sx * 0.15, -0.235, 0.115)), P['cheek'], head, outline=False)
         part('smile', sphere(1, seg=16, rings=10, cut=('below', 0), scale=(0.075, 0.03, 0.06), loc=(0, -0.252, 0.085)), P['mouth'], head, outline=False)
         browc = shade(hair, -0.25)
     else:
-        beard = {'ragnar': P['beard_red'], 'bjorn': P['beard_grey'], 'harald': P['beard_brown']}[who]
+        beard = {'ragnar': P['beard_red'], 'bjorn': P['beard_grey'], 'harald': P['beard_brown'], 'loke': P['hair_red']}[who]
         long = who in ('bjorn', 'harald')
-        part('beard', sphere(1, scale=(0.25, 0.17, 0.25 if long else 0.2), loc=(0, -0.12, -0.06 if long else -0.04)), beard, head)
+        if who == 'loke':  # only a thin pointed goatee: the trickster keeps his grin in view
+            part('goatee', cyl(0.07, 0.0, 0.2, seg=10, rot=(math.pi + 0.3, 0, 0), loc=(0, -0.2, -0.08)), beard, head, smooth=False)
+        else:
+            part('beard', sphere(1, scale=(0.25, 0.17, 0.25 if long else 0.2), loc=(0, -0.12, -0.06 if long else -0.04)), beard, head)
         for sx in (-1, 1):
             part('mustache', sphere(1, scale=(0.11, 0.07, 0.055), rot=(0, sx * 0.35, 0), loc=(sx * 0.075, -0.25, 0.105)), shade(beard, 0.08), head)
-        if who in ('ragnar', 'harald'):  # loud, open grin
+        if who in ('ragnar', 'harald', 'loke'):  # loud, open grin
             part('mouth', sphere(1, seg=16, rings=10, scale=(0.075, 0.03, 0.05), loc=(0, -0.262, 0.035)), P['mouth'], head, outline=False)
         browc = shade(beard, -0.15)
     stern = who == 'bjorn'
@@ -387,6 +408,20 @@ def build_viking(who, color=None):
             part('ring', torus(r + 0.004, 0.01, seg=18, ring=6, loc=(0, -0.06, z1)), P['wood_dark'], arm, outline=False)
         part('lens', cyl(0.05, 0.05, 0.01, seg=18, loc=(0, -0.06, -0.586)), P['ice'], arm, outline=False, emission=True)
         return rig
+    if who == 'loke':
+        # A two-pointed trickster's hood in green and black with gold bells – no helmet for Loke.
+        part('hood', sphere(0.3, scale=(1, 1, 0.9), loc=(0, 0.06, 0.24)), P['loke'], head)
+        part('band', torus(0.27, 0.035, rot=(0.2, 0, 0), loc=(0, -0.03, 0.2)), P['gold'], head)
+        for sx, col in ((-1, P['loke']), (1, P['loke_dark'])):
+            for k in range(6):  # each point curls out and down
+                u = k / 5
+                part('point', sphere(0.09 - 0.045 * u, seg=14, rings=8,
+                                     loc=(sx * (0.18 + 0.28 * u), 0.05, 0.42 + 0.2 * math.sin(u * 2.4))), col, head)
+            part('bell', sphere(0.05, seg=12, rings=8, loc=(sx * 0.48, 0.05, 0.5)), P['gold'], head)
+        for sx in (-1, 1):  # sly slanted brows on top of the usual ones
+            part('slybrow', box(scale=(0.11, 0.03, 0.03), rot=(0, sx * 0.45, 0), loc=(sx * 0.09, -0.255, 0.3)), P['hair_red'], head,
+                 smooth=False, outline=False)
+        return rig
     part('helmet', sphere(0.29, cut=('above', 0.0), scale=(1, 1, 0.8), loc=(0, 0, hz)), P['steel'], head)
     part('rim', torus(0.29, 0.03, loc=(0, 0, hz)), P['steel_dark'], head)
     if who in ('harald', 'ulvhild'):  # a gold crown around the helmet marks the jarl
@@ -397,6 +432,11 @@ def build_viking(who, color=None):
     else:
         part('knob', sphere(0.045, loc=(0, 0, hz + 0.235)), P['steel_dark'], head)
     for sx in (-1, 1):
+        if who == 'valkyrie':  # small white wings on the helmet instead of horns
+            for k in range(3):
+                part('helmwing', sphere(1, seg=12, rings=8, scale=(0.05, 0.13 - 0.025 * k, 0.03), rot=(0, sx * (0.7 + 0.25 * k), 0),
+                                        loc=(sx * (0.3 + 0.03 * k), 0.04 + 0.03 * k, hz + 0.08 + 0.06 * k)), P['feather'], head)
+            continue
         part('horn', cyl(0.07, 0.035, 0.2, rot=(0, sx * 1.0, 0), loc=(sx * 0.32, 0, hz + 0.12)), P['horn'], head)
         part('horntip', cyl(0.038, 0.004, 0.16, rot=(0, sx * 0.25, 0), loc=(sx * 0.41, 0, hz + 0.26)), P['horn'], head)
 
@@ -407,6 +447,10 @@ def build_viking(who, color=None):
         part('handle', cyl(0.022 * k, 0.022 * k, 0.55 * k, loc=(0, -0.06, -0.2 + 0.12 * k)), P['wood_dark'], arm)
         part('blade', sphere(1, seg=24, rings=12, cut=('above', 0.0), scale=(0.17 * k, 0.025, 0.15 * k), rot=(0, math.pi / 2, 0),
                              loc=(0.015, -0.06, -0.2 + 0.34 * k)), P['steel'], arm)
+    if who == 'valkyrie':  # a spear with a gold point
+        arm = rig['armR']
+        part('shaft', cyl(0.02, 0.02, 0.95, seg=10, loc=(0, -0.06, -0.05)), P['wood_dark'], arm)
+        part('point', cyl(0.05, 0.0, 0.16, seg=8, loc=(0, -0.06, 0.5)), P['gold'], arm, smooth=False)
     if who == 'bjorn':
         arm = rig['armL']
         sh = empty('shield', (-0.02, -0.16, -0.16), arm)
@@ -485,6 +529,15 @@ def pose_viking(rig, anim, t):
         hips.rotation_euler.x = -0.08
         hips.location.z = 0.30 + 0.01 * breath
         head.rotation_euler.x = -0.22 + 0.04 * breath
+    elif anim == 'fly':
+        # The valkyrie in flight: lifted off the ground, leaning forward, legs trailing, spear held forward.
+        hips.location.z = 0.42 + 0.03 * math.sin(p)
+        hips.rotation_euler.x = 0.32
+        rig['legL'].rotation_euler.x = -0.35
+        rig['legR'].rotation_euler.x = -0.55
+        rig['armR'].rotation_euler = (-1.2, -0.1, 0)
+        rig['armL'].rotation_euler = (0.3, 0.6, 0)
+        head.rotation_euler.x = -0.25
     elif anim == 'fail':
         # Slump: head drops, arms hang, a slow sad shake. Played once; the last frame holds.
         u = min(1.0, t / 0.5)
@@ -496,6 +549,10 @@ def pose_viking(rig, anim, t):
         rig['armR'].rotation_euler = (0.35 * u, 0.15 * u, 0)
         rig['legL'].rotation_euler.y = -0.12 * u
         rig['legR'].rotation_euler.y = 0.12 * u
+    if 'wingL' in rig:  # the valkyrie's wings: folded back at rest, a full beat in flight
+        beat = {'fly': 0.6, 'victory': 0.35, 'run': 0.2}.get(anim, 0.06)
+        for side, sx in (('L', -1), ('R', 1)):
+            rig['wing' + side].rotation_euler = (0.2, sx * beat * math.sin(p), sx * -0.35)
 
 
 # ---------------------------------------------------------------- loot (ui-settings.md §5)
@@ -672,6 +729,45 @@ def build_cage(color):
         part('dome', torus(0.28, 0.014, seg=24, ring=6, rot=(math.pi / 2, 0, a), loc=(0, 0, 0.62), scale=(1, 1, 0.55)), team, root, outline=False)
     part('hook', torus(0.05, 0.014, seg=16, ring=6, rot=(math.pi / 2, 0, 0), loc=(0, 0, 0.8)), P['steel_dark'], root)
     part('lock', box(scale=(0.09, 0.03, 0.08), loc=(0, -0.29, 0.3)), P['gold'], root, smooth=False)
+    return root
+
+
+def build_gold(_color=None):
+    """Asgård's golden treasure: a heap of coins with a goblet and a red gem. No colour – anyone may take it."""
+    root = empty('root')
+    part('heap', sphere(0.3, seg=24, rings=12, cut=('above', 0.0), scale=(1.15, 1.0, 0.5)), P['gold'], root)
+    for k in range(14):  # coins lying on and around the heap
+        a = 2.4 * k
+        r = 0.12 + 0.2 * ((k * 37) % 10) / 10
+        z = max(0.02, 0.2 * (1 - (r / 0.34) ** 2))
+        part('coin', cyl(0.06, 0.06, 0.016, seg=16, rot=(0.6 * math.sin(k), 0.5 * math.cos(k * 1.3), 0),
+                         loc=(r * math.cos(a), r * math.sin(a) * 0.9, z)), P['gold'] if k % 3 else P['gold_dark'], root)
+    # Three towers of stacked coins on the heap, and a red gem in front.
+    for (cx, cy, n) in ((-0.13, 0.0, 4), (0.12, 0.04, 3), (0.0, 0.14, 5)):
+        for k in range(n):
+            part('stack', cyl(0.075, 0.075, 0.028, seg=20, loc=(cx + 0.006 * math.sin(k * 2.1), cy, 0.12 + 0.032 * k)),
+                 P['gold'] if k % 2 else P['gold_dark'], root)
+    part('gem', sphere(0.045, seg=12, rings=8, loc=(0.02, -0.2, 0.1)), P['red'], root, emission=True)
+    for x, z in ((-0.2, 0.12), (0.22, 0.1), (-0.13, 0.25)):  # glints
+        part('glint', sphere(0.025, seg=8, rings=6, loc=(x, -0.27, z)), P['white'], root, outline=False, emission=True)
+    return root
+
+
+def build_gate(color):
+    """Valhalla's gate: a marble arch with a lintel in the gate's colour and a round gold plaque, drawn on top
+    of the loot it guards (like the padlock). The game writes how many items are still needed on the plaque."""
+    team = P[color]
+    root = empty('root')
+    gate = empty('gate', (0, -0.3, 0), root)
+    gate.rotation_euler.z = math.radians(22)  # undo the loot turn so the arch faces the camera
+    for x in (-0.3, 0.3):
+        part('pillar', cyl(0.055, 0.05, 0.56, seg=12, loc=(x, 0, 0.28)), P['marble'], gate)
+        part('base', box(scale=(0.14, 0.14, 0.05), loc=(x, 0, 0.025)), P['marble_shade'], gate, smooth=False, bevel=0.01)
+        part('capital', box(scale=(0.14, 0.14, 0.04), loc=(x, 0, 0.58)), P['marble_shade'], gate, smooth=False, bevel=0.01)
+    part('lintel', box(scale=(0.78, 0.13, 0.1), loc=(0, 0, 0.65)), team, gate, smooth=False, bevel=0.02)
+    part('trim', box(scale=(0.8, 0.14, 0.025), loc=(0, 0, 0.71)), P['gold'], gate, smooth=False, bevel=0.008)
+    part('plaque', cyl(0.11, 0.11, 0.04, seg=24, rot=(math.pi / 2, 0, 0), loc=(0, -0.09, 0.65)), P['gold'], gate)
+    part('plaquein', cyl(0.085, 0.085, 0.02, seg=24, rot=(math.pi / 2, 0, 0), loc=(0, -0.11, 0.65)), shade(team, -0.35), gate, outline=False)
     return root
 
 
@@ -871,10 +967,40 @@ def build_surt(t):
     return root
 
 
-BOSS_BUILDERS = {'serpent': build_serpent, 'ulvhild': build_ulvhild, 'ymer': build_ymer, 'surt': build_surt}
+def build_loke(t):
+    """Loke the trickster: a grinning god in a two-pointed hood on a rock in the sea, a green flame of magic in
+    one hand and a golden mask – his lies – in the other."""
+    root = empty('root')
+    water_ring(root, 0.55)
+    part('rock', sphere(1, scale=(0.42, 0.34, 0.16), loc=(0, 0, 0.02)), P['stone'], root)
+    rig = build_viking('loke')
+    rig['root'].parent = root
+    rig['root'].location.z = 0.14
+    pose_viking(rig, 'idle', t)
+    p = 2 * math.pi * t
+    rig['armL'].rotation_euler = (-0.9, 0.5, 0)
+    rig['armR'].rotation_euler = (-1.1 + 0.08 * math.sin(p), -0.4, 0)
+    flame = empty('flame', (0, -0.02, -0.34), rig['armL'])
+    for k in range(4):
+        f = 0.5 + 0.5 * math.sin(p * 2 + k * 1.6)
+        part('magic', cyl(0.06 - 0.01 * k, 0.0, 0.16 + 0.06 * f, seg=8, rot=(0.3 * math.sin(k), 0.3 * math.cos(k), 0),
+                          loc=(0.02 * math.sin(k * 2), 0, -0.04 - 0.04 * k)), P['magic'] if k % 2 else P['loke'], flame,
+             smooth=False, outline=False, emission=True)
+    mask = empty('mask', (0, -0.08, -0.36), rig['armR'])
+    mask.rotation_euler = (math.pi / 2 + 0.3, 0, 0)
+    part('mask', sphere(1, seg=18, rings=10, cut=('above', 0.0), scale=(0.15, 0.17, 0.06)), P['gold'], mask)
+    for sx in (-1, 1):
+        part('maskeye', sphere(0.025, seg=8, rings=6, loc=(sx * 0.055, -0.04, 0.05)), P['black'], mask, outline=False)
+    part('maskgrin', box(scale=(0.1, 0.02, 0.012), loc=(0, 0.06, 0.05)), P['black'], mask, smooth=False, outline=False)
+    return root
+
+
+BOSS_BUILDERS = {'serpent': build_serpent, 'ulvhild': build_ulvhild, 'ymer': build_ymer, 'surt': build_surt, 'loke': build_loke}
 # Camera target height and ortho scale per boss (the serpent and Surt's sword are tall).
-BOSS_CAMERA = {'serpent': (0, 0.55, 2.0), 'ulvhild': (0, 0.72, 1.85), 'ymer': (0, 0.6, 1.9), 'surt': (0.15, 0.75, 2.5)}
-BOSS_PORTRAIT = {'serpent': (0, 1.05, 0.75), 'ulvhild': (0, 1.2, 0.85), 'ymer': (0, 1.0, 0.95), 'surt': (0, 0.95, 0.95)}
+BOSS_CAMERA = {'serpent': (0, 0.55, 2.0), 'ulvhild': (0, 0.72, 1.85), 'ymer': (0, 0.6, 1.9), 'surt': (0.15, 0.75, 2.5),
+               'loke': (0, 0.74, 1.9)}
+BOSS_PORTRAIT = {'serpent': (0, 1.05, 0.75), 'ulvhild': (0, 1.2, 0.85), 'ymer': (0, 1.0, 0.95), 'surt': (0, 0.95, 0.95),
+                 'loke': (0, 1.24, 0.95)}
 BOSS_FRAME, BOSS_FRAMES = 240, 4
 
 
@@ -916,6 +1042,8 @@ SHIP_STYLES = {
                      'star': True},
     'ymer': {'sail': ('#2A1D17', '#F5C542'), 'dragon': '#B8322A', 'shields': ('#2A1D17', '#F5C542'), 'horn': '#F5C542'},
     'surt': {'sail': ('#F2642A', '#FFC23D'), 'dragon': '#2A2224', 'shields': ('#F2642A', '#2A2224'), 'horn': '#FFC23D'},
+    'gyllene': {'sail': ('#F5C542', '#FFFFFF'), 'dragon': '#F5C542', 'shields': ('#F5C542', '#FFFFFF'), 'horn': '#FFFFFF',
+                'star': True},
 }
 
 
@@ -1054,9 +1182,9 @@ VIKING_ANIMS = [('idle', 12, 8), ('run', 10, 16), ('attack', 10, 18), ('carry', 
 CHARACTERS = {
     'ragnar': ('ragnar', 'red'), 'bjorn': ('bjorn', 'blue'), 'freja': ('freja', 'yellow'),
     'harald-red': ('harald', 'red'), 'harald-blue': ('harald', 'blue'), 'harald-yellow': ('harald', 'yellow'),
-    'ylva': ('ylva', None), 'sigrid': ('sigrid', None),
+    'ylva': ('ylva', None), 'sigrid': ('sigrid', None), 'valkyrie': ('valkyrie', None),
 }
-EXTRA_ANIMS = {'sigrid': [('look', 10, 10)]}  # character-specific animations
+EXTRA_ANIMS = {'sigrid': [('look', 10, 10)], 'valkyrie': [('fly', 8, 14)]}  # character-specific animations
 VIKING_FRAME = 192  # shown at ~92 logical px = 184 px on the 2x canvas
 VIKING_QUALITY = 78  # character sheets are the bulk of the download
 
@@ -1099,6 +1227,8 @@ def render_viking(key, manifest):
         manifest['wild'] = entry
     elif who == 'sigrid':
         manifest['scout'] = entry
+    elif who == 'valkyrie':
+        manifest['valkyrie'] = entry
     else:
         manifest['vikings'][color] = entry
 
@@ -1121,6 +1251,11 @@ def render_loot(manifest):
     # 0.5 – Muspelheim: powder kegs and cages per colour.
     jobs += [('keg', build_keg, color) for color in ('red', 'blue', 'yellow')]
     jobs += [('cage', build_cage, color) for color in ('red', 'blue', 'yellow')]
+    # 0.6 – Asgård: the golden treasure and Valhalla's gate (an overlay per colour). New frames go last,
+    # so every older frame keeps its index.
+    jobs += [('gold', build_gold, None)]
+    jobs += [('gate', build_gate, color) for color in ('red', 'blue', 'yellow')]
+    plaque = None
     for kind, build, color in jobs:
             reset_scene()
             OUTLINE_W[0] = 0.012
@@ -1130,6 +1265,12 @@ def render_loot(manifest):
             name = f'{kind}-{color}' if color else kind
             path = os.path.join(TMP, 'loot', f'{name}.png')
             render_to(path)
+            if kind == 'gate' and plaque is None:
+                # Where the gate's plaque lands in the frame, so the game can write the count on it.
+                bpy.context.view_layer.update()
+                ob = next(o for o in bpy.data.objects if o.name.startswith('plaquein'))
+                pts = [ob.matrix_world @ v.co for v in ob.data.vertices]
+                plaque = anchor(cam, sum(pts, Vector((0, 0, 0))) / len(pts))
             if kind == 'ice':
                 fade_png(path, 0.68)  # see-through, so the frozen loot shows inside
             frames.append(path)
@@ -1139,6 +1280,8 @@ def render_loot(manifest):
     pack(frames, LOOT_FRAME, LOOT_FRAME, 3, os.path.join(PUBLIC, rel))
     manifest['loot'] = {'sheet': rel, 'frameWidth': LOOT_FRAME, 'frameHeight': LOOT_FRAME, 'originX': ox, 'originY': oy,
                         'frames': {n: i for i, n in enumerate(names)}}
+    if plaque:
+        manifest['loot']['gatePlaque'] = list(plaque)
 
 
 SHIP_W, SHIP_H, SHIP_FRAMES = 424, 272, 12
@@ -1247,6 +1390,30 @@ def build_spire(lx, ly, s):
     return root
 
 
+def build_pillar(lx, ly, s):
+    """Asgård: a white marble pillar with a gold band instead of a tree."""
+    root = empty('pillar', L(lx, ly))
+    part('base', box(scale=(0.2 * s, 0.2 * s, 0.06 * s), loc=(0, 0, 0.03 * s)), P['marble_shade'], root, smooth=False, bevel=0.01)
+    part('shaft', cyl(0.075 * s, 0.065 * s, 0.7 * s, seg=12, loc=(0, 0, 0.41 * s)), P['marble'], root, smooth=False)
+    part('band', cyl(0.08 * s, 0.08 * s, 0.04 * s, seg=12, loc=(0, 0, 0.62 * s)), P['gold'], root)
+    part('capital', box(scale=(0.22 * s, 0.22 * s, 0.06 * s), loc=(0, 0, 0.78 * s)), P['marble_shade'], root, smooth=False, bevel=0.01)
+    return root
+
+
+def build_bifrost(a, b, height):
+    """The rainbow bridge Bifrost: six coloured bands arching from logical point a to b."""
+    root = empty('bifrost')
+    pa, pb = L(*a), L(*b)
+    for band, col in enumerate(RAINBOW):
+        lift = 0.07 * (len(RAINBOW) - 1 - band)
+        for i in range(41):
+            u = i / 40
+            pos = pa.lerp(pb, u)
+            pos.z = 0.03 + (height + lift) * math.sin(math.pi * u)
+            part('arc', sphere(0.05, seg=10, rings=6, loc=tuple(pos)), col, root, outline=False, emission=band in (2, 3))
+    return root
+
+
 def build_tree(lx, ly, s, snow=False):
     root = empty('tree', L(lx, ly))
     part('trunk', cyl(0.04 * s, 0.035 * s, 0.24 * s, seg=10, loc=(0, 0, 0.12 * s)), P['wood_dark'], root)
@@ -1270,8 +1437,9 @@ def build_rock(lx, ly, s, snow=False):
     return root
 
 
-def build_island(snow=False, lava=False):
-    """The island under the loot. snow=True: the winter version used in Isriket; lava=True: Muspelheim."""
+def build_island(snow=False, lava=False, gold=False):
+    """The island under the loot. snow=True: the winter version used in Isriket; lava=True: Muspelheim;
+    gold=True: Asgård (0.6), with marble pillars, gold ponds and the rainbow bridge."""
     C = {
         'cliff': '#7A8591' if snow else '#7D8086', 'sand': '#D6E1E8' if snow else '#E6CF98',
         'grass': P['snow'] if snow else '#6CBB48', 'patch': P['snow_shade'] if snow else '#86CC5B',
@@ -1281,6 +1449,9 @@ def build_island(snow=False, lava=False):
     if lava:
         C = {'cliff': '#2E292A', 'sand': '#4A4244', 'grass': '#5E5553', 'patch': P['lava'], 'cobble': '#766B68',
              'bush': (P['basalt'], P['ash'])}
+    if gold:
+        C = {'cliff': '#CFC6B4', 'sand': '#F2DE9C', 'grass': '#8ED36A', 'patch': P['gold'], 'cobble': P['marble'],
+             'bush': ('#5FBF5A', P['gold'])}
     root = empty('island')
     x, y, w, h = 8, 58, 344, 326  # ISLAND in RaidScene.ts
     part('cliff', slab(rrect(x, y, w, h - 4, 30), rrect(x - 4, y + 4, w + 8, h + 4, 34), -0.03, -0.4),
@@ -1292,6 +1463,8 @@ def build_island(snow=False, lava=False):
         if lava:  # glowing lava pools with a hot core
             part('lavapool', ground_disc(px, py, pw * 0.8, ph * 0.8, 0.036, 0.004), C['patch'], root, outline=False, emission=True)
             part('lavacore', ground_disc(px, py, pw * 0.4, ph * 0.4, 0.037, 0.004), P['lava_hot'], root, outline=False, emission=True)
+        elif gold:  # small golden ponds that shine
+            part('goldpond', ground_disc(px, py, pw * 0.75, ph * 0.75, 0.036, 0.004), C['patch'], root, outline=False, emission=True)
         else:
             part('patch', ground_disc(px, py, pw, ph, 0.035, 0.004), C['patch'], root, outline=False)
     for r in range(7):
@@ -1302,6 +1475,8 @@ def build_island(snow=False, lava=False):
     for tx, ty, ts in ((26, 120, 1.0), (334, 104, 1.1), (30, 300, 0.95), (336, 260, 1.0), (346, 180, 0.8)):
         if lava:
             build_spire(tx, ty, ts)
+        elif gold:
+            build_pillar(tx, ty, ts)
         else:
             build_tree(tx, ty, ts, snow)
     for rx, ry, rs in ((22, 210, 0.8), (340, 350, 0.9), (300, 76, 0.7), (60, 368, 0.8)):
@@ -1318,11 +1493,16 @@ def build_island(snow=False, lava=False):
         part('bush2', sphere(0.08, seg=12, rings=8, cut=('above', 0), loc=L(bx + 10, by + 4), scale=(1.2, 1, 0.8)), C['bush'][1], root)
         if snow:
             part('bushsnow', sphere(0.1, seg=12, rings=8, cut=('above', 0), loc=L(bx, by, 0.05), scale=(1.2, 1, 0.45)), P['snow'], root, outline=False)
+    if gold:  # Bifrost arches over the back corner, away from the loot
+        build_bifrost((236, 66), (352, 66), 0.3)
     # flowers and tufts (or ice crystals in winter) scattered along the edges, away from the loot grid
     for i, (fx, fy) in enumerate(((40, 80), (200, 66), (320, 140), (28, 250), (338, 220), (150, 372), (250, 370), (90, 70))):
         if lava:  # small flames
             part('flame', cyl(0.035, 0.0, 0.11, seg=6, loc=L(fx, fy, 0.09)), P['lava'], root, smooth=False, outline=False, emission=True)
             part('flame2', cyl(0.02, 0.0, 0.07, seg=6, loc=L(fx + 6, fy + 2, 0.07)), P['lava_hot'], root, smooth=False, outline=False, emission=True)
+        elif gold:  # white and gold flowers
+            part('flower', sphere(0.024, seg=8, rings=6, loc=L(fx, fy, 0.05)), (P['white'], P['gold'])[i % 2], root)
+            part('tuft', cyl(0.03, 0.0, 0.06, seg=5, loc=L(fx + 9, fy + 3, 0.065)), '#5FBF5A', root, smooth=False, outline=False)
         elif snow:
             part('crystal', cyl(0.03, 0.0, 0.1, seg=4, loc=L(fx, fy, 0.09)), P['ice'], root, smooth=False)
             part('crystal2', cyl(0.022, 0.0, 0.07, seg=4, rot=(0, 0.5, 0), loc=L(fx + 7, fy + 2, 0.07)), P['ice_dark'], root, smooth=False)
@@ -1332,18 +1512,18 @@ def build_island(snow=False, lava=False):
     return root
 
 
-def render_island(manifest, snow=False, lava=False):
+def render_island(manifest, snow=False, lava=False, gold=False):
     reset_scene()
     OUTLINE_W[0] = 0.012
-    build_island(snow, lava)
+    build_island(snow, lava, gold)
     res = (720, ISLAND_H * 2)
     camera((0, 0, 0), 3.6, res, elev=ISLAND_ELEV)
-    name = 'island-lava' if lava else 'island-snow' if snow else 'island'
+    name = 'island-gold' if gold else 'island-lava' if lava else 'island-snow' if snow else 'island'
     tmp = os.path.join(TMP, 'island', f'{name}.png')
     render_to(tmp)
     rel = f'assets/island/{name}.webp'
     pack([tmp], res[0], res[1], 1, os.path.join(PUBLIC, rel))
-    key = 'islandLava' if lava else 'islandSnow' if snow else 'island'
+    key = 'islandGold' if gold else 'islandLava' if lava else 'islandSnow' if snow else 'island'
     manifest[key] = {'image': rel, 'x': 0, 'y': ISLAND_TOP, 'width': 360, 'height': ISLAND_H}
 
 
@@ -1401,7 +1581,7 @@ def write_manifest(manifest):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'boats', 'island', 'island-snow', 'island-lava', 'raven', 'bosses'}
+    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'boats', 'island', 'island-snow', 'island-lava', 'island-gold', 'raven', 'bosses'}
     if 'harald' in want:
         want |= {'harald-red', 'harald-blue', 'harald-yellow'}
     manifest = {'vikings': {}, 'loot': None, 'ship': None, 'island': None}
@@ -1430,6 +1610,9 @@ def main():
     if 'island-lava' in want:
         render_island(manifest, lava=True)
         print('[viking-loot] rendered lava island')
+    if 'island-gold' in want:
+        render_island(manifest, gold=True)
+        print('[viking-loot] rendered Asgård island')
     if 'raven' in want:
         render_raven(manifest)
         print('[viking-loot] rendered raven')

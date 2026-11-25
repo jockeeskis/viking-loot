@@ -219,6 +219,14 @@ export function evaluate(spec: Spec, cand: Candidate): Found | string {
     const bareRate = bare.winningLines / (bare.winningLines + bare.losingLines)
     if (bareRate > rate - (spec.min === 1 ? 0.15 : 0.1)) return 'ship does not matter'
   }
+  // 0.6: in a puzzle a valkyrie must matter too: without her the level has to be clearly harder (or lose
+  // outright). An intro level cannot be lost anyway, so there she only has to be there.
+  if (spec.min < 1 && cand.queue.some(q => typeof q !== 'string' && q.kind === 'valkyrie')) {
+    const queue = cand.queue.filter(q => typeof q === 'string' || q.kind !== 'valkyrie')
+    const bare = solve(startGame({ loot, queue, ships: cand.ships, raven: cand.raven }))
+    const bareRate = bare.winnable ? bare.winningLines / (bare.winningLines + bare.losingLines) : 0
+    if (bareRate > rate - 0.1) return 'valkyrie does not matter'
+  }
   return { ...cand, rate, lines, par: r.minWaits ?? 0 }
 }
 

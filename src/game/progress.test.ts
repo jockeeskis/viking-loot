@@ -69,12 +69,13 @@ test('mechanicsOf finds the new mechanics in a level', () => {
   assert.deepEqual(mechanicsOf(l), ['house', 'stone', 'jarl', 'wild', 'hidden'])
 })
 
-test('Fjordarna, Isriket and Muspelheim introduce each mechanic on a level that cannot be lost, then use it in a puzzle', () => {
-  assert.equal(levels.length, 48)
+test('Fjordarna, Isriket, Muspelheim and Asgård introduce each mechanic on a level that cannot be lost, then use it in a puzzle', () => {
+  assert.equal(levels.length, 60)
   const intros: [number, string][] = [
     [12, 'house'], [14, 'stone'], [16, 'jarl'], [18, 'wild'], [20, 'hidden'], // Fjordarna
     [24, 'key'], [26, 'ice'], [28, 'ships'], [30, 'scout'], // Isriket
     [36, 'keg'], [38, 'tide'], [40, 'cage'], [42, 'raven'], // Muspelheim
+    [48, 'gold'], [50, 'gate'], [52, 'valkyrie'], // Asgård
   ]
   const seen = new Set<string>()
   levels.slice(0, 12).forEach(l => mechanicsOf(l).forEach(m => seen.add(m)))
@@ -89,6 +90,6 @@ test('Fjordarna, Isriket and Muspelheim introduce each mechanic on a level that 
     assert.ok(mechanicsOf(puzzle).includes(m as never), `${puzzle.name} uses ${m}`)
     assert.ok(solve(startGame(puzzle)).lossPath, `${puzzle.name} can be lost`)
   }
-  for (const l of [...levels.slice(22, 24), ...levels.slice(33, 36), ...levels.slice(44)]) assert.ok(mechanicsOf(l).length >= 3, `${l.name} mixes mechanics`)
+  for (const l of [...levels.slice(22, 24), ...levels.slice(33, 36), ...levels.slice(44, 48), ...levels.slice(54)]) assert.ok(mechanicsOf(l).length >= 3, `${l.name} mixes mechanics`)
   assert.ok(mechanicsOf(levels[32]).length >= 2, `${levels[32].name} mixes mechanics`)
 })

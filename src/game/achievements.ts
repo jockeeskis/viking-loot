@@ -1,5 +1,6 @@
 // Statistics, achievements and the ships of Skeppsvarvet (0.4). Pure rules plus small storage helpers.
 import { levels, worlds } from './levels.ts'
+import { bosses } from './bosses.ts'
 import type { Progress } from './progress.ts'
 import type { ModeProgress } from './modes.ts'
 
@@ -23,13 +24,14 @@ export type Ctx = { stats: Stats; progress: Progress; modes: ModeProgress }
 
 // ---------------------------------------------------------------- ships
 
-export type ShipId = 'ormen' | 'havsorn' | 'nordstjarnan' | 'ymer' | 'surt'
+export type ShipId = 'ormen' | 'havsorn' | 'nordstjarnan' | 'ymer' | 'surt' | 'gyllene'
 export const SHIPS: { id: ShipId; name: string; stars: number; text: string }[] = [
   { id: 'ormen', name: 'Ormen', stars: 0, text: 'Det gamla trotjänarskeppet med rött och vitt segel.' },
   { id: 'havsorn', name: 'Havsörnen', stars: 30, text: 'Blått segel och en vit örn i fören.' },
   { id: 'nordstjarnan', name: 'Nordstjärnan', stars: 60, text: 'Nattblått segel med en gyllene stjärna.' },
   { id: 'ymer', name: 'Ymers drake', stars: 100, text: 'Svart och guld, med en röd drake som vaknat ur isen.' },
   { id: 'surt', name: 'Surtsglöd', stars: 130, text: 'Ett segel som glöder som lava och en drake svart som sot.' },
+  { id: 'gyllene', name: 'Gyllene Draken', stars: 165, text: 'Ett segel i guld och vitt med en stjärna, och en drake av rent guld.' },
 ]
 /** Stars from levels and bosses together (they unlock the ships). */
 export const totalStars = (p: Progress) => [...p.stars, ...(p.bossStars ?? [])].reduce((a, b) => a + (b ?? 0), 0)
@@ -44,7 +46,7 @@ const wonAll = (p: Progress, first: number, last: number, stars = 1) => {
 }
 const countIn = (p: Progress, first: number, last: number, stars = 1) =>
   p.stars.slice(first, last + 1).filter(s => (s ?? 0) >= stars).length
-const [KUSTEN, FJORDARNA, ISRIKET, MUSPELHEIM] = worlds
+const [KUSTEN, FJORDARNA, ISRIKET, MUSPELHEIM, ASGARD] = worlds
 const bossesBeaten = (p: Progress, stars = 1) => (p.bossStars ?? []).filter(s => (s ?? 0) >= stars).length
 const LAST = levels.length - 1
 
@@ -74,6 +76,10 @@ export const ACHIEVEMENTS: Achievement[] = [
     done: c => wonAll(c.progress, MUSPELHEIM.first, MUSPELHEIM.last), progress: c => [countIn(c.progress, MUSPELHEIM.first, MUSPELHEIM.last), 12],
   },
   {
+    id: 'asgard', icon: '🌈', title: 'Asgårds herre', text: 'Vinn alla banor i Asgård.',
+    done: c => wonAll(c.progress, ASGARD.first, ASGARD.last), progress: c => [countIn(c.progress, ASGARD.first, ASGARD.last), 12],
+  },
+  {
     id: 'gold-coast', icon: '⭐', title: 'Guldkusten', text: 'Tre stjärnor på alla banor i Kusten.',
     done: c => wonAll(c.progress, KUSTEN.first, KUSTEN.last, 3), progress: c => [countIn(c.progress, KUSTEN.first, KUSTEN.last, 3), 12],
   },
@@ -82,12 +88,12 @@ export const ACHIEVEMENTS: Achievement[] = [
     done: c => wonAll(c.progress, 0, LAST, 3), progress: c => [countIn(c.progress, 0, LAST, 3), levels.length],
   },
   {
-    id: 'boss-hunter', icon: '⚔️', title: 'Bossjägare', text: 'Besegra alla fyra bossarna.',
-    done: c => bossesBeaten(c.progress) >= 4, progress: c => [bossesBeaten(c.progress), 4],
+    id: 'boss-hunter', icon: '⚔️', title: 'Bossjägare', text: 'Besegra alla fem bossarna.',
+    done: c => bossesBeaten(c.progress) >= bosses.length, progress: c => [bossesBeaten(c.progress), bosses.length],
   },
   {
-    id: 'ragnarok', icon: '🌅', title: 'Ragnarök', text: 'Tre stjärnor på alla fyra bossarna.',
-    done: c => bossesBeaten(c.progress, 3) >= 4, progress: c => [bossesBeaten(c.progress, 3), 4],
+    id: 'ragnarok', icon: '🌅', title: 'Ragnarök', text: 'Tre stjärnor på alla fem bossarna.',
+    done: c => bossesBeaten(c.progress, 3) >= bosses.length, progress: c => [bossesBeaten(c.progress, 3), bosses.length],
   },
   {
     id: 'loot-100', icon: '🪙', title: 'Hundra skatter', text: 'Plundra 100 skatter.',

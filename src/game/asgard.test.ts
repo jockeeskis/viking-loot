@@ -18,7 +18,7 @@ const item = (s: GameState, id: string) => s.loot.find(l => l.id === id)!
 test('regression: levels 1–48 and the four bosses give exactly the same solver numbers as in 0.5', () => {
   // [winning lines, losing lines, par], computed with the 0.5 engine before Asgård was added.
   const v05 = [[1458, 0, 0], [6, 0, 0], [18, 0, 0], [122, 34, 1], [68, 83, 1], [256, 429, 2], [22, 28, 1], [52, 91, 1], [168, 360, 2], [104, 340, 2], [208, 1055, 1], [88, 419, 2], [54, 0, 0], [180, 210, 1], [18, 0, 0], [20, 33, 1], [18, 0, 1], [308, 722, 2], [18, 0, 0], [154, 331, 1], [18, 0, 0], [162, 324, 2], [366, 923, 1], [510, 3852, 0], [18, 0, 0], [74, 76, 2], [18, 0, 0], [42, 70, 2], [18, 0, 1], [276, 280, 2], [54, 0, 0], [4308, 6963, 1], [392, 892, 2], [224, 742, 2], [259, 969, 2], [1296, 9594, 3], [18, 0, 0], [136, 286, 1], [18, 0, 0], [670, 1175, 2], [10, 0, 0], [176, 349, 2], [54, 0, 0], [1484, 2890, 1], [264, 641, 1], [420, 1892, 2], [238, 1414, 2], [1786, 11332, 1], [124, 331, 1], [32, 130, 2], [78, 466, 5], [468, 2419, 1]]
-  const all = [...levels.slice(0, 48), ...bosses.map(b => b.level)]
+  const all = [...levels.slice(0, 48), ...bosses.filter(b => b.world < 4).map(b => b.level)]
   assert.equal(all.length, v05.length)
   all.forEach((l, i) => {
     const r = solve(startGame(l))

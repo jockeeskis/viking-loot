@@ -52,6 +52,19 @@ export const LEVEL_EN: { name: string; hint: string }[] = [
   { name: 'Veil of Smoke', hint: 'Everything is hidden in the smoke, a prisoner waits in a cage and the raven is circling.' },
   { name: 'The Volcano', hint: 'Ice in the fire, a powder keg, a cage and the tide – all on one island.' },
   { name: 'Surtr\'s Forge', hint: 'The last raid: everything you have learned, in the fire giant\'s forge.' },
+  // Asgard
+  { name: 'Gold Beach', hint: 'Gold has no colour – any viking can take it. It costs one carry slot like everything else.' },
+  { name: 'The Treasury', hint: 'Two heaps of gold. Who should take the gold – and who needs the slot for their own colour?' },
+  { name: 'The Gatekeeper', hint: 'Valhalla’s gate opens when two other red treasures have been plundered – anywhere on the island.' },
+  { name: 'Hall of the Einherjar', hint: 'Two gates in different colours. Plunder the right colour in the right order and they open in time.' },
+  { name: 'Valkyrie Rock', hint: 'The valkyrie carries nothing. She lifts whoever has waited longest back into the queue – load and all.' },
+  { name: 'Fjord of Wings', hint: 'Send the valkyrie when the ship starts to fill up – but the viking she lifts will come back.' },
+  { name: 'The Golden Gate', hint: 'Gold, a gate and a house. Gold does not count when the gate counts its colour.' },
+  { name: 'Windy Spire', hint: 'The raven takes, the valkyrie lifts and the ice melts. Keep count of the moves.' },
+  { name: 'Gate in the Mist', hint: 'Everything is hidden but the gate. The key, the chest and the gate – in what order?' },
+  { name: 'Rainbow Surf', hint: 'Tide, a prisoner, gold and a valkyrie. The wave decides what is in front.' },
+  { name: 'Bifrost Keep', hint: 'The jarl, a powder keg, gold, a gate and the valkyrie – nearly everything at once.' },
+  { name: 'The Gates of Valhalla', hint: 'The last raid: two gates, gold, Ylva, Sigrid and the valkyrie – and everything is hidden.' },
 ]
 
 /** English names and hints of the boss raids, by world (0.5). */
@@ -60,4 +73,5 @@ export const BOSS_EN: { name: string; hint: string }[] = [
   { name: 'Jarl Ulvhild', hint: 'Ulvhild has lured away every ordinary viking. Only jarls and Ylva come along – and the loot is hidden.' },
   { name: 'Ymer the Frost Giant', hint: 'The giant has frozen almost everything. The ice breaks in waves – count the moves and use the red ship.' },
   { name: 'Surtr the Fire Giant', hint: 'Powder kegs, the tide, a prisoner and the raven every fourth move – Surtr\'s final trial.' },
+  { name: 'Loke the Liar', hint: 'Loke’s lies: nearly everything is hidden, and the gold and the gates are where you least expect them.' },
 ]

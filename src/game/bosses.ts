@@ -2,10 +2,10 @@
 // They use only mechanics the player already knows, plus one twist each. Found with
 // `npm run generate-levels -- --bosses` and checked by the solver (`npm run check-levels`, bosses.test.ts).
 // Stars are saved apart from the levels (`Progress.bossStars`), so level indices never move.
-import { stacks, jarl, WILD, type Level } from './levels.ts'
+import { stacks, jarl, WILD, VALK, type Level } from './levels.ts'
 import type { LootColor } from './engine.ts'
 
-export type BossId = 'serpent' | 'ulvhild' | 'ymer' | 'surt'
+export type BossId = 'serpent' | 'ulvhild' | 'ymer' | 'surt' | 'loke'
 export type Boss = { id: BossId; world: number; icon: string; level: Level }
 
 const R: LootColor = 'red', B: LootColor = 'blue', Y: LootColor = 'yellow'
@@ -52,6 +52,16 @@ export const bosses: Boss[] = [
       queue: [B, R, Y, Y, R, B, R, R],
       raven: 4,
       loot: stacks(['≈rbrbr', 'rr*br', 'ybss', 'yry*y&rr']),
+    },
+  },
+  {
+    id: 'loke', world: 4, icon: '🎭',
+    level: {
+      name: 'Loke Lögnaren',
+      par: 1,
+      hint: 'Lokes lögner: nästan allt är dolt, och guldet och portarna ligger där du minst anar.',
+      queue: [B, R, Y, B, R, VALK, B, B, R, B],
+      loot: stacks(['?r?b?y?br', '?y?$?$%2r', '?b?b?b%3bb', '?r?r?rb']),
     },
   },
 ]

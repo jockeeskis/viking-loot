@@ -4,6 +4,8 @@ export type StoryId =
   | 'start' | 'world-1' | 'world-2' | 'world-3'
   | 'boss-0-before' | 'boss-0-after' | 'boss-1-before' | 'boss-1-after'
   | 'boss-2-before' | 'boss-2-after' | 'boss-3-before' | 'boss-3-after' | 'finale'
+  // 0.6: Asgård and Loke. 'finale' is now the end of the first four worlds; 'finale-2' ends the game.
+  | 'world-4' | 'boss-4-before' | 'boss-4-after' | 'finale-2'
 
 export type StoryCard = { id: StoryId; icon: string; title: { sv: string; en: string }; pages: { sv: string; en: string }[] }
 
@@ -154,11 +156,59 @@ export const STORY: StoryCard[] = [
     ],
   },
   {
-    id: 'finale', icon: '🏆', title: { sv: 'Hem till hallen', en: 'Home to the hall' },
+    id: 'finale', icon: '🌋', title: { sv: 'Muspelheim är fritt', en: 'Muspelheim is free' },
     pages: [
       {
         sv: 'Ormen, Ulvhild, Ymer och Surt – alla besegrade. Skeppet är så fullt av skatter att Björn får sitta på en kista.',
         en: 'The Serpent, Ulvhild, Ymer and Surtr – all defeated. The ship is so full of treasure that Björn has to sit on a chest.',
+      },
+      {
+        sv: 'Men vad är det som lyser i norr? En regnbåge – rakt ner i havet. Björn säger att det är en bro. Björn säger mycket.',
+        en: 'But what is that shining in the north? A rainbow – straight down into the sea. Björn says it is a bridge. Björn says a lot of things.',
+      },
+    ],
+  },
+  {
+    id: 'world-4', icon: '🌈', title: { sv: 'Till Asgård', en: 'To Asgard' },
+    pages: [
+      {
+        sv: 'Bifrost! Regnbågsbron lyser över havet, och på andra sidan ligger Asgård – gudarnas egen ö. Guldet ligger i öppna högar. Vem som helst får ta det.',
+        en: 'Bifrost! The rainbow bridge shines over the sea, and on the other side lies Asgard – the gods\' own island. Gold lies about in open heaps. Anyone may take it.',
+      },
+      {
+        sv: 'Men Valhalls portar öppnas bara för den som redan plundrat nog i deras färg. Och valkyrian lyfter den som väntat för länge tillbaka till kön. Hon menar väl. Tror jag.',
+        en: 'But Valhalla\'s gates only open for those who have already plundered enough of their colour. And the valkyrie lifts whoever has waited too long back into the queue. She means well. I think.',
+      },
+    ],
+  },
+  {
+    id: 'boss-4-before', icon: '🎭', title: { sv: 'Lokes lögner', en: 'Loke\'s lies' },
+    pages: [
+      {
+        sv: 'Där! På klippan står Loke och flinar. Han har lagt en presenning över nästan varje skatt och svär att allt under den är guld. Det är det inte.',
+        en: 'There! On the rock stands Loke, grinning. He has thrown a tarp over almost every treasure and swears it is all gold underneath. It is not.',
+      },
+      {
+        sv: 'Guld, portar och en valkyria – och ingen vet vad som ligger var. Lita inte på något han säger. Lita på det du ser.',
+        en: 'Gold, gates and a valkyrie – and nobody knows what lies where. Trust nothing he says. Trust what you see.',
+      },
+    ],
+  },
+  {
+    id: 'boss-4-after', icon: '🎭', title: { sv: 'Masken faller', en: 'The mask falls' },
+    pages: [
+      {
+        sv: 'Loke skrattade, kastade sin gyllene mask i havet och försvann i en grön blixt. Freja fiskade upp masken. Den var av målat trä. Förstås.',
+        en: 'Loke laughed, threw his golden mask into the sea and vanished in a green flash. Freja fished the mask out. It was painted wood. Of course.',
+      },
+    ],
+  },
+  {
+    id: 'finale-2', icon: '🏆', title: { sv: 'Hem till hallen', en: 'Home to the hall' },
+    pages: [
+      {
+        sv: 'Ormen, Ulvhild, Ymer, Surt och till och med Loke – alla besegrade. Skeppet är så fullt av guld att Björn får sitta på en kista. En gyllene.',
+        en: 'The Serpent, Ulvhild, Ymer, Surtr and even Loke – all defeated. The ship is so full of gold that Björn has to sit on a chest. A golden one.',
       },
       {
         sv: 'Tack, vän. Utan dig hade vi fortfarande stått på stranden och grälat om vem som skulle gå först. Skål!',
@@ -170,5 +220,5 @@ export const STORY: StoryCard[] = [
 
 export const storyCard = (id: string) => STORY.find(c => c.id === id)
 /** The arrival card of a world (none for Kusten – the start card covers it). */
-export const worldStory = (world: number): StoryId | null => (world >= 1 && world <= 3 ? (`world-${world}` as StoryId) : null)
+export const worldStory = (world: number): StoryId | null => (world >= 1 && world <= 4 ? (`world-${world}` as StoryId) : null)
 export const bossStory = (world: number, when: 'before' | 'after') => `boss-${world}-${when}` as StoryId

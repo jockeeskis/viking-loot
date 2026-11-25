@@ -183,12 +183,14 @@ export const SV: Dict = {
   'scene.one': '⚠️ En viking väntar – en säker plats kvar',
   'scene.carries3': 'BÄR 3',
   'scene.scout': 'SPEJAR',
+  'scene.valkyrie': 'LYFTER',
   'scene.lastVikings': 'Sista vikingarna!',
   'scene.emptyQueue': 'Kön är tom',
   'world.0': 'Kusten',
   'world.1': 'Fjordarna',
   'world.2': 'Isriket',
   'world.3': 'Muspelheim',
+  'world.4': 'Asgård',
 }
 
 export const EN: Dict = {
@@ -348,12 +350,14 @@ export const EN: Dict = {
   'scene.one': '⚠️ A viking is waiting – one safe seat left',
   'scene.carries3': 'CARRIES 3',
   'scene.scout': 'SCOUT',
+  'scene.valkyrie': 'LIFTS',
   'scene.lastVikings': 'Last vikings!',
   'scene.emptyQueue': 'The queue is empty',
   'world.0': 'The Coast',
   'world.1': 'The Fjords',
   'world.2': 'The Ice Realm',
   'world.3': 'Muspelheim',
+  'world.4': 'Asgard',
 }
 
 /** English for game data defined in Swedish elsewhere (intros, achievements, ships), by id. */
@@ -401,12 +405,14 @@ export const DATA_EN: Dict = {
   'ach.isriket.text': 'Win every level in the Ice Realm.',
   'ach.muspelheim.title': 'Lord of Muspelheim',
   'ach.muspelheim.text': 'Win every level in Muspelheim.',
+  'ach.asgard.title': 'Lord of Asgard',
+  'ach.asgard.text': 'Win every level in Asgard.',
   'ach.kegs-25.title': 'Powder monkey',
   'ach.kegs-25.text': 'Blow up 25 powder kegs.',
   'ach.boss-hunter.title': 'Boss hunter',
-  'ach.boss-hunter.text': 'Defeat all four bosses.',
+  'ach.boss-hunter.text': 'Defeat all five bosses.',
   'ach.ragnarok.title': 'Ragnarök',
-  'ach.ragnarok.text': 'Three stars on all four bosses.',
+  'ach.ragnarok.text': 'Three stars on all five bosses.',
   'ach.gold-coast.title': 'Golden Coast',
   'ach.gold-coast.text': 'Three stars on every level on the Coast.',
   'ach.all-gold.title': 'The whole North in gold',
@@ -440,6 +446,8 @@ export const DATA_EN: Dict = {
   'ship.ymer.text': 'Black and gold, with a red dragon woken from the ice.',
   'ship.surt.name': 'Surtr\'s Glow',
   'ship.surt.text': 'A sail that glows like lava and a dragon black as soot.',
+  'ship.gyllene.name': 'The Golden Dragon',
+  'ship.gyllene.text': 'A gold and white sail with a star, and a dragon of pure gold.',
 }
 
 const DICTS: Record<Lang, Dict> = { sv: SV, en: EN }

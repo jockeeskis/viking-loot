@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { levels, worlds, startGame, type Level } from './levels'
 import { mechanicsOf } from './intros'
 import {
-  createGame, selectViking, isAvailable, mainSeats, SELECTABLE, TIDE_EVERY,
+  createGame, selectViking, isAvailable, gateLeft, carriesNothing, mainSeats, SELECTABLE, TIDE_EVERY,
   type GameEvent, type GameState, type LootColor, type LossReason, type GameStatus, type Viking,
 } from './engine'
 import {
@@ -50,6 +50,7 @@ const BOAT_W = 88
 const SHIP_SHIFT = 28 // the longship makes room for the colour ship
 const BOAT_SCALE = 0.48
 const SCOUT_COLOR = 0x3e7d6a
+const VALKYRIE_COLOR = 0x7fb6dc
 const TAP_SLOP = 24 // game pixels a finger may move and still count as a tap
 const boatSeatPos = (i: number, seats: number) => ({ x: BOAT.x + (i - (seats - 1) / 2) * 28, y: BOAT.y - 10 })
 const PREVIEW_MAX = 6
@@ -78,8 +79,12 @@ type Sprite = Phaser.GameObjects.Container
 /** Which island a level is played on: by its world, or for generated raids by the newest mechanics it uses. */
 function islandStyleOf(data: Level): IslandStyle {
   const index = levels.indexOf(data)
-  if (index >= 0) return index >= (worlds[3]?.first ?? Infinity) ? 'lava' : index >= (worlds[2]?.first ?? Infinity) ? 'snow' : 'grass'
+  if (index >= 0) {
+    if (index >= (worlds[4]?.first ?? Infinity)) return 'gold'
+    return index >= (worlds[3]?.first ?? Infinity) ? 'lava' : index >= (worlds[2]?.first ?? Infinity) ? 'snow' : 'grass'
+  }
   const m = mechanicsOf(data)
+  if (m.some(x => x === 'gold' || x === 'gate' || x === 'valkyrie')) return 'gold'
   if (m.some(x => x === 'keg' || x === 'tide' || x === 'cage' || x === 'raven')) return 'lava'
   return m.some(x => x === 'key' || x === 'ice' || x === 'ships' || x === 'scout') ? 'snow' : 'grass'
 }
@@ -602,7 +607,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   /** Stones (no colour) and hidden loot (colour not yet known) use their own looks. */
-  private makeItemGraphic(p: { kind?: LootKind; id: string; color?: LootColor; stone?: boolean }, hiddenNow: boolean): Sprite {
+  private makeItemGraphic(p: { kind?: LootKind; id: string; color?: LootColor; stone?: boolean; gold?: boolean }, hiddenNow: boolean): Sprite {
     const named = p.stone ? namedLootFrame('stone') : hiddenNow ? namedLootFrame('hidden') : undefined
     if (named !== undefined && hasLoot(this)) {
       const a = lootAsset()!
@@ -627,8 +632,76 @@ export class RaidScene extends Phaser.Scene {
       const q = this.add.text(0, 0, '?', cartoonText(24, '#f5c542')).setOrigin(0.5)
       return this.add.container(0, 0, [g, q]).setName('art')
     }
-    // Gold has no colour; until it gets its own art (0.6 phase 3) it is drawn as a yellow barrel.
+    if (p.gold) return this.makeGoldGraphic()
     return this.makeLootGraphic(p.kind ?? this.kindOf(p.id), p.color ?? 'yellow')
+  }
+
+  /** Asgård's golden treasure (0.6): a heap of coins that glitters now and then. */
+  private makeGoldGraphic(): Sprite {
+    const frame = namedLootFrame('gold')
+    const parts: Phaser.GameObjects.GameObject[] = []
+    if (hasLoot(this) && frame !== undefined) {
+      const a = lootAsset()!
+      parts.push(this.add.ellipse(0, 22, 58, 16, 0x000000, 0.22))
+      parts.push(this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth).setName('img'))
+    } else {
+      const g = this.add.graphics()
+      g.fillStyle(0x000000, 0.22); g.fillEllipse(0, 20, 58, 16)
+      g.fillStyle(GOLD); g.fillEllipse(0, 8, 54, 30)
+      g.lineStyle(2.5, INK); g.strokeEllipse(0, 8, 54, 30)
+      g.fillStyle(shade(GOLD, 0.4)); g.fillCircle(-8, 2, 7); g.fillCircle(9, 6, 6)
+      parts.push(g)
+    }
+    const twinkle = this.add.text(12, -10, '✦', cartoonText(16, '#fff8d0')).setOrigin(0.5).setAlpha(0).setName('twinkle')
+    parts.push(twinkle)
+    if (!this.reduced) {
+      this.tweens.add({
+        targets: twinkle, alpha: { from: 0, to: 1 }, scale: { from: 0.4, to: 1.1 }, angle: 90,
+        duration: 380, yoyo: true, repeat: -1, repeatDelay: 1400 + Math.random() * 1400, delay: Math.random() * 1600,
+      })
+    }
+    return this.add.container(0, 0, parts).setName('art')
+  }
+
+  /** The look of an item that is about to be shown again (after a reveal, or carried home). */
+  private artFor(target: Sprite): Sprite {
+    return target.getData('gold') ? this.makeGoldGraphic() : this.makeLootGraphic(target.getData('kind'), target.getData('color'))
+  }
+
+  /** Valhalla's gate (0.6): a marble arch in the gate's colour with the count on its plaque. */
+  private makeGate(color: LootColor, taken: number, need: number): Phaser.GameObjects.GameObject {
+    const frame = lootFrame('gate', color)
+    const a = lootAsset()
+    const parts: Phaser.GameObjects.GameObject[] = []
+    let px = 0, py = -38
+    if (hasLoot(this) && a && frame !== undefined) {
+      parts.push(this.add.image(0, 22, LOOT_KEY, frame).setOrigin(a.originX, a.originY).setScale(LOOT_W / a.frameWidth))
+      const [fx, fy] = a.gatePlaque ?? [0.39, 0.4]
+      px = (fx - a.originX) * LOOT_W
+      py = 22 + (fy - a.originY) * a.frameHeight * (LOOT_W / a.frameWidth)
+    } else {
+      const g = this.add.graphics()
+      g.fillStyle(0xf4f0e8); g.fillRect(-28, -30, 8, 50); g.fillRect(20, -30, 8, 50)
+      g.fillStyle(COLORS[color]); g.fillRect(-32, -42, 64, 12)
+      g.lineStyle(2, INK); g.strokeRect(-32, -42, 64, 12)
+      parts.push(g)
+    }
+    const text = this.add.text(px, py, `${taken}/${need}`, { ...cartoonText(9, '#ffffff'), resolution: 3 }).setOrigin(0.5).setName('gateText')
+    parts.push(text, ...this.mark(color, px + 16, py + 2, 5))
+    return this.add.container(0, 0, parts).setName('gate')
+  }
+
+  /** Update every gate's count after a move (with a little pulse when it changes). */
+  private updateGates(state: GameState) {
+    for (const item of state.loot) {
+      if (!item.gate || item.collected) continue
+      const text = (this.lootSprites.get(item.id)?.getByName('gate') as Sprite | null)?.getByName('gateText') as Phaser.GameObjects.Text | null
+      if (!text) continue
+      const label = `${item.gate - gateLeft(state, item)}/${item.gate}`
+      if (text.text === label) continue
+      text.setText(label)
+      this.tweens.add({ targets: text, scale: { from: 1.6, to: 1 }, duration: 260, ease: 'Back.easeOut' })
+    }
   }
 
   /** A house that took its first hit: show the broken-open model (or cracks on drawn art). */
@@ -678,8 +751,10 @@ export class RaidScene extends Phaser.Scene {
       if (item.lockedBy.some(k => !this.state.loot.find(l => l.id === k)?.collected)) overlays.push(this.makePadlock(this.keyColor(item.lockedBy)))
       // Frozen loot sits in a block of ice with the number of moves until it thaws.
       if (item.frozenLeft > 0) overlays.push(this.makeIce(), this.makeIceCounter(item.frozenLeft))
+      // A shut gate stands over its loot and counts the items of its colour taken so far.
+      if (item.gate && item.color && gateLeft(this.state, item) > 0) overlays.push(this.makeGate(item.color, item.gate - gateLeft(this.state, item), item.gate))
       const c = this.add.container(x, y, [art, shadeG, lock, ...overlays]).setScale(scale).setDepth(2 + depth * 0.01)
-      c.setData('kind', kind).setData('color', p.color).setData('stone', !!p.stone)
+      c.setData('kind', kind).setData('color', p.color ?? (p.gold ? 'yellow' : undefined)).setData('stone', !!p.stone).setData('gold', !!p.gold)
       c.setSize(66, 62).setInteractive()
       c.on('pointerup', (ptr: Phaser.Input.Pointer) => {
         if (!ptr.wasCanceled && ptr.getDistance() < TAP_SLOP && ptr.getDuration() < 900) this.explainItem(p.id)
@@ -803,7 +878,7 @@ export class RaidScene extends Phaser.Scene {
       if (!c || item.collected) continue
       // Stones are never plundered, so they never look locked; they simply crumble. Ice and padlocks
       // show for themselves, so only blockers in front grey an item out.
-      const open = item.kind === 'stone' || isAvailable(state, { ...item, frozenLeft: 0, lockedBy: [] })
+      const open = item.kind === 'stone' || isAvailable(state, { ...item, frozenLeft: 0, lockedBy: [], gate: 0 })
       const img = (c.getByName('art') as Sprite | null)?.getByName('img') as Phaser.GameObjects.Image | null
       if (img) { if (open) img.clearTint(); else img.setTint(0xaeb4c4) }
       const parts = [c.getByName('shade'), c.getByName('lock')] as unknown as Phaser.GameObjects.Components.Alpha[]
@@ -840,7 +915,7 @@ export class RaidScene extends Phaser.Scene {
     rig.setScale(rig.getData('size'))
     const carry = this.add.container(0, -36).setName('carry')
     const badge = this.add.text(0, 34, '', { ...cartoonText(14), padding: { x: 4, y: 0 } }).setOrigin(0.5).setName('badge').setVisible(false)
-    const marks = v.kind === 'scout' ? [] : this.mark(v.color, -20, 24, 7)
+    const marks = carriesNothing(v) ? [] : this.mark(v.color, -20, 24, 7)
     return this.add.container(0, 0, [rig, carry, badge, ...marks]).setDepth(30)
   }
 
@@ -894,7 +969,7 @@ export class RaidScene extends Phaser.Scene {
   private makeCard(v: Viking, index: number): Sprite {
     const color = lookOf(v)
     const asset = assetFor(v)
-    const c = v.kind === 'scout' ? SCOUT_COLOR : v.kind === 'wild' && !v.color ? GOLD : COLORS[color]
+    const c = v.kind === 'scout' ? SCOUT_COLOR : v.kind === 'valkyrie' ? VALKYRIE_COLOR : v.kind === 'wild' && !v.color ? GOLD : COLORS[color]
     const { w, h } = CARD
     const g = this.add.graphics()
     g.fillStyle(0x000000, 0.3); g.fillRoundedRect(-w / 2 + 2, -h / 2 + 5, w, h, 16)
@@ -927,7 +1002,13 @@ export class RaidScene extends Phaser.Scene {
       ;[COLORS.red, COLORS.blue, COLORS.yellow].forEach((col, i) => { stripes.fillStyle(col); stripes.fillRect(-w / 2 + 8 + i * ((w - 16) / 3), h / 2 - 18, (w - 16) / 3, 8) })
       extras.push(stripes, this.add.text(w / 2 - 14, -h / 2 + 14, '✦', cartoonText(14, '#ffffff')).setOrigin(0.5))
     }
-    if (v.kind !== 'scout') extras.push(...this.mark(v.color, -w / 2 + 16, -h / 2 + 16, 9))
+    if (v.kind === 'valkyrie') {
+      extras.push(this.add.text(w / 2 - 14, -h / 2 + 14, '🪽', { fontSize: '16px', resolution: 2 }).setOrigin(0.5))
+      extras.push(this.add.text(0, h / 2 - 12, t('scene.valkyrie'), cartoonText(10)).setOrigin(0.5))
+    }
+    // A viking the valkyrie put back in the queue still carries its load.
+    if (v.collectedCount > 0) extras.push(this.add.text(-w / 2 + 18, h / 2 - 30, `${v.collectedCount}/${v.capacity}`, { ...cartoonText(11), backgroundColor: '#3b2414cc', padding: { x: 3, y: 0 } }).setOrigin(0.5))
+    if (!carriesNothing(v)) extras.push(...this.mark(v.color, -w / 2 + 16, -h / 2 + 16, 9))
     const card = this.add.container(cardX(index), CARD.y, [g, portrait, ...extras]).setSize(w, h).setDepth(20)
     card.once(Phaser.GameObjects.Events.DESTROY, () => mask.destroy())
     return card
@@ -971,7 +1052,7 @@ export class RaidScene extends Phaser.Scene {
     rest.slice(0, PREVIEW_MAX).forEach((v, i) => {
       const x = QUEUE_PANEL.x + 24 + i * 29, y = PANEL_Y + 34
       g.fillStyle(0x2a190c); g.fillCircle(x, y, 13)
-      g.lineStyle(v.kind === 'jarl' ? 3.5 : 2.5, v.kind === 'scout' ? SCOUT_COLOR : v.color ? COLORS[v.color] : GOLD); g.strokeCircle(x, y, 13)
+      g.lineStyle(v.kind === 'jarl' ? 3.5 : 2.5, v.kind === 'scout' ? SCOUT_COLOR : v.kind === 'valkyrie' ? VALKYRIE_COLOR : v.color ? COLORS[v.color] : GOLD); g.strokeCircle(x, y, 13)
       const asset = assetFor(v)
       if (asset && this.textures.exists(portraitKey(asset))) {
         const head = this.add.image(x, y + 1, portraitKey(asset)).setDepth(6)
@@ -982,7 +1063,7 @@ export class RaidScene extends Phaser.Scene {
         head.once(Phaser.GameObjects.Events.DESTROY, () => m.destroy())
         this.preview.push(head)
       } else drawHead(g, lookOf(v), 9, x, y + 1)
-      if (v.kind !== 'scout') this.mark(v.color, x + 10, y + 9, 5).forEach(m => this.preview.push(m.setDepth(7)))
+      if (!carriesNothing(v)) this.mark(v.color, x + 10, y + 9, 5).forEach(m => this.preview.push(m.setDepth(7)))
     })
     if (rest.length > PREVIEW_MAX) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w - 10, PANEL_Y + 34, `+${rest.length - PREVIEW_MAX}`, cartoonText(12)).setOrigin(1, 0.5).setDepth(6))
     if (rest.length === 0) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y + 34, this.state.queue.length ? t('scene.lastVikings') : t('scene.emptyQueue'), cartoonText(11, '#e8d6bb')).setOrigin(0.5).setDepth(6))
@@ -1133,7 +1214,7 @@ export class RaidScene extends Phaser.Scene {
             this.tweens.add({ targets: fly, y: fly.y - 46, x: fly.x + 26, angle: 35, alpha: 0, duration: 420, ease: 'Sine.easeOut', onComplete: () => fly.destroy() })
           }
           old?.destroy()
-          const art = this.makeLootGraphic(target.getData('kind'), target.getData('color'))
+          const art = this.artFor(target)
           const cageOf = this.levelData.loot.find(l => l.id === e.lootId)?.cage
           if (cageOf) this.addPrisoner(art, cageOf)
           target.addAt(art, 0)
@@ -1142,6 +1223,22 @@ export class RaidScene extends Phaser.Scene {
           this.tweens.add({ targets: target, scale: { from: target.scale * 0.6, to: target.scale }, duration: 260, ease: 'Back.easeOut' })
         }
         this.refreshLocks(view, false)
+        continue
+      }
+      if (e.type === 'unlock' && e.gate) {
+        // Valhalla's gate opens: a burst of light, then the arch rises and fades away.
+        const target = this.lootSprites.get(e.lootId)
+        const arch = target?.getByName('gate') as Sprite | null
+        if (target && arch) {
+          sfx.gate()
+          const glow = this.add.circle(target.x, target.y - 6, 30, 0xfff4c0, 0.85).setDepth(target.depth + 0.005)
+          this.tweens.add({ targets: glow, scale: 2.2, alpha: 0, duration: this.reduced ? 200 : 520, ease: 'Sine.easeOut', onComplete: () => glow.destroy() })
+          sparkle(this, target.x, target.y - 20)
+          await this.tween({ targets: arch, y: arch.y - 18, alpha: 0, duration: 420, ease: 'Sine.easeIn' })
+          arch.destroy()
+        }
+        this.refreshLocks(view, true)
+        await this.delay(120)
         continue
       }
       if (e.type === 'unlock') {
@@ -1211,6 +1308,38 @@ export class RaidScene extends Phaser.Scene {
         await this.tween({ targets: runner, x: cardX(0), y: CARD.y - 30, scale: 0.7, duration: 520, ease: 'Sine.easeInOut' })
         await this.tween({ targets: runner, alpha: 0, scale: 0.4, duration: 160 })
         runner.destroy()
+        continue
+      }
+      if (e.type === 'valkyrie') {
+        // The valkyrie flies to the longest-waiting viking on the main ship and carries it to the end of the queue.
+        const valk = this.actors.get(e.vikingId)
+        const lifted = e.carriedId ? this.actors.get(e.carriedId) : undefined
+        const carried = view.waiting.find(w => w.id === e.carriedId)
+        sfx.valkyrie()
+        if (valk) {
+          this.animate(valk, 'fly')
+          const end = { x: QUEUE_PANEL.x + QUEUE_PANEL.w - 18, y: PANEL_Y + 30 }
+          if (lifted && carried) {
+            await this.tween({ targets: valk, x: lifted.x, y: lifted.y - 34, scale: 1, duration: 420, ease: 'Sine.easeInOut' })
+            view = { ...view, waiting: view.waiting.filter(w => w.id !== carried.id), queue: [...view.queue, { ...carried, ship: 0 }] }
+            this.drawSlots(view.waiting)
+            this.actors.delete(carried.id)
+            this.setBadge(lifted, null)
+            this.animate(lifted, 'carry')
+            await Promise.all([
+              this.tween({ targets: valk, x: end.x, y: end.y - 40, duration: 620, ease: 'Sine.easeInOut' }),
+              this.tween({ targets: lifted, x: end.x, y: end.y - 6, scale: 0.45, duration: 620, ease: 'Sine.easeInOut' }),
+            ])
+            sparkle(this, end.x, end.y)
+            await this.tween({ targets: lifted, alpha: 0, scale: 0.3, duration: 160 })
+            lifted.destroy()
+          } else {
+            await this.tween({ targets: valk, y: valk.y - 30, duration: 300, ease: 'Sine.easeOut' })
+          }
+          await this.tween({ targets: valk, y: -50, alpha: 0, duration: 380, ease: 'Sine.easeIn' })
+          valk.destroy()
+          this.actors.delete(e.vikingId)
+        }
         continue
       }
       if (e.type === 'raven') {
@@ -1300,7 +1429,8 @@ export class RaidScene extends Phaser.Scene {
           this.refreshLocks(view, true)
           // carry a small copy of the loot above the head
           const carry = actor.getByName('carry') as Sprite
-          carry.add(this.makeLootGraphic(target.getData('kind'), target.getData('color')).setScale(0.32).setPosition(0, -carry.length * 13))
+          carry.add(this.artFor(target).setScale(0.32).setPosition(0, -carry.length * 13))
+          this.updateGates(view)
         }
         bumpWaiter(actor, e.vikingId)
         await this.delay(80)
