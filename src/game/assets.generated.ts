@@ -649,5 +649,24 @@ export const MANIFEST: AssetManifest = {
     "y": 36,
     "width": 360,
     "height": 372
+  },
+  "cosmetics": {
+    "sail": {
+      "rutor": "assets/ships/sail-rutor.webp",
+      "korset": "assets/ships/sail-korset.webp",
+      "fjord": "assets/ships/sail-fjord.webp",
+      "frost": "assets/ships/sail-frost.webp",
+      "glod": "assets/ships/sail-glod.webp",
+      "regnbage": "assets/ships/sail-regnbage.webp",
+      "sol": "assets/ships/sail-sol.webp"
+    },
+    "shields": {
+      "delad": "assets/ships/shields-delad.webp",
+      "krut": "assets/ships/shields-krut.webp",
+      "havet": "assets/ships/shields-havet.webp",
+      "lag": "assets/ships/shields-lag.webp",
+      "drake": "assets/ships/shields-drake.webp",
+      "guld": "assets/ships/shields-guld.webp"
+    }
   }
 }

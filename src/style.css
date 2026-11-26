@@ -94,3 +94,16 @@ button:disabled{cursor:not-allowed;opacity:.4}
 .tutorial-buttons button{padding:6px 12px;font-size:13px}
 @keyframes tutorial-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion: reduce){.tutorial{animation:none}}
+/* 0.6 – Skeppsvarvet tabs and the collector's album */
+.yard-tabs{display:flex;gap:6px;margin:0 0 10px}
+.yard-tabs button{flex:1;margin:0;padding:7px 4px;font-size:14px;background:#193a4b;color:#cfe3ee;box-shadow:0 3px 0 #0e2430}
+.yard-tabs button.on{background:#ffd45a;color:#3b2414;box-shadow:0 3px 0 #b8860b}
+.badge-text .badge-reward{color:#b8860b}
+.album{max-width:320px;max-height:80%;overflow:auto}
+.album h2 small{font-size:14px;opacity:.75}
+.album ul{list-style:none;margin:8px 0;padding:0;display:grid;grid-template-columns:1fr;gap:6px;text-align:left}
+.album li{display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:12px;background:rgba(59,36,20,.08)}
+.album li span:last-child{display:flex;flex-direction:column}
+.album li small{font-size:12px;opacity:.85}
+.album li:not(.owned){opacity:.6}
+.relic-icon{font-size:28px;line-height:1;width:34px;text-align:center}

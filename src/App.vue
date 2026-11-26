@@ -18,7 +18,9 @@ import {
   ACHIEVEMENTS, SHIPS, loadMeta, saveMeta, migrate, newlyEarned, unlock, recordRaid, lootOf, totalStars, shipUnlocked, unlockedShips,
   type ShipId,
 } from './game/achievements'
-import { shipSheet } from './game/assets'
+import { shipSheet, cosmeticSheet } from './game/assets'
+import { COSMETICS, equip, owns, allOwned, overlayOf, cosmetic, type Slot, type Source, type OwnCtx } from './game/cosmetics'
+import { RELICS } from './game/relics'
 import LevelMap from './components/LevelMap.vue'
 import SettingsPanel from './components/Settings.vue'
 import {
@@ -168,6 +170,7 @@ function update(d: RaidUpdate) {
   if (justWon) {
     lastStars.value = starsFor(d.waits, active.value.par)
     const shipsBefore = unlockedShips(progress.value)
+    const rewardsBefore = allOwned(ownCtx.value)
     if (mode.value === 'campaign') {
       const openBefore = bosses.filter(b => bossUnlocked(progress.value, worlds[b.world].last)).length
       progress.value = recordWin(progress.value, current.value, lastStars.value, levels.length)
@@ -203,6 +206,7 @@ function update(d: RaidUpdate) {
     for (const id of unlockedShips(progress.value)) {
       if (!shipsBefore.includes(id)) toast('⛵', t('toast.ship', { name: shipName(id) }), t('toast.shipText'))
     }
+    for (const id of allOwned(ownCtx.value)) if (!rewardsBefore.includes(id)) toastReward(id)
   }
   if (justLost && mode.value === 'endless') endless.value = { ...endless.value, over: true }
 }
@@ -445,9 +449,56 @@ function chooseShip(id: ShipId) {
   saveMeta(meta.value)
   scene?.setShip(id)
 }
-const shipPreview = (id: string) => {
+// ---------- sails, shields and the album (0.6) ----------
+const yardTab = ref<'ship' | Slot>('ship')
+const showAlbum = ref(false)
+const ownCtx = computed<OwnCtx>(() => ({ unlocked: meta.value.unlocked, owned: meta.value.owned, bossStars: progress.value.bossStars }))
+const looks = () => [overlayOf(meta.value.sail), overlayOf(meta.value.shields)] as const
+function chooseLook(id: string) {
+  const next = equip(meta.value, id, ownCtx.value)
+  if (next === meta.value) return
+  meta.value = next
+  saveMeta(meta.value)
+  scene?.setLooks(...looks())
+}
+const cosName = (id: string) => { const c = cosmetic(id)!; return tr(c.name, `cos.${id}.name`) }
+const cosText = (id: string) => { const c = cosmetic(id)!; return tr(c.text, `cos.${id}.text`) }
+const relicName = (r: (typeof RELICS)[number]) => tr(r.name, `relic.${r.id}.name`)
+const relicText = (r: (typeof RELICS)[number]) => tr(r.text, `relic.${r.id}.text`)
+/** Where a locked cosmetic or relic is found. */
+function sourceText(src: Source) {
+  if (src.kind === 'achievement') {
+    const a = ACHIEVEMENTS.find(x => x.id === src.id)
+    return a ? t('reward.fromAch', { t: achTitle(a) }) : ''
+  }
+  if (src.kind === 'boss') { const b = bosses.find(x => x.id === src.id); return b ? t('reward.fromBoss', { name: bName(b.world) }) : '' }
+  if (src.kind === 'event') return t('reward.fromEvent', { name: t(`event.${src.id}`) })
+  if (src.kind === 'weekly') return t('reward.fromWeekly')
+  return ''
+}
+/** The reward an achievement gives, shown under it in the list. */
+const rewardOf = (achId: string) => COSMETICS.find(c => c.source.kind === 'achievement' && c.source.id === achId)
+function toastReward(id: string) {
+  const c = cosmetic(id)
+  if (c) { toast(c.slot === 'sail' ? '⛵' : '🛡️', t(c.slot === 'sail' ? 'toast.sail' : 'toast.shields', { name: cosName(id) }), t('toast.lookText')); return }
+  const r = RELICS.find(x => x.id === id)
+  if (r) toast(r.icon, t('toast.relic', { name: relicName(r) }), t('toast.relicText'))
+}
+const yardCards = computed(() => yardTab.value === 'ship' ? [] : COSMETICS.filter(c => c.slot === yardTab.value).map(c => ({
+  id: c.id, owned: owns(c.id, ownCtx.value), chosen: meta.value[c.slot] === c.id, lock: sourceText(c.source),
+})))
+const albumView = computed(() => RELICS.map(r => ({ ...r, owned: owns(r.id, ownCtx.value), lock: sourceText(r.source) })))
+const albumCount = computed(() => albumView.value.filter(r => r.owned).length)
+/** A longship card: the ship's sheet with the chosen (or tried) sail and shields on top, frame 0. */
+const shipPreview = (id: string, sail = meta.value.sail, shields = meta.value.shields) => {
+  const urls = [overlayOf(sail), overlayOf(shields)].filter(Boolean).map(x => cosmeticSheet(x!)).filter(Boolean)
   const sheet = shipSheet(id)
-  return sheet ? { backgroundImage: `url(${import.meta.env.BASE_URL}${sheet})` } : {}
+  if (sheet) urls.push(sheet)
+  return urls.length ? { backgroundImage: urls.map(u => `url(${import.meta.env.BASE_URL}${u})`).join(', ') } : {}
+}
+const lookPreview = (id: string) => {
+  const c = cosmetic(id)!
+  return shipPreview(meta.value.ship, c.slot === 'sail' ? id : meta.value.sail, c.slot === 'shields' ? id : meta.value.shields)
 }
 const statRows = computed(() => {
   const s = meta.value.stats
@@ -488,6 +539,7 @@ onMounted(() => {
     game?.canvas.addEventListener('touchend', e => { if (e.cancelable) e.preventDefault() }, { passive: false })
     scene?.setUpdate(update)
     scene?.setShip(meta.value.ship)
+    scene?.setLooks(...looks())
     scene?.setColorMarks(settings.value.colorMarks)
     scene?.setMotion(reduced.value, settings.value.batterySaver)
     scene?.play(levels[current.value], currentTitle())
@@ -600,6 +652,19 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
           <button class="close-btn" @click="showChronicle = false">{{ t('story.close') }}</button>
         </div>
       </div>
+      <div v-if="showAlbum" class="overlay" @click.self="showAlbum = false">
+        <div class="result album">
+          <h2>{{ t('album.title') }} <small>{{ albumCount }}/{{ RELICS.length }}</small></h2>
+          <p><small>{{ t('album.text') }}</small></p>
+          <ul>
+            <li v-for="r in albumView" :key="r.id" :class="{ owned: r.owned }">
+              <span class="relic-icon">{{ r.owned ? r.icon : '❔' }}</span>
+              <span><strong>{{ r.owned ? relicName(r) : t('album.unknown') }}</strong><small>{{ r.owned ? relicText(r) : r.lock }}</small></span>
+            </li>
+          </ul>
+          <button class="close-btn" @click="showAlbum = false">{{ t('story.close') }}</button>
+        </div>
+      </div>
       <SettingsPanel
         v-if="showSettings" :t="t" :lang="lang" :music="music" :sound="!muted"
         :vibration="settings.vibration" :color-marks="settings.colorMarks"
@@ -635,7 +700,7 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
         </span>
       </button>
     </div>
-    <h2 class="section-title map-title">{{ t('section.map') }} <button class="chronicle-btn" @click="showChronicle = true">{{ t('map.chronicle') }}</button></h2>
+    <h2 class="section-title map-title">{{ t('section.map') }} <button class="chronicle-btn" @click="showChronicle = true">{{ t('map.chronicle') }}</button><button class="chronicle-btn" @click="showAlbum = true">{{ t('map.album') }}</button></h2>
     <LevelMap
       :worlds="worlds.map((w, i) => ({ ...w, name: wName(i) }))"
       :names="levels.map((_, i) => lvlName(i))" :stars="progress.stars" :unlocked="unlocked"
@@ -643,7 +708,23 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
       :bosses="bossCards" @select="openLevel" @boss="openBoss"
     />
     <h2 class="section-title">{{ t('section.shipyard') }} <small>★ {{ stars }}</small></h2>
-    <div class="shipyard">
+    <div class="yard-tabs" role="tablist">
+      <button v-for="tab in (['ship', 'sail', 'shields'] as const)" :key="tab" role="tab" :aria-selected="yardTab === tab"
+        :class="{ on: yardTab === tab }" @click="yardTab = tab">{{ t(`yard.${tab}`) }}</button>
+    </div>
+    <div v-if="yardTab !== 'ship'" class="shipyard">
+      <button
+        v-for="c in yardCards" :key="c.id" class="ship-card"
+        :class="{ chosen: c.chosen, locked: !c.owned }" :disabled="!c.owned" @click="chooseLook(c.id)"
+      >
+        <span class="ship-pic" :style="lookPreview(c.id)"></span>
+        <strong>{{ cosName(c.id) }}</strong>
+        <small v-if="!c.owned">🔒 {{ c.lock }}</small>
+        <small v-else-if="c.chosen">{{ t('ship.sailing') }}</small>
+        <small v-else>{{ t('ship.choose') }}</small>
+      </button>
+    </div>
+    <div v-else class="shipyard">
       <button
         v-for="sh in SHIPS" :key="sh.id" class="ship-card"
         :class="{ chosen: meta.ship === sh.id, locked: stars < sh.stars }"
@@ -661,7 +742,7 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
       <ul class="badges">
         <li v-for="a in achievementView" :key="a.id" :class="{ earned: a.earned }">
           <span class="badge-icon">{{ a.icon }}</span>
-          <span class="badge-text"><strong>{{ a.title }}</strong><small>{{ a.text }}</small></span>
+          <span class="badge-text"><strong>{{ a.title }}</strong><small>{{ a.text }}</small><small v-if="rewardOf(a.id)" class="badge-reward">🎁 {{ cosName(rewardOf(a.id)!.id) }}</small></span>
           <span v-if="!a.earned && a.progressText" class="badge-progress">{{ a.progressText }}</span>
         </li>
       </ul>

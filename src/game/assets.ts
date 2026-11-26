@@ -35,6 +35,8 @@ export type AssetManifest = {
   raven?: (SheetInfo & { anims: { fly: AnimRange } }) | null
   /** The four bosses (0.5): idle frames plus a portrait for the story cards. */
   bosses?: Record<string, BossAsset>
+  /** Sails and shield rows (0.6): overlay sheets with the longship's frame layout, by slot and key. */
+  cosmetics?: Partial<Record<'sail' | 'shields', Record<string, string>>>
   /** Small colour ships, one frame per colour. */
   boats?: (SheetInfo & { frames: Record<LootColor, number> }) | null
 }
@@ -81,6 +83,21 @@ export function ensureShip(scene: Phaser.Scene, id: string, done: () => void) {
   if (!a || scene.textures.exists(key)) { createAnims(scene); done(); return }
   scene.load.spritesheet(key, a.sheet, { frameWidth: a.frameWidth, frameHeight: a.frameHeight })
   scene.load.once(Phaser.Loader.Events.COMPLETE, () => { createAnims(scene); done() })
+  scene.load.start()
+}
+/** The overlay sheet of a cosmetic ('sail-rutor' → cosmetics.sail.rutor), or null if it has none. */
+export function cosmeticSheet(id: string): string | null {
+  const [slot, ...rest] = id.split('-')
+  return MANIFEST.cosmetics?.[slot as 'sail' | 'shields']?.[rest.join('-')] ?? null
+}
+export const cosmeticKey = (id: string) => `cosmetic-${id}`
+/** Load a sail or shield overlay the first time it is shown (same frame size as the longship). */
+export function ensureCosmetic(scene: Phaser.Scene, id: string, done: () => void) {
+  const key = cosmeticKey(id), sheet = cosmeticSheet(id), ship = MANIFEST.ship
+  if (!sheet || !ship) return
+  if (scene.textures.exists(key)) { done(); return }
+  scene.load.spritesheet(key, sheet, { frameWidth: ship.frameWidth, frameHeight: ship.frameHeight })
+  scene.load.once(`filecomplete-spritesheet-${key}`, done)
   scene.load.start()
 }
 export const bossAsset = (id: string) => MANIFEST.bosses?.[id] ?? null

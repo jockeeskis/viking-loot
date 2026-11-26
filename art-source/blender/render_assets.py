@@ -1315,6 +1315,165 @@ def render_ship(manifest):
         print(f'[viking-loot] rendered ship {style}')
 
 
+# ---------------------------------------------------------------- cosmetics (0.6): sails and shield rows
+# Each cosmetic is an overlay sheet with the same frames and camera as the longship: only the sail
+# (or the shields) is visible, everything else on the ship is a holdout so it hides what is behind it.
+# The overlay fits every ship style, since all longships share the same sail and shields.
+SAILS = {
+    # id: pattern(u, v) → hex colour; u 0..1 left→right, v 0..1 bottom→top
+    'rutor': lambda u, v: P['sail_red'] if (int(u * 4) + int(v * 4)) % 2 else P['sail_cream'],
+    'korset': lambda u, v: P['gold'] if (0.3 <= u <= 0.44 or 0.42 <= v <= 0.58) else '#2F6FA8',
+    'fjord': lambda u, v: ('#3E7D6A', P['sail_cream'], '#2F6FA8', P['sail_cream'], '#3E7D6A')[min(4, int(v * 5))],
+    'frost': lambda u, v: (lambda d: P['ice_dark'] if 0.62 <= d <= 1 else (P['ice'] if d < 0.62 else P['snow']))(
+        abs(u - 0.5) / 0.36 + abs(v - 0.5) / 0.42),
+    'glod': lambda u, v: P['lava'] if ((v + abs(u - 0.5) * 0.9) * 2.5 + 0.2) % 1 < 0.4 else P['soot'],
+    'regnbage': lambda u, v: RAINBOW[5 - min(5, int(v * 6))],
+    'sol': lambda u, v: (lambda r: P['gold'] if r < 0.24 else (P['sail_red'] if r < 0.31 else P['sail_cream']))(
+        math.hypot(u - 0.5, (v - 0.5) * 0.82)),
+}
+
+SHIELDS = {
+    # id: design(i, angle, radius) → hex colour for shield number i (0..6), a point at angle (rad) and radius (0..1)
+    'havet': lambda i, a, r: ('#2F6FA8', P['white'])[i % 2],
+    'lag': lambda i, a, r: (P['red'], P['blue'], P['yellow'])[i % 3],
+    'delad': lambda i, a, r: (P['sail_red'], P['sail_cream'])[(math.cos(a) > 0) ^ (i % 2)],
+    'krut': lambda i, a, r: P['lava'] if int((a % (2 * math.pi)) / (math.pi / 3)) % 2 else P['soot'],
+    'drake': lambda i, a, r: ('#3E8E5A', P['gold'])[(int((a % (2 * math.pi)) / (math.pi / 2)) + i) % 2],
+    'guld': lambda i, a, r: P['gold_dark'] if 0.45 < r < 0.7 else P['gold'],
+}
+
+
+def multi_part(name, faces, colors, parent=None, outline=False, share=False):
+    """One object from (verts, material index) quads/tris; colors lists the materials in index order.
+    share=True welds equal corners, so a closed shape gets consistent normals (needed for the outline)."""
+    bm = bmesh.new()
+    seen = {}
+
+    def vert(v):
+        if not share:
+            return bm.verts.new(v)
+        k = tuple(round(c, 6) for c in v)
+        if k not in seen:
+            seen[k] = bm.verts.new(v)
+        return seen[k]
+    for vs, mi in faces:
+        f = bm.faces.new([vert(v) for v in vs])
+        f.material_index = mi
+        f.smooth = False
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    for c in colors:
+        me.materials.append(mat(c))
+    if outline and OUTLINE_W[0] > 0:
+        me.materials.append(mat(P['ink'], outline=True))
+        so = ob.modifiers.new('Outline', 'SOLIDIFY')
+        so.thickness = OUTLINE_W[0]
+        so.offset = 1.0
+        so.use_flip_normals = True
+        so.use_rim = False
+        so.material_offset = len(colors)
+    if parent:
+        ob.parent = parent
+    return ob
+
+
+def _cube(c, h):
+    """The six faces of an axis-aligned box: centre c, half sizes h."""
+    (x, y, z), (a, b, d) = c, h
+    v = [(x + sx * a, y + sy * b, z + sz * d) for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
+    return [(v[0], v[1], v[3], v[2]), (v[4], v[6], v[7], v[5]), (v[0], v[4], v[5], v[1]),
+            (v[2], v[3], v[7], v[6]), (v[0], v[2], v[6], v[4]), (v[1], v[5], v[7], v[3])]
+
+
+def build_sail_overlay(pattern, root):
+    """The longship's sail (six bulging strips, as in build_ship) cut into small cells coloured by pattern."""
+    n, sub, rows = 6, 10, 48
+    w, top, h = 1.0, 1.46, 0.82
+    colors, faces = [], []
+    for i in range(n):
+        x0 = -0.5 + i / n
+        bulge = -0.07 * math.cos((x0 + 0.5 / n) * math.pi)
+        y = -0.05 + bulge
+        for k in range(sub):
+            cx = x0 + (k + 0.5) / (n * sub)
+            for j in range(rows):
+                cz = top - h + (j + 0.5) * h / rows
+                col = pattern((cx + 0.5) / w, (cz - (top - h)) / h)
+                if col not in colors:
+                    colors.append(col)
+                hx = 0.5 / (n * sub) + (0.001 if k in (0, sub - 1) else 0.0005)
+                for f in _cube((cx, y, cz), (hx, 0.0125, h / rows / 2 + 0.0005)):
+                    faces.append((f, colors.index(col)))
+    return multi_part('sail', faces, colors, root)
+
+
+def build_shield_overlay(design, root):
+    """The seven shields along the side, each a disc of coloured sectors (rim and boss as on the ship)."""
+    seg, rings = 32, 6
+    dy = -0.03  # a little in front of the hull, which cuts the ship's own middle shields
+    for i in range(7):
+        x = -0.84 + i * 0.28
+        colors, faces = [], []
+        for k in range(seg):
+            a0, a1 = 2 * math.pi * k / seg, 2 * math.pi * (k + 1) / seg
+            for j in range(rings):
+                r0, r1 = 0.1 * j / rings, 0.1 * (j + 1) / rings
+                col = design(i, (a0 + a1) / 2, (j + 0.5) / rings)
+                if col not in colors:
+                    colors.append(col)
+                pt = lambda r, a, y: (x + r * math.cos(a), y, 0.25 + r * math.sin(a)) if r else (x, y, 0.25)
+                front = [pt(r0, a0, -0.35 + dy), pt(r1, a0, -0.35 + dy), pt(r1, a1, -0.35 + dy), pt(r0, a1, -0.35 + dy)]
+                back = [pt(r0, a1, -0.32 + dy), pt(r1, a1, -0.32 + dy), pt(r1, a0, -0.32 + dy), pt(r0, a0, -0.32 + dy)]
+                if j == 0:  # the centre: triangles
+                    front, back = front[:3], back[1:]
+                faces += [(front, colors.index(col)), (back, colors.index(col))]
+                if j == rings - 1:
+                    faces.append(([pt(r1, a0, -0.35 + dy), pt(r1, a0, -0.32 + dy), pt(r1, a1, -0.32 + dy), pt(r1, a1, -0.35 + dy)], colors.index(col)))
+        multi_part('shield', faces, colors, root, outline=True, share=True)
+        part('shieldrim', torus(0.1, 0.014, seg=24, ring=8, rot=(math.pi / 2, 0, 0), loc=(x, -0.35 + dy, 0.25)), P['gold'], root, outline=False)
+        part('boss', sphere(0.028, seg=12, rings=8, loc=(x, -0.36 + dy, 0.25)), P['gold'], root, outline=False)
+
+
+def render_cosmetics(manifest, only=None):
+    """Every sail and shield row as an overlay sheet (manifest['cosmetics'])."""
+    cos = manifest.setdefault('cosmetics', {})
+    jobs = [('sail', k, v) for k, v in SAILS.items()] + [('shields', k, v) for k, v in SHIELDS.items()]
+    for slot, key, fn in jobs:
+        if only and key not in only:
+            continue
+        reset_scene()
+        OUTLINE_W[0] = 0.02
+        root = build_ship('ormen')
+        hide = {'sail', 'shield', 'shieldrim', 'boss'} if slot == 'sail' else {'shield', 'shieldrim', 'boss'}
+        for ob in list(bpy.data.objects):
+            if ob.type == 'MESH' and ob.name.split('.')[0] in hide:
+                bpy.data.objects.remove(ob)
+        holdouts = [ob for ob in bpy.data.objects if ob.type == 'MESH']
+        if slot == 'sail':
+            build_sail_overlay(fn, root)
+        else:
+            build_shield_overlay(fn, root)
+        for ob in holdouts:
+            ob.is_holdout = True
+        cam = camera((0.1, 0, 0.7), 3.6, (SHIP_W, SHIP_H), elev=18)
+        frames = []
+        for f in range(SHIP_FRAMES):
+            p = 2 * math.pi * f / SHIP_FRAMES
+            root.location.z = 0.02 * math.sin(p)
+            root.rotation_euler = (0.025 * math.sin(p + 0.6), 0.035 * math.sin(p), 0)
+            path = os.path.join(TMP, 'cosmetics', f'{slot}-{key}_{f:02d}.png')
+            render_to(path)
+            frames.append(path)
+        rel = f'assets/ships/{slot}-{key}.webp'
+        pack(frames, SHIP_W, SHIP_H, 4, os.path.join(PUBLIC, rel))
+        cos.setdefault(slot, {})[key] = rel
+        print(f'[viking-loot] rendered {slot} {key}')
+
+
 BOAT_W, BOAT_H = 200, 176
 
 
@@ -1581,7 +1740,7 @@ def write_manifest(manifest):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'boats', 'island', 'island-snow', 'island-lava', 'island-gold', 'raven', 'bosses'}
+    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'cosmetics', 'boats', 'island', 'island-snow', 'island-lava', 'island-gold', 'raven', 'bosses'}
     if 'harald' in want:
         want |= {'harald-red', 'harald-blue', 'harald-yellow'}
     manifest = {'vikings': {}, 'loot': None, 'ship': None, 'island': None}
@@ -1598,6 +1757,10 @@ def main():
     if 'ship' in want:
         render_ship(manifest)
         print('[viking-loot] rendered ship')
+    cos_keys = {k for k in want if k in SAILS or k in SHIELDS}
+    if 'cosmetics' in want or cos_keys:
+        render_cosmetics(manifest, None if 'cosmetics' in want else cos_keys)
+        print('[viking-loot] rendered cosmetics')
     if 'boats' in want:
         render_boats(manifest)
         print('[viking-loot] rendered boats')

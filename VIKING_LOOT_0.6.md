@@ -1,6 +1,6 @@
 # Viking Loot 0.6 – Asgård, säsonger och en bättre start
 
-> **Status (2026-11-25):** Fas 1–3 är klara. Fas 1: guidad första räd, förklarade förluster, Mindre rörelse och Spara batteri. Fas 2: gyllene skatten, Valhalls port och valkyrian i regelmotorn. Fas 3: Asgård (bana 49–60), bossen Loke, berättelsen och grafiken. Nästa: fas 4 (kosmetika och samlaralbum). Användaren startar varje fas själv.
+> **Status (2026-11-26):** Fas 1–4 är klara. Fas 1: guidad första räd, förklarade förluster, Mindre rörelse och Spara batteri. Fas 2: gyllene skatten, Valhalls port och valkyrian i regelmotorn. Fas 3: Asgård (bana 49–60), bossen Loke, berättelsen och grafiken. Fas 4: segel, sköldar och samlaralbumet. Nästa: fas 5 (veckans utmaning och händelser). Användaren startar varje fas själv.
 
 ## Syfte
 
@@ -156,6 +156,31 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
 - **Data:** kosmetikan finns i `src/game/cosmetics.ts`. Vad man äger och har valt sparas i meta, och gamla sparningar migreras.
 - **Samlaralbum 🏺:** reliker från händelser och veckosviter, i `src/game/relics.ts`. Albumet nås från kartan, bredvid Krönikan.
 - **Belöningar:** kosmetika får man från prestationer, veckans utmaning och händelser.
+
+**Så blev det (fas 4):**
+
+- **Teknik:** segel och sköldar är egna överläggsark från Blender (`render_cosmetics` i `render_assets.py`, `npm run render-art -- cosmetics`). De har samma kamera och samma tolv gungbildrutor som långskeppet. Resten av skeppet är "holdout", så överlägget döljs där skeppet skymmer det. Alla långskepp har samma segel och sköldar, så ett överlägg passar på alla sex skepp. Scenen ritar överläggen direkt ovanpå skeppet och följer dess bildruta (`setLooks`). Arken laddas först när de används. Toning av en sprite valdes bort, eftersom mönster med flera färger då inte går.
+- **Sju segel:** Rutsegel, Nordkorset, Fjordsegel, Frostsegel, Glödsegel, Bifrostsegel och Solsegel.
+- **Sex sköldrader:** Havets, Lagets, Delade, Krut-, Drakens och Guldsköldar.
+- **Utöver detta:**
+  - "Skeppets eget" segel och sköldar, som alltid finns.
+  - Varje kosmetik delas ut av en prestation, till exempel Rutsegel för Första räden och Guldsköldar för Hela Norden i guld.
+  - Under prestationen i listan står belöningen (🎁).
+- **Data (`cosmetics.ts`, `relics.ts`):**
+  - Ägandet räknas fram från prestationer och besegrade bossar, så befintliga spelare får sina belöningar direkt.
+  - Händelser och veckans utmaning lägger till id:n i `meta.owned` med `grant()`.
+  - `equip()` vägrar allt man inte äger.
+  - Gamla sparningar får standardvalen, och okända id:n rensas bort.
+- **Skeppsvarvet:**
+  - Har flikarna Skepp, Segel och Sköldar.
+  - Förhandsbilden visar det valda skeppet med segel och sköldar.
+  - Låsta kort visar var man får dem.
+- **Samlaralbumet 🏺** (knappen bredvid Krönikan) har 13 reliker:
+  - en per boss (fanns inte i planen, men gör att albumet har innehåll redan nu)
+  - en per händelse
+  - fyra från veckans utmaning
+  - Okända reliker visas som ❔ tillsammans med var man hittar dem.
+- **Notiser:** efter en vunnen räd visas en notis för varje nytt segel, nya sköldar eller ny relik.
 
 ## 5. Veckans utmaning och händelser
 

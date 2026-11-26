@@ -3,6 +3,8 @@ import { levels, worlds } from './levels.ts'
 import { bosses } from './bosses.ts'
 import type { Progress } from './progress.ts'
 import type { ModeProgress } from './modes.ts'
+import { COSMETICS, DEFAULT_SAIL, DEFAULT_SHIELDS } from './cosmetics.ts'
+import { RELICS } from './relics.ts'
 
 export type Stats = {
   raidsWon: number // every win: campaign, Dagens räd and endless rounds
@@ -18,6 +20,9 @@ export type Meta = {
   unlocked: Record<string, string> // achievement id → day it was earned
   ship: ShipId
   migrated: boolean // 0.3 progress has been counted in
+  sail: string // 0.6: the chosen sail (cosmetics.ts)
+  shields: string // 0.6: the chosen shield row
+  owned: string[] // 0.6: cosmetics and relics given by events and the weekly challenge
 }
 /** What the game knows when deciding achievements. */
 export type Ctx = { stats: Stats; progress: Progress; modes: ModeProgress }
@@ -179,7 +184,9 @@ export function lootOf(level: { loot: { stone?: boolean; lockedBy?: string[]; ke
 }
 
 export const emptyStats = (): Stats => ({ raidsWon: 0, lootTaken: 0, perfectRaids: 0, chestsOpened: 0, cleanWins: 0, dailyWins: 0, kegsBlown: 0 })
-export const emptyMeta = (): Meta => ({ stats: emptyStats(), unlocked: {}, ship: 'ormen', migrated: false })
+export const emptyMeta = (): Meta => ({
+  stats: emptyStats(), unlocked: {}, ship: 'ormen', migrated: false, sail: DEFAULT_SAIL, shields: DEFAULT_SHIELDS, owned: [],
+})
 
 /**
  * 0.3 only saved stars, so the statistics start from the won levels: one raid and all its loot
@@ -215,6 +222,13 @@ export function parseMeta(raw: string | null): Meta {
     }
     if (SHIPS.some(s => s.id === d.ship)) m.ship = d.ship
     m.migrated = d.migrated === true
+    // 0.6 – saves from 0.4/0.5 have none of these and keep the defaults
+    if (COSMETICS.some(c => c.slot === 'sail' && c.id === d.sail)) m.sail = d.sail
+    if (COSMETICS.some(c => c.slot === 'shields' && c.id === d.shields)) m.shields = d.shields
+    if (Array.isArray(d.owned)) {
+      const known = (id: unknown) => typeof id === 'string' && (COSMETICS.some(c => c.id === id) || RELICS.some(r => r.id === id))
+      m.owned = [...new Set(d.owned.filter(known) as string[])]
+    }
   } catch { /* corrupt data – start over */ }
   return m
 }

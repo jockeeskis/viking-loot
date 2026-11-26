@@ -11,7 +11,7 @@ import {
 } from './art'
 import {
   preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, hasBoats, lootAsset, shipAsset,
-  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, shipKey, shipAnimKey, ensureBoss, bossKey, bossAsset, hasRaven, RAVEN_KEY, ravenAsset, type IslandStyle,
+  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, ensureCosmetic, cosmeticKey, cosmeticSheet, shipKey, shipAnimKey, ensureBoss, bossKey, bossAsset, hasRaven, RAVEN_KEY, ravenAsset, type IslandStyle,
   type VikingAnim, type VikingAsset,
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, explosion, wave, CAMERA_ZOOM } from './fx'
@@ -132,6 +132,9 @@ export class RaidScene extends Phaser.Scene {
   private boat?: Phaser.GameObjects.GameObject
   private longship?: Phaser.GameObjects.Sprite
   private shipId = 'ormen'
+  // 0.6: sail and shield overlays drawn on top of the longship, frame by frame
+  private overlays: Partial<Record<'sail' | 'shields', Phaser.GameObjects.Sprite>> = {}
+  private looks: Record<'sail' | 'shields', string | null> = { sail: null, shields: null }
   private queueLabel?: Phaser.GameObjects.Text
   private seatsLabel?: Phaser.GameObjects.Text
   private colorMarks = false // colour-blind mode: symbols on everything whose colour matters
@@ -151,6 +154,7 @@ export class RaidScene extends Phaser.Scene {
     this.drawEnvironment()
     this.ready = true
     if (this.shipId !== 'ormen') this.setShip(this.shipId)
+    this.setLooks(this.looks.sail, this.looks.shields)
     if (this.pending) { const p = this.pending; this.pending = undefined; this.play(p.data, p.title, p.boss) } else this.reset(this.level)
   }
 
@@ -267,6 +271,33 @@ export class RaidScene extends Phaser.Scene {
       if (this.shipId !== id || !this.longship) return
       this.longship.setTexture(shipKey(id), 0).play(shipAnimKey(id))
     })
+  }
+
+  /** Sail and shield row from Skeppsvarvet (0.6); null keeps the ship's own. Loaded on first use. */
+  setLooks(sail: string | null, shields: string | null) {
+    this.looks = { sail, shields }
+    if (!this.ready || !this.longship) return
+    for (const slot of ['sail', 'shields'] as const) {
+      const id = this.looks[slot], ov = this.overlays[slot]
+      if (!ov) continue
+      if (!id || !cosmeticSheet(id)) { ov.setVisible(false); continue }
+      ensureCosmetic(this, id, () => {
+        if (this.looks[slot] !== id || !this.longship) return
+        ov.setTexture(cosmeticKey(id)).setVisible(true)
+        this.syncOverlays()
+      })
+    }
+  }
+
+  /** Keep the overlays on the longship's frame and place. */
+  private syncOverlays() {
+    const ship = this.longship
+    if (!ship) return
+    for (const ov of Object.values(this.overlays)) {
+      if (!ov?.visible) continue
+      ov.setPosition(ship.x, ship.y)
+      ov.setFrame(ship.frame.name)
+    }
   }
 
   /** Start a campaign level by index. */
@@ -474,6 +505,11 @@ export class RaidScene extends Phaser.Scene {
     if (hasShip(this)) {
       const sh = shipAsset()!
       this.longship = this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY).setScale(SHIP_W / sh.frameWidth).play('ship-bob')
+      for (const slot of ['sail', 'shields'] as const) {
+        this.overlays[slot] = this.add.sprite(SHIP.x, SHIP.y - 2, SHIP_KEY).setOrigin(sh.originX, sh.originY)
+          .setScale(SHIP_W / sh.frameWidth).setVisible(false)
+      }
+      this.longship.on(Phaser.Animations.Events.ANIMATION_UPDATE, () => this.syncOverlays())
     } else drawShip(this.add.graphics(), SHIP.x, SHIP.y)
     this.drawHud()
   }
@@ -569,6 +605,7 @@ export class RaidScene extends Phaser.Scene {
     this.boat?.destroy(); this.boat = undefined
     const color = this.state.ships[1]?.color
     this.longship?.setX(color ? SHIP.x - SHIP_SHIFT : SHIP.x)
+    this.syncOverlays()
     if (!color) return
     let boat: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics | Phaser.GameObjects.Container
     if (hasBoats(this)) {
