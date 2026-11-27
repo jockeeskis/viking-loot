@@ -188,6 +188,7 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
 - Kortraden visar alltid läget efter det senast valda draget. Ett kort som ligger kvar glider till sin nya plats, och det tryckta kortet tonas bort.
 - Vikingar, platser och nedräkningar ritas från det drag som just spelats upp (`layoutBoard`).
 - Ett fjärde tryck i förväg blockeras, och kortet skakar lite.
+- **Kön syns** som en rad med numrerade vikingahuvuden på bryggan till vänster om skeppet (`drawAhead`). Huvudet flyger dit från kortet man tryckte på. Nummer 1 spelas härnäst, och raden krymper när dragen spelas upp. Raden ligger ovanför varningen om skeppsplatserna, så de krockar inte.
 - Ångra och tips väntar tills alla drag har spelats upp.
 - Testat i Chrome: bana 21, 36 och 53 vanns med drag i skurar om 1+3. Efter uppspelningen stämmer brädet exakt med regelmotorns läge.
 

@@ -49,6 +49,7 @@ const BOAT = { x: 314, y: 436 }
 const BOAT_W = 88
 /** How many moves can wait while an earlier one animates (0.6). */
 const MOVES_AHEAD = 3
+const AHEAD_Y = 401 // the row of waiting moves, by the dock (clear of the seat warning below)
 const SHIP_SHIFT = 28 // the longship makes room for the colour ship
 const BOAT_SCALE = 0.48
 const SCOUT_COLOR = 0x3e7d6a
@@ -110,7 +111,8 @@ export class RaidScene extends Phaser.Scene {
   private busy = false
   // Moves chosen while an earlier move still animates (0.6). The engine applies each at once; the scene
   // replays them in order. `this.state` is always the newest state, and the cards always show it.
-  private ahead: { before: GameState; after: GameState }[] = []
+  private ahead: { before: GameState; after: GameState; viking: Viking }[] = []
+  private aheadChips?: Phaser.GameObjects.Container // the waiting moves, shown as numbered heads by the dock
   private generation = 0
   private lootSprites = new Map<string, Sprite>()
   private actors = new Map<string, Sprite>() // vikings out on the island or seated on the ship
@@ -344,6 +346,7 @@ export class RaidScene extends Phaser.Scene {
     this.cameras.main.setZoom(CAMERA_ZOOM) // never carry a half-finished victory punch into the next level
     this.busy = false
     this.ahead = []
+    this.drawAhead()
     this.state = state
     this.lootSprites.forEach(s => s.destroy()); this.lootSprites.clear()
     this.actors.forEach(s => s.destroy()); this.actors.clear()
@@ -1164,6 +1167,7 @@ export class RaidScene extends Phaser.Scene {
     const before = this.state
     const after = selectViking(before, vikingId)
     if (after === before) return
+    const viking = before.queue.find(v => v.id === vikingId)!
     // The outcome is decided here; the animation only replays the engine's events.
     this.history = [before]
     this.trail.push({ state: before, id: vikingId })
@@ -1178,12 +1182,63 @@ export class RaidScene extends Phaser.Scene {
     }
     this.layoutCards(true)
     sfx.click()
-    this.ahead.push({ before, after })
+    this.ahead.push({ before, after, viking })
     if (!this.busy) {
       this.busy = true
       void this.replay()
-    }
+    } else this.drawAhead(tapped?.x)
     this.notify()
+  }
+
+  /**
+   * Moves chosen ahead wait by the dock as a row of numbered heads (1 plays next). A new one flies
+   * there from the tapped card (fromX); when a move starts playing its head leaves the row.
+   */
+  private drawAhead(fromX?: number) {
+    this.aheadChips?.destroy(); this.aheadChips = undefined
+    if (!this.ahead.length) return
+    const R = 10, GAP = 23, X0 = 14 + R, Y = AHEAD_Y
+    const box = this.add.container(0, 0).setDepth(40)
+    const bg = this.add.graphics()
+    bg.fillStyle(0x2a190c, 0.88); bg.fillRoundedRect(6, Y - R - 5, 16 + this.ahead.length * GAP, 2 * R + 10, 10)
+    bg.lineStyle(2, GOLD, 0.9); bg.strokeRoundedRect(6, Y - R - 5, 16 + this.ahead.length * GAP, 2 * R + 10, 10)
+    box.add(bg)
+    this.ahead.forEach(({ viking: v }, i) => {
+      const x = X0 + 2 + i * GAP
+      const chip = this.add.container(x, Y)
+      const g = this.add.graphics()
+      g.fillStyle(0x3b2414); g.fillCircle(0, 0, R)
+      g.lineStyle(2.5, v.kind === 'scout' ? SCOUT_COLOR : v.kind === 'valkyrie' ? VALKYRIE_COLOR : v.color ? COLORS[v.color] : GOLD)
+      g.strokeCircle(0, 0, R)
+      chip.add(g)
+      const asset = assetFor(v)
+      if (asset && this.textures.exists(portraitKey(asset))) {
+        const head = this.add.image(0, 1, portraitKey(asset))
+        head.setScale((2 * R + 6) / head.width)
+        const m = this.make.graphics({}, false)
+        m.fillStyle(0xffffff); m.fillCircle(0, 0, R - 1)
+        const mask = m.createGeometryMask()
+        head.setMask(mask)
+        // The mask is drawn in world space; keep it on the chip while the chip moves.
+        const follow = () => m.setPosition(chip.x, chip.y)
+        follow()
+        this.events.on(Phaser.Scenes.Events.POST_UPDATE, follow)
+        chip.once(Phaser.GameObjects.Events.DESTROY, () => { this.events.off(Phaser.Scenes.Events.POST_UPDATE, follow); m.destroy() })
+        chip.add(head)
+      } else {
+        const hg = this.add.graphics()
+        drawHead(hg, lookOf(v), 7, 0, 1)
+        chip.add(hg)
+      }
+      const n = this.add.text(R - 2, R - 3, String(i + 1), { ...cartoonText(9), backgroundColor: '#d9a441', padding: { x: 2, y: 0 } }).setOrigin(0.5)
+      chip.add(n)
+      box.add(chip)
+      if (fromX !== undefined && i === this.ahead.length - 1) {
+        chip.setPosition(fromX, CARD.y - 20).setScale(1.6)
+        this.tweens.add({ targets: chip, x, y: Y, scale: 1, duration: 260, ease: 'Sine.easeOut' })
+      }
+    })
+    this.aheadChips = box
   }
 
   /** Play the chosen moves one after another, then settle the board. */
@@ -1191,6 +1246,7 @@ export class RaidScene extends Phaser.Scene {
     const gen = this.generation
     while (this.ahead.length) {
       const { before, after } = this.ahead.shift()!
+      this.drawAhead()
       await this.playEvents(before, after, gen)
       if (gen !== this.generation) return
       if (after.status === 'won') {
