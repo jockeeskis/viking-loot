@@ -19,7 +19,7 @@ export function tierFor(completed: boolean[]): Tier {
 }
 export const mechanicsForTier = (tier: Tier): Mechanic[] => WORLD_MECHANICS.slice(0, tier + 1).flat()
 
-function withMechanic(spec: Spec, m: Mechanic, rand: () => number): Spec {
+export function withMechanic(spec: Spec, m: Mechanic, rand: () => number): Spec {
   switch (m) {
     case 'house': return { ...spec, houses: 1 + Math.floor(rand() * 2) }
     case 'stone': return { ...spec, stones: 1 }
@@ -40,7 +40,7 @@ function withMechanic(spec: Spec, m: Mechanic, rand: () => number): Spec {
   }
 }
 
-function pickMechanics(tier: Tier, count: number, rand: () => number): Mechanic[] {
+export function pickMechanics(tier: Tier, count: number, rand: () => number): Mechanic[] {
   const pool = mechanicsForTier(tier)
   // At least one from the newest world the player has completed, so the raid feels current.
   const newest = shuffle([...WORLD_MECHANICS[tier]], rand)
@@ -49,7 +49,7 @@ function pickMechanics(tier: Tier, count: number, rand: () => number): Mechanic[
   return picked.slice(0, count)
 }
 
-const heights = (cols: number, lo: number, hi: number, rand: () => number) =>
+export const heights = (cols: number, lo: number, hi: number, rand: () => number) =>
   Array.from({ length: cols }, () => lo + Math.floor(rand() * (hi - lo + 1)))
 
 /**
@@ -136,6 +136,42 @@ export function dailyLevel(day: string, tier: Tier): Level {
     'Dagens räd är densamma för alla i dag. Första vinsten ger stjärnorna – vinn varje dag för att hålla sviten vid liv.')
 }
 
+// ---------------------------------------------------------------- the weekly challenge (0.6)
+
+/** The ISO week of a local date, as '2026-W48' (weeks start on Monday; week 1 holds the year's first Thursday). */
+export function weekKey(d: Date): string {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const day = t.getUTCDay() || 7
+  t.setUTCDate(t.getUTCDate() + 4 - day) // the Thursday of this week decides the year
+  const year = t.getUTCFullYear()
+  const week = Math.ceil(((t.getTime() - Date.UTC(year, 0, 1)) / 86400000 + 1) / 7)
+  return `${year}-W${String(week).padStart(2, '0')}`
+}
+/** Days left of the week, today included (Monday 7 … Sunday 1). */
+export const daysLeftInWeek = (d: Date) => 8 - (d.getDay() || 7)
+export const WEEKLY_ISLANDS = 3
+export const weekSeed = (week: string, step: number, tier: Tier) => hashString(`viking-loot weekly ${week} island ${step} tier ${tier}`)
+
+/** The week's three islands get harder: a warm-up, a real puzzle and a hard one. */
+export function weeklySpec(step: number, tier: Tier, seed: number): Spec {
+  const rand = rng(seed)
+  const shape = [
+    { cols: 3, lo: 3, hi: 4, min: 0.3, max: 0.65, count: 1 },
+    { cols: 4, lo: 3, hi: 4, min: 0.2, max: 0.45, count: 1 },
+    // Small enough to generate in a few seconds on a phone; the hardness comes from few winning lines.
+    { cols: 4, lo: 3, hi: 4, min: 0.06, max: 0.26, count: 2 },
+  ][Math.min(step, 2)]
+  let spec: Spec = { heights: heights(shape.cols, shape.lo, shape.hi, rand), min: shape.min, max: shape.max }
+  for (const m of pickMechanics(tier, tier === 0 ? 0 : shape.count, rand)) spec = withMechanic(spec, m, rand)
+  return evenHits(spec, shape.lo, shape.hi)
+}
+
+export function weeklyLevel(week: string, step: number, tier: Tier): Level {
+  return toLevel(generateWithFallback(s => weeklySpec(step, tier, s), weekSeed(week, step, tier)),
+    `Veckans utmaning · ö ${step + 1}`,
+    'Veckans tre öar är desamma för alla hela veckan. Klara alla tre för veckans belöning.')
+}
+
 export function endlessLevel(round: number, tier: Tier, runSeed: number): Level {
   const seed = (runSeed + round * 104729) >>> 0
   return toLevel(generateWithFallback(s => endlessSpec(round, tier, s), seed), `Oändlig räd · runda ${round}`,
@@ -147,13 +183,21 @@ export function endlessLevel(round: number, tier: Tier, runSeed: number): Level 
 export type ModeProgress = {
   daily: { results: Record<string, number>; lastWon: string | null; streak: number; bestStreak: number }
   endless: { best: number; runs: number }
+  /** 0.6: stars per island of a week ('2026-W48' → [★, ★, ★], 0 = not won yet). */
+  weekly: Record<string, number[]>
+  /** 0.6: stars per island of an event and year ('midvinterblot-2026' → six islands). */
+  events: Record<string, number[]>
 }
 const KEY = 'viking-loot-0.4-modes'
 
 export const emptyModes = (): ModeProgress => ({
   daily: { results: {}, lastWon: null, streak: 0, bestStreak: 0 },
   endless: { best: 0, runs: 0 },
+  weekly: {},
+  events: {},
 })
+const starList = (v: unknown, n: number) =>
+  Array.isArray(v) ? Array.from({ length: n }, (_, i) => (Number.isInteger(v[i]) ? Math.max(0, Math.min(3, v[i] as number)) : 0)) : null
 
 export function parseModes(raw: string | null): ModeProgress {
   const p = emptyModes()
@@ -169,6 +213,12 @@ export function parseModes(raw: string | null): ModeProgress {
     if (d?.endless && typeof d.endless === 'object') {
       if (Number.isInteger(d.endless.best)) p.endless.best = Math.max(0, d.endless.best)
       if (Number.isInteger(d.endless.runs)) p.endless.runs = Math.max(0, d.endless.runs)
+    }
+    if (d?.weekly && typeof d.weekly === 'object') {
+      for (const [k, v] of Object.entries(d.weekly)) { const l = starList(v, WEEKLY_ISLANDS); if (/^\d{4}-W\d\d$/.test(k) && l) p.weekly[k] = l }
+    }
+    if (d?.events && typeof d.events === 'object') {
+      for (const [k, v] of Object.entries(d.events)) { const l = starList(v, EVENT_ISLANDS); if (/^[a-z]+-\d{4}$/.test(k) && l) p.events[k] = l }
     }
   } catch { /* corrupt data – start over */ }
   return p
@@ -211,3 +261,21 @@ export function startEndlessRun(p: ModeProgress): ModeProgress {
 export function recordEndlessRound(p: ModeProgress, round: number): ModeProgress {
   return { ...p, endless: { ...p.endless, best: Math.max(p.endless.best, round) } }
 }
+
+/** Record a won island of the week; the best stars are kept. Only the last 12 weeks are stored. */
+export function recordWeeklyWin(p: ModeProgress, week: string, step: number, stars: number): ModeProgress {
+  const row = [...(p.weekly[week] ?? Array(WEEKLY_ISLANDS).fill(0))]
+  row[step] = Math.max(row[step] ?? 0, stars)
+  const weekly = Object.fromEntries(Object.entries({ ...p.weekly, [week]: row }).sort().slice(-12))
+  return { ...p, weekly }
+}
+export const weekDone = (p: ModeProgress, week: string) => (p.weekly[week] ?? []).filter(s => s > 0).length >= WEEKLY_ISLANDS
+
+/** The islands of an event: five generated ones and the handmade finale (events.ts). */
+export const EVENT_ISLANDS = 6
+export function recordEventWin(p: ModeProgress, key: string, index: number, stars: number): ModeProgress {
+  const row = [...(p.events[key] ?? Array(EVENT_ISLANDS).fill(0))]
+  row[index] = Math.max(row[index] ?? 0, stars)
+  return { ...p, events: { ...p.events, [key]: row } }
+}
+export const eventDone = (p: ModeProgress, key: string) => (p.events[key] ?? []).filter(s => s > 0).length >= EVENT_ISLANDS

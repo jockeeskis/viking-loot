@@ -11,6 +11,7 @@ import { bosses } from './bosses.ts'
 import { BOSS_EN } from './levelTexts.ts'
 import { COSMETICS } from './cosmetics.ts'
 import { RELICS } from './relics.ts'
+import { EVENTS } from './events.ts'
 
 test('Swedish and English have the same UI texts, none empty', () => {
   assert.deepEqual(Object.keys(EN).sort(), Object.keys(SV).sort())
@@ -32,6 +33,7 @@ test('every level, intro, achievement and ship has an English text', () => {
   for (const c of COSMETICS) for (const f of ['name', 'text']) assert.ok(DATA_EN[`cos.${c.id}.${f}`], `cosmetic ${c.id} ${f}`)
   for (const r of RELICS) for (const f of ['name', 'text']) assert.ok(DATA_EN[`relic.${r.id}.${f}`], `relic ${r.id} ${f}`)
   for (const r of RELICS) if (r.source.kind === 'event') assert.ok(SV[`event.${r.source.id}`] && EN[`event.${r.source.id}`], `event ${r.source.id}`)
+  for (const e of EVENTS) assert.ok(DATA_EN[`event.${e.id}.finale`] && DATA_EN[`event.${e.id}.finaleHint`] && SV[`event.${e.id}`] && EN[`event.${e.id}`], `event ${e.id}`)
 })
 
 test('every story card has both languages on every page', () => {

@@ -658,7 +658,13 @@ export const MANIFEST: AssetManifest = {
       "frost": "assets/ships/sail-frost.webp",
       "glod": "assets/ships/sail-glod.webp",
       "regnbage": "assets/ships/sail-regnbage.webp",
-      "sol": "assets/ships/sail-sol.webp"
+      "sol": "assets/ships/sail-sol.webp",
+      "midvinter": "assets/ships/sail-midvinter.webp",
+      "var": "assets/ships/sail-var.webp",
+      "midsommar": "assets/ships/sail-midsommar.webp",
+      "alva": "assets/ships/sail-alva.webp",
+      "vagor": "assets/ships/sail-vagor.webp",
+      "sparre": "assets/ships/sail-sparre.webp"
     },
     "shields": {
       "delad": "assets/ships/shields-delad.webp",
@@ -668,5 +674,11 @@ export const MANIFEST: AssetManifest = {
       "drake": "assets/ships/shields-drake.webp",
       "guld": "assets/ships/shields-guld.webp"
     }
+  },
+  "decor": {
+    "julbock": "assets/decor/julbock.webp",
+    "bjorkris": "assets/decor/bjorkris.webp",
+    "majstang": "assets/decor/majstang.webp",
+    "lyktor": "assets/decor/lyktor.webp"
   }
 }

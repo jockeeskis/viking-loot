@@ -37,6 +37,8 @@ export type AssetManifest = {
   bosses?: Record<string, BossAsset>
   /** Sails and shield rows (0.6): overlay sheets with the longship's frame layout, by slot and key. */
   cosmetics?: Partial<Record<'sail' | 'shields', Record<string, string>>>
+  /** Event decorations (0.6 fas 5): one still image each, set on a corner of the island. */
+  decor?: Record<string, string>
   /** Small colour ships, one frame per colour. */
   boats?: (SheetInfo & { frames: Record<LootColor, number> }) | null
 }
@@ -98,6 +100,16 @@ export function ensureCosmetic(scene: Phaser.Scene, id: string, done: () => void
   if (scene.textures.exists(key)) { done(); return }
   scene.load.spritesheet(key, sheet, { frameWidth: ship.frameWidth, frameHeight: ship.frameHeight })
   scene.load.once(`filecomplete-spritesheet-${key}`, done)
+  scene.load.start()
+}
+export const decorKey = (id: string) => `decor-${id}`
+/** Load an event decoration the first time it is shown. */
+export function ensureDecor(scene: Phaser.Scene, id: string, done: () => void) {
+  const key = decorKey(id), path = MANIFEST.decor?.[id]
+  if (!path) return
+  if (scene.textures.exists(key)) { done(); return }
+  scene.load.image(key, path)
+  scene.load.once(`filecomplete-image-${key}`, done)
   scene.load.start()
 }
 export const bossAsset = (id: string) => MANIFEST.bosses?.[id] ?? null

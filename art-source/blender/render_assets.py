@@ -1330,7 +1330,74 @@ SAILS = {
     'regnbage': lambda u, v: RAINBOW[5 - min(5, int(v * 6))],
     'sol': lambda u, v: (lambda r: P['gold'] if r < 0.24 else (P['sail_red'] if r < 0.31 else P['sail_cream']))(
         math.hypot(u - 0.5, (v - 0.5) * 0.82)),
+    # 0.6 fas 5 – the events and the weekly challenge
+    'midvinter': lambda u, v: _snowflake(u, v),
+    'var': lambda u, v: _flower(u, v),
+    'midsommar': lambda u, v: _wreath(u, v),
+    'alva': lambda u, v: _lanterns(u, v),
+    'vagor': lambda u, v: P['white'] if (((v - 0.5) * 0.82 + 0.035 * math.sin((u - 0.5) * 6 * math.pi)) * 5.5) % 1 < 0.24 else '#2F6FA8',
+    'sparre': lambda u, v: P['sail_red'] if (((u - 0.5) + (v - 0.5) * 0.82) * 4.5) % 1 < 0.5 else P['gold'],
 }
+
+
+def _xy(u, v):
+    """Sail coordinates in world units from the centre (the sail is 1.0 wide and 0.82 tall)."""
+    return u - 0.5, (v - 0.5) * 0.82
+
+
+def _seg_dist(x, y, ax, ay, bx, by):
+    dx, dy = bx - ax, by - ay
+    t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(x - ax - t * dx, y - ay - t * dy)
+
+
+def _snowflake(u, v):
+    x, y = _xy(u, v)
+    d = 9.0
+    for k in range(3):  # three bars through the centre, with small branches near each end
+        a = math.pi / 2 + k * math.pi / 3
+        ex, ey = 0.3 * math.cos(a), 0.3 * math.sin(a)
+        d = min(d, _seg_dist(x, y, -ex, -ey, ex, ey))
+        for sgn in (1, -1):
+            bx, by = sgn * ex * 0.62, sgn * ey * 0.62
+            for turn in (0.6, -0.6):
+                b = a + (0 if sgn > 0 else math.pi) + turn
+                d = min(d, _seg_dist(x, y, bx, by, bx + 0.09 * math.cos(b), by + 0.09 * math.sin(b)))
+    return P['white'] if d < 0.022 else '#22365F'
+
+
+def _flower(u, v):
+    x, y = _xy(u, v)
+    if math.hypot(x, y) < 0.075:
+        return P['gold']
+    for k in range(6):
+        a = k * math.pi / 3
+        if math.hypot(x - 0.16 * math.cos(a), y - 0.16 * math.sin(a)) < 0.095:
+            return P['white']
+    return '#8CC084'
+
+
+def _wreath(u, v):
+    x, y = _xy(u, v)
+    r = math.hypot(x, y)
+    for k, col in enumerate(('#E5484D', P['gold'], '#458FC4', '#F49AC1') * 2):
+        a = k * math.pi / 4 + math.pi / 8
+        if math.hypot(x - 0.255 * math.cos(a), y - 0.255 * math.sin(a)) < 0.05:
+            return col
+    return '#3C9445' if 0.22 < r < 0.29 else P['sail_cream']
+
+
+def _lanterns(u, v):
+    x, y = _xy(u, v)
+    for cx in (-0.3, 0.0, 0.3):
+        for cy in (-0.22, 0.0, 0.22):
+            d = math.hypot(x - cx, y - cy)
+            big = 0.07 if (cx, cy) == (0.0, 0.0) else 0.045
+            if d < big:
+                return P['lava_hot']
+            if d < big + 0.025:
+                return '#7A4FA0'
+    return '#2E2440'
 
 SHIELDS = {
     # id: design(i, angle, radius) → hex colour for shield number i (0..6), a point at angle (rad) and radius (0..1)
@@ -1472,6 +1539,104 @@ def render_cosmetics(manifest, only=None):
         pack(frames, SHIP_W, SHIP_H, 4, os.path.join(PUBLIC, rel))
         cos.setdefault(slot, {})[key] = rel
         print(f'[viking-loot] rendered {slot} {key}')
+
+
+# ---------------------------------------------------------------- event decorations (0.6 fas 5)
+# One still image per event, set on a corner of the island during the event's raids.
+def build_julbock(_=None):
+    """The straw Yule goat with red ribbons."""
+    straw, dark = '#E2B54A', '#B8862E'
+    root = empty('root')
+    part('body', sphere(1, scale=(0.32, 0.15, 0.15), loc=(0, 0, 0.5)), straw, root)
+    for x in (-0.22, 0.22):
+        for y in (-0.08, 0.08):
+            part('leg', cyl(0.035, 0.03, 0.4, seg=10, loc=(x, y, 0.22)), straw, root)
+    part('neck', cyl(0.07, 0.06, 0.3, seg=12, rot=(0, math.radians(-30), 0), loc=(0.32, 0, 0.66)), straw, root)
+    part('head', sphere(1, scale=(0.13, 0.08, 0.08), loc=(0.44, 0, 0.8)), straw, root)
+    for y in (-0.05, 0.05):
+        for k in range(14):  # horns curling back (overlapping beads make one smooth horn)
+            a = k / 13 * math.pi * 1.1
+            part('horn', sphere(0.034 - 0.0012 * k, seg=10, rings=6, loc=(0.42 - 0.1 * math.sin(a), y * 1.4, 0.86 + 0.1 * (1 - math.cos(a)))), dark, root, outline=False)
+    part('tail', sphere(0.05, loc=(-0.33, 0, 0.58)), straw, root)
+    for x in (-0.12, 0.12):  # red ribbons round the body
+        part('ribbon', torus(0.15, 0.025, seg=24, ring=8, rot=(0, math.pi / 2, 0), loc=(x, 0, 0.5)), P['sail_red'], root, outline=False)
+    part('ribbon', torus(0.07, 0.022, seg=20, ring=8, rot=(0, math.radians(60), 0), loc=(0.35, 0, 0.7)), P['sail_red'], root, outline=False)
+    return root
+
+
+def build_bjorkris(_=None):
+    """Birch twigs in a pot with bright feathers (Vårblot)."""
+    root = empty('root')
+    part('pot', cyl(0.16, 0.12, 0.26, seg=20, loc=(0, 0, 0.13)), '#B8622E', root)
+    part('potrim', torus(0.16, 0.025, seg=24, ring=8, loc=(0, 0, 0.26)), shade('#B8622E', -0.2), root, outline=False)
+    cols = ('#E5484D', P['gold'], '#458FC4', '#F49AC1', '#5BBF5A', '#F28C38')
+    for k in range(7):
+        a = k / 7 * 2 * math.pi
+        lean = 0.2 + 0.12 * (k % 2)
+        tip = (math.cos(a) * lean, math.sin(a) * lean * 0.6, 1.0 + 0.08 * (k % 3))
+        mid = (tip[0] / 2, tip[1] / 2, (0.26 + tip[2]) / 2)
+        ln = math.dist((0, 0, 0.26), tip)
+        tilt = math.atan2(math.hypot(tip[0], tip[1]), tip[2] - 0.26)
+        twig = part('twig', cyl(0.014, 0.008, ln, seg=8), '#5B3A20', root, outline=False)
+        twig.location = mid
+        twig.rotation_euler = (0, tilt, a)
+        part('feather', sphere(1, scale=(0.05, 0.03, 0.08), loc=tip), cols[k % len(cols)], root)
+    return root
+
+
+def build_majstang(_=None):
+    """The midsummer pole: green-clad, a cross bar with two wreaths and ribbons."""
+    green = '#3C9445'
+    root = empty('root')
+    part('pole', cyl(0.035, 0.03, 1.25, seg=12, loc=(0, 0, 0.62)), green, root)
+    part('bar', cyl(0.03, 0.03, 0.62, seg=12, rot=(0, math.pi / 2, 0), loc=(0, 0, 1.0)), green, root)
+    for x in (-0.27, 0.27):
+        part('wreath', torus(0.12, 0.035, seg=28, ring=8, rot=(math.pi / 2, 0, 0), loc=(x, 0, 0.84)), green, root)
+        for k in range(6):
+            a = k * math.pi / 3
+            part('flower', sphere(0.028, seg=8, rings=6, loc=(x + 0.12 * math.cos(a), -0.035, 0.84 + 0.12 * math.sin(a))),
+                 ('#E5484D', P['gold'], '#F49AC1')[k % 3], root, outline=False)
+    for z in (0.2, 0.42, 0.64):  # flowers along the pole
+        part('flower', sphere(0.03, seg=8, rings=6, loc=(0, -0.035, z)), ('#E5484D', P['gold'], '#458FC4')[int(z * 10) % 3], root, outline=False)
+    part('top', sphere(0.05, loc=(0, 0, 1.27)), green, root)
+    for x, col in ((-0.05, '#458FC4'), (0.05, P['gold'])):  # ribbons from the top
+        part('band', box(scale=(0.03, 0.01, 0.45), rot=(0, math.radians(8 if x > 0 else -8), 0), loc=(x * 2, -0.02, 1.0)), col, root, smooth=False, outline=False)
+    part('base', cyl(0.1, 0.12, 0.05, seg=16, loc=(0, 0, 0.02)), '#5B3A20', root)
+    return root
+
+
+def build_lyktor(_=None):
+    """Two lantern posts for Alvablot, the lanterns glowing."""
+    root = empty('root')
+    for x, h in ((-0.2, 0.95), (0.22, 0.75)):
+        part('post', cyl(0.03, 0.03, h, seg=10, loc=(x, 0, h / 2)), P['wood_dark'], root)
+        part('arm', cyl(0.018, 0.018, 0.16, seg=8, rot=(0, math.pi / 2, 0), loc=(x + 0.08, 0, h - 0.03)), P['wood_dark'], root, outline=False)
+        lx, lz = x + 0.15, h - 0.17
+        part('lamp', box(scale=(0.11, 0.11, 0.15), loc=(lx, 0, lz)), '#3B2A20', root, smooth=False)
+        part('glow', box(scale=(0.09, 0.115, 0.12), loc=(lx, 0, lz)), P['lava_hot'], root, smooth=False, outline=False, emission=True)
+        part('cap', cyl(0.085, 0.0, 0.08, seg=4, rot=(0, 0, math.pi / 4), loc=(lx, 0, lz + 0.11)), '#3B2A20', root, smooth=False)
+        part('foot', cyl(0.07, 0.08, 0.04, seg=12, loc=(x, 0, 0.02)), P['stone'], root)
+    return root
+
+
+DECOR = {'julbock': build_julbock, 'bjorkris': build_bjorkris, 'majstang': build_majstang, 'lyktor': build_lyktor}
+DECOR_FRAME = 160
+
+
+def render_decor(manifest):
+    out = manifest.setdefault('decor', {})
+    for key, build in DECOR.items():
+        reset_scene()
+        OUTLINE_W[0] = 0.012
+        root = build()
+        root.rotation_euler.z = math.radians(-22)
+        camera((0, 0, 0.62), 1.45, (DECOR_FRAME, DECOR_FRAME), elev=22)
+        path = os.path.join(TMP, 'decor', f'{key}.png')
+        render_to(path)
+        rel = f'assets/decor/{key}.webp'
+        pack([path], DECOR_FRAME, DECOR_FRAME, 1, os.path.join(PUBLIC, rel))
+        out[key] = rel
+        print(f'[viking-loot] rendered decor {key}')
 
 
 BOAT_W, BOAT_H = 200, 176
@@ -1740,7 +1905,7 @@ def write_manifest(manifest):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'cosmetics', 'boats', 'island', 'island-snow', 'island-lava', 'island-gold', 'raven', 'bosses'}
+    want = set(argv) or {*CHARACTERS, 'loot', 'ship', 'cosmetics', 'decor', 'boats', 'island', 'island-snow', 'island-lava', 'island-gold', 'raven', 'bosses'}
     if 'harald' in want:
         want |= {'harald-red', 'harald-blue', 'harald-yellow'}
     manifest = {'vikings': {}, 'loot': None, 'ship': None, 'island': None}
@@ -1757,6 +1922,8 @@ def main():
     if 'ship' in want:
         render_ship(manifest)
         print('[viking-loot] rendered ship')
+    if 'decor' in want:
+        render_decor(manifest)
     cos_keys = {k for k in want if k in SAILS or k in SHIELDS}
     if 'cosmetics' in want or cos_keys:
         render_cosmetics(manifest, None if 'cosmetics' in want else cos_keys)

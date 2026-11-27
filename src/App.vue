@@ -12,14 +12,16 @@ import StoryCard from './components/StoryCard.vue'
 import { INTROS, mechanicsOf, type Mechanic } from './game/intros'
 import {
   dateKey, tierFor, type Tier, loadModes, saveModes, recordDailyWin, currentStreak, startEndlessRun, recordEndlessRound,
+  weekKey, daysLeftInWeek, recordWeeklyWin, weekDone, WEEKLY_ISLANDS, recordEventWin, eventDone, EVENT_ISLANDS,
 } from './game/modes'
-import { requestLevel } from './game/levelGen'
+import { activeEvent, eventYear, eventKey, eventDaysLeft, EVENTS, type EventId } from './game/events'
+import { requestLevel, isEmergency, type LevelRequest } from './game/levelGen'
 import {
   ACHIEVEMENTS, SHIPS, loadMeta, saveMeta, migrate, newlyEarned, unlock, recordRaid, lootOf, totalStars, shipUnlocked, unlockedShips,
   type ShipId,
 } from './game/achievements'
 import { shipSheet, cosmeticSheet } from './game/assets'
-import { COSMETICS, equip, owns, allOwned, overlayOf, cosmetic, type Slot, type Source, type OwnCtx } from './game/cosmetics'
+import { COSMETICS, equip, owns, allOwned, overlayOf, cosmetic, grant, weeklyReward, type Slot, type Source, type OwnCtx } from './game/cosmetics'
 import { RELICS } from './game/relics'
 import LevelMap from './components/LevelMap.vue'
 import SettingsPanel from './components/Settings.vue'
@@ -113,12 +115,17 @@ if (!savedMeta.migrated) {
 const tier = computed(() => tierFor(worlds.map(w => (progress.value.stars[w.last] ?? 0) > 0)))
 
 // ---------- what is being played ----------
-type Mode = 'campaign' | 'daily' | 'endless' | 'boss'
+type Mode = 'campaign' | 'daily' | 'endless' | 'boss' | 'weekly' | 'event'
 const mode = ref<Mode>('campaign')
 const bossWorld = ref(0) // the boss being fought (mode 'boss')
 const active = shallowRef<Level>(levels[current.value])
 const today = ref(dateKey(new Date()))
 const playingDay = ref('') // the day of the Dagens räd being played
+// 0.6 fas 5: the weekly challenge and the events
+const playingWeek = ref({ week: '', step: 0 }) // the weekly island being played
+const playingEvent = ref({ id: 'midvinterblot' as EventId, year: 0, index: 0 }) // the event island being played
+/** In development an event can be forced with ?event=<id>, so every event can be tried on any day. */
+const forcedEvent = import.meta.env.DEV ? new URLSearchParams(location.search).get('event') : null
 const endless = ref({ round: 0, runSeed: 0, tier: 0 as Tier, over: false, bestBefore: 0 })
 let nextEndless: Promise<Level> | null = null // the next round, generated while this one is played
 const generating = ref(false)
@@ -187,6 +194,17 @@ function update(d: RaidUpdate) {
       const beaten = (b: (typeof bosses)[number]) => (progress.value.bossStars[b.world] ?? 0) > 0
       if (bosses.filter(b => b.world <= 3).every(beaten)) queueStory('finale')
       if (bosses.every(beaten)) queueStory('finale-2')
+    } else if (mode.value === 'weekly') {
+      const { week, step } = playingWeek.value
+      modes.value = recordWeeklyWin(modes.value, week, step, lastStars.value)
+      saveModes(modes.value)
+      if (weekDone(modes.value, week)) meta.value = grant(meta.value, [weeklyReward(week)])
+    } else if (mode.value === 'event') {
+      const { id, year, index } = playingEvent.value
+      const key = eventKey(EVENTS.find(e => e.id === id)!, year)
+      modes.value = recordEventWin(modes.value, key, index, lastStars.value)
+      saveModes(modes.value)
+      if (eventDone(modes.value, key)) meta.value = grant(meta.value, EVENTS.find(e => e.id === id)!.rewards)
     } else if (mode.value === 'daily') {
       dailyCounted.value = !modes.value.daily.results[playingDay.value]
       modes.value = recordDailyWin(modes.value, playingDay.value, lastStars.value)
@@ -276,6 +294,8 @@ function show(level: Level, title: string, key: string) {
   hintsLeft.value = hintsUsed.has(key) ? 0 : HINTS_PER_LEVEL
   info.value = { ...info.value, status: 'playing', busy: false }
   if (tutorial.value) { tutorial.value = null; scene?.pointAt(null) } // leaving level 1 ends the tour for now
+  const ev = mode.value === 'event' ? EVENTS.find(e => e.id === playingEvent.value.id) : null
+  scene?.setEventLook(ev ? { decor: ev.decor, island: ev.island, mist: !!ev.mist } : null)
   scene?.play(level, title, mode.value === 'boss' ? bossOf(bossWorld.value)?.id : undefined)
   maybeIntro()
   maybeTutorial()
@@ -335,10 +355,93 @@ async function openDaily() {
     generating.value = true
     level = await requestLevel({ kind: 'daily', day, tier: tierNow })
     if (my !== ticket) return
-    cacheDaily(day, tierNow, level)
+    if (!isEmergency(level)) cacheDaily(day, tierNow, level)
     generating.value = false
   }
   show(level, currentTitle(), `d${day}`)
+}
+
+/** Generated weekly and event islands are kept (a handful), so each is only generated once. */
+const GEN_CACHE = 'viking-loot-0.6-gen-cache'
+function cachedLevel(key: string): Level | null {
+  try { return (JSON.parse(localStorage.getItem(GEN_CACHE) ?? '{}')[key] as Level | undefined) ?? null } catch { return null }
+}
+function cacheLevel(key: string, level: Level) {
+  if (isEmergency(level)) return
+  try {
+    const c = JSON.parse(localStorage.getItem(GEN_CACHE) ?? '{}') as Record<string, Level>
+    const kept = Object.entries({ ...c, [key]: level }).slice(-12)
+    localStorage.setItem(GEN_CACHE, JSON.stringify(Object.fromEntries(kept)))
+  } catch { /* private mode */ }
+}
+
+/** Generate islands in the background (one after another in the worker) so they are ready when opened. */
+const prefetching = new Set<string>()
+function prefetch(key: string, r: LevelRequest) {
+  if (prefetching.has(key) || cachedLevel(key)) return
+  prefetching.add(key)
+  void requestLevel(r).then(l => { cacheLevel(key, l); prefetching.delete(key) })
+}
+
+async function openWeekly(step: number) {
+  const my = ++ticket
+  today.value = dateKey(new Date())
+  const week = weekKey(new Date()), tierNow = tier.value
+  mode.value = 'weekly'
+  playingWeek.value = { week, step }
+  const key = `w:${week}:${step}:${tierNow}`
+  let level = cachedLevel(key)
+  if (!level) {
+    generating.value = true
+    level = await requestLevel({ kind: 'weekly', week, step, tier: tierNow })
+    if (my !== ticket) return
+    cacheLevel(key, level)
+    generating.value = false
+  }
+  show(level, currentTitle(), `w${week}-${step}`)
+  for (let i = 0; i < WEEKLY_ISLANDS; i++) prefetch(`w:${week}:${i}:${tierNow}`, { kind: 'weekly', week, step: i, tier: tierNow })
+}
+
+async function openEvent(index: number) {
+  const ev = activeEv.value
+  if (!ev) return
+  const my = ++ticket
+  const year = eventYear(ev, new Date()), tierNow = tier.value
+  mode.value = 'event'
+  playingEvent.value = { id: ev.id, year, index }
+  let level: Level | null = index === EVENT_ISLANDS - 1 ? ev.finale : cachedLevel(`e:${ev.id}:${year}:${index}:${tierNow}`)
+  if (!level) {
+    generating.value = true
+    level = await requestLevel({ kind: 'event', event: ev.id, year, index, tier: tierNow })
+    if (my !== ticket) return
+    cacheLevel(`e:${ev.id}:${year}:${index}:${tierNow}`, level)
+    generating.value = false
+  }
+  show(level, currentTitle(), `v${ev.id}${year}-${index}`)
+  queueStory(`event-${ev.id}` as StoryId)
+  for (let i = index + 1; i < EVENT_ISLANDS - 1; i++) prefetch(`e:${ev.id}:${year}:${i}:${tierNow}`, { kind: 'event', event: ev.id, year, index: i, tier: tierNow })
+}
+/** After a won weekly or event island: the next one not yet won (or simply the next). */
+const nextIsland = computed(() => {
+  if (mode.value === 'weekly') {
+    const row = modes.value.weekly[playingWeek.value.week] ?? []
+    const n = WEEKLY_ISLANDS
+    for (let k = 1; k < n; k++) { const i = (playingWeek.value.step + k) % n; if (!row[i]) return i }
+    return null
+  }
+  if (mode.value === 'event') {
+    const key = eventKey(EVENTS.find(e => e.id === playingEvent.value.id)!, playingEvent.value.year)
+    const row = modes.value.events[key] ?? []
+    const n = EVENT_ISLANDS
+    for (let k = 1; k < n; k++) { const i = (playingEvent.value.index + k) % n; if (!row[i]) return i }
+    return null
+  }
+  return null
+})
+function goNextIsland() {
+  if (nextIsland.value === null) return
+  if (mode.value === 'weekly') void openWeekly(nextIsland.value)
+  else void openEvent(nextIsland.value)
 }
 
 async function playEndlessRound(level: Promise<Level>, round: number) {
@@ -390,6 +493,13 @@ function currentTitle(): string {
   if (mode.value === 'daily') return t('daily.name', { day: dayLabel(playingDay.value) })
   if (mode.value === 'endless') return t('endless.name', { n: endless.value.round })
   if (mode.value === 'boss') return t('boss.title', { name: bossName(bossWorld.value) })
+  if (mode.value === 'weekly') return t('weekly.name', { n: playingWeek.value.step + 1 })
+  if (mode.value === 'event') {
+    const { id, index } = playingEvent.value
+    const name = t(`event.${id}`)
+    const ev = EVENTS.find(e => e.id === id)!
+    return index === EVENT_ISLANDS - 1 ? `${ev.icon} ${tr(ev.finale.name, `event.${id}.finale`)}` : t('event.name', { name, n: index + 1 })
+  }
   return `${current.value + 1}. ${levelName(current.value)}`
 }
 const activeHint = computed(() => {
@@ -397,6 +507,11 @@ const activeHint = computed(() => {
   if (mode.value === 'daily') return t('daily.hint')
   if (mode.value === 'endless') return t('endless.hint')
   if (mode.value === 'boss') return bossHint(bossWorld.value)
+  if (mode.value === 'weekly') return t('weekly.hint')
+  if (mode.value === 'event') {
+    const ev = EVENTS.find(e => e.id === playingEvent.value.id)!
+    return playingEvent.value.index === EVENT_ISLANDS - 1 ? tr(ev.finale.hint, `event.${ev.id}.finaleHint`) : t('event.hint')
+  }
   return levelHint(current.value)
 })
 function next() { if (current.value < levels.length - 1) openLevel(current.value + 1) }
@@ -518,6 +633,32 @@ const statRows = computed(() => {
 // ---------- the raid cards ----------
 const streak = computed(() => currentStreak(modes.value, today.value))
 const todayStars = computed(() => modes.value.daily.results[today.value] ?? 0)
+const stars3 = (n: number) => (n ? '★'.repeat(n) + '☆'.repeat(3 - n) : '–')
+const weekView = computed(() => {
+  const now = new Date(today.value + 'T12:00:00')
+  const week = weekKey(now)
+  const row = modes.value.weekly[week] ?? []
+  const reward = weeklyReward(week)
+  const name = cosmetic(reward) ? cosName(reward) : relicName(RELICS.find(r => r.id === reward)!)
+  return {
+    week, stars: Array.from({ length: WEEKLY_ISLANDS }, (_, i) => row[i] ?? 0), done: weekDone(modes.value, week),
+    left: t('weekly.left', { days: tn('days', daysLeftInWeek(now)) }),
+    reward: t(owns(reward, ownCtx.value) ? 'weekly.rewardOwned' : 'weekly.reward', { name }),
+  }
+})
+const activeEv = computed(() => activeEvent(new Date(today.value + 'T12:00:00'), forcedEvent))
+const eventView = computed(() => {
+  const ev = activeEv.value
+  if (!ev) return null
+  const now = new Date(today.value + 'T12:00:00')
+  const key = eventKey(ev, eventYear(ev, now))
+  const row = modes.value.events[key] ?? []
+  const rewards = ev.rewards.map(id => (cosmetic(id) ? cosName(id) : relicName(RELICS.find(r => r.id === id)!)))
+  return {
+    ev, name: t(`event.${ev.id}`), stars: Array.from({ length: EVENT_ISLANDS }, (_, i) => row[i] ?? 0), done: eventDone(modes.value, key),
+    left: t('event.left', { days: tn('days', eventDaysLeft(ev, now)) }), rewards: `🎁 ${rewards.join(' · ')}`,
+  }
+})
 const onVisible = () => { if (!document.hidden) today.value = dateKey(new Date()) }
 
 onMounted(() => {
@@ -613,12 +754,15 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
               <small v-else>{{ t('result.dailyReplay') }}</small>
             </template>
             <template v-else-if="mode === 'campaign' && current === levels.length - 1"><br /><strong>{{ t('result.allDone', { n: levels.length }) }}</strong></template>
+            <template v-else-if="mode === 'weekly' && weekDone(modes, playingWeek.week)"><br /><strong>{{ t('weekly.done') }}</strong></template>
+            <template v-else-if="mode === 'event' && eventView?.done"><br /><strong>{{ t('event.done', { name: eventView.name }) }}</strong></template>
           </p>
           <p v-else>{{ lossText }}<template v-if="wrongText"><br /><small class="wrong">{{ wrongText }}</small></template></p>
           <button v-if="lost && !wrong" class="soft" @click="whereWrong">{{ t('fatal.button') }}</button>
           <button v-if="won && nextBoss" @click="openBoss(nextBoss.world)">{{ t('result.boss', { name: bName(nextBoss.world) }) }}</button>
           <button v-if="won && mode === 'campaign' && current < levels.length - 1" @click="next">{{ t('result.next') }}</button>
           <button v-if="won && mode === 'boss'" @click="toMap">{{ t('result.map') }}</button>
+          <button v-if="won && (mode === 'weekly' || mode === 'event') && nextIsland !== null" @click="goNextIsland">{{ t('result.nextIsland') }}</button>
           <button v-if="lost && info.canUndo" @click="undo">{{ t('actions.undo') }}</button>
           <button @click="restart">{{ won ? t('result.again') : t('result.retry') }}</button>
         </div>
@@ -699,6 +843,28 @@ onBeforeUnmount(() => { document.removeEventListener('visibilitychange', onVisib
           <small>{{ t('endless.recordCard', { r: roundsText(modes.endless.best) }) }}</small>
         </span>
       </button>
+    </div>
+    <div class="mode-wide" :class="{ current: mode === 'weekly', done: weekView.done }">
+      <div class="mode-head">
+        <span class="mode-icon">🗓️</span>
+        <span class="mode-text"><strong>{{ t('weekly.title') }}</strong><small>{{ weekView.left }} · {{ weekView.reward }}</small></span>
+      </div>
+      <div class="isles">
+        <button v-for="(st, i) in weekView.stars" :key="i" :class="{ won: st > 0, on: mode === 'weekly' && playingWeek.step === i }" @click="openWeekly(i)">
+          <span>{{ t('weekly.island', { n: i + 1 }) }}</span><small>{{ stars3(st) }}</small>
+        </button>
+      </div>
+    </div>
+    <div v-if="eventView" class="mode-wide event" :class="[eventView.ev.id, { current: mode === 'event', done: eventView.done }]">
+      <div class="mode-head">
+        <span class="mode-icon">{{ eventView.ev.icon }}</span>
+        <span class="mode-text"><strong>{{ eventView.name }}</strong><small>{{ eventView.left }} · {{ eventView.rewards }}</small></span>
+      </div>
+      <div class="isles six">
+        <button v-for="(st, i) in eventView.stars" :key="i" :class="{ won: st > 0, on: mode === 'event' && playingEvent.index === i, finale: i === EVENT_ISLANDS - 1 }" @click="openEvent(i)">
+          <span>{{ i === EVENT_ISLANDS - 1 ? t('event.finaleShort') : i + 1 }}</span><small>{{ stars3(st) }}</small>
+        </button>
+      </div>
     </div>
     <h2 class="section-title map-title">{{ t('section.map') }} <button class="chronicle-btn" @click="showChronicle = true">{{ t('map.chronicle') }}</button><button class="chronicle-btn" @click="showAlbum = true">{{ t('map.album') }}</button></h2>
     <LevelMap

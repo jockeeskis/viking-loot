@@ -36,6 +36,14 @@ const BOSS_SPECS: Spec[] = [
   // Loke's lies: gold, gates and a valkyrie, and nearly everything hidden (gates show their colour).
   { label: 'loke', heights: [5, 4, 5, 4], gold: 2, gates: 2, valkyries: 1, hidden: true, min: 0.05, max: 0.2, seed: 105, tries: 80000 },
 ]
+// The handmade finales of the events (0.6), one per event: a fair puzzle with the event's theme.
+// Run with `npm run generate-levels -- --events [label ...]`.
+const EVENT_SPECS: Spec[] = [
+  { label: 'midvinterblot', heights: [4, 4, 4, 4], ice: 2, keys: 1, min: 0.15, max: 0.3, seed: 201, tries: 40000 },
+  { label: 'varblot', heights: [4, 4, 4, 4], houses: 2, hidden: true, min: 0.15, max: 0.3, seed: 202, tries: 40000 },
+  { label: 'midsommar', heights: [4, 5, 4, 5], wilds: 1, houses: 1, stones: 1, min: 0.15, max: 0.3, seed: 203, tries: 40000 },
+  { label: 'alvablot', heights: [4, 4, 5, 5], hidden: true, scouts: 1, raven: 4, min: 0.15, max: 0.3, seed: 204, tries: 40000 },
+]
 const DEFAULT_TRIES = 20000
 const KEEP = 6 // candidates collected per spec
 const fmtQueue = (q: QueueEntry[]) => q.map(e =>
@@ -44,8 +52,9 @@ const fmtQueue = (q: QueueEntry[]) => q.map(e =>
 
 const args = process.argv.slice(2)
 const bosses = args.includes('--bosses')
-const wanted = args.filter(a => a !== '--bosses')
-for (const spec of (bosses ? BOSS_SPECS : SPECS).filter(s => !wanted.length || wanted.includes(s.label))) {
+const events = args.includes('--events')
+const wanted = args.filter(a => a !== '--bosses' && a !== '--events')
+for (const spec of (bosses ? BOSS_SPECS : events ? EVENT_SPECS : SPECS).filter(s => !wanted.length || wanted.includes(s.label))) {
   const rand = rng(spec.seed)
   const found: Found[] = []
   const tries = spec.tries ?? DEFAULT_TRIES

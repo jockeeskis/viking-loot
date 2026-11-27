@@ -6,6 +6,8 @@ export type StoryId =
   | 'boss-2-before' | 'boss-2-after' | 'boss-3-before' | 'boss-3-after' | 'finale'
   // 0.6: Asgård and Loke. 'finale' is now the end of the first four worlds; 'finale-2' ends the game.
   | 'world-4' | 'boss-4-before' | 'boss-4-after' | 'finale-2'
+  // 0.6 fas 5: the events
+  | 'event-midvinterblot' | 'event-varblot' | 'event-midsommar' | 'event-alvablot'
 
 export type StoryCard = { id: StoryId; icon: string; title: { sv: string; en: string }; pages: { sv: string; en: string }[] }
 
@@ -213,6 +215,59 @@ export const STORY: StoryCard[] = [
       {
         sv: 'Tack, vän. Utan dig hade vi fortfarande stått på stranden och grälat om vem som skulle gå först. Skål!',
         en: 'Thank you, friend. Without you we would still be standing on the beach arguing about who goes first. Skål!',
+      },
+    ],
+  },
+  // 0.6 fas 5: the events, told the first time each one is opened
+  {
+    id: 'event-midvinterblot', icon: '🐐', title: { sv: 'Midvinterblot', en: 'Midwinter Blot' },
+    pages: [
+      {
+        sv: 'Det är midvinter, den mörkaste tiden på året. Freja har flätat en bock av halm, och Björn har redan ätit upp hälften av julmaten.',
+        en: 'It is midwinter, the darkest time of the year. Freja has woven a goat of straw, and Björn has already eaten half of the Yule feast.',
+      },
+      {
+        sv: 'Sex frusna öar väntar till trettondagen. Klarar vi alla får vi hem julbocken – och ett segel som glittrar som snö.',
+        en: 'Six frozen islands wait until Twelfth Night. Clear them all and we bring the Yule goat home – and a sail that sparkles like snow.',
+      },
+    ],
+  },
+  {
+    id: 'event-varblot', icon: '🌿', title: { sv: 'Vårblot', en: 'Spring Blot' },
+    pages: [
+      {
+        sv: 'Isen har gått upp och björkarna slår ut. Vid vårblotet ber vi om en god sommar – och om rika öar att plundra.',
+        en: 'The ice has broken and the birches are in leaf. At the spring blot we pray for a good summer – and for rich islands to plunder.',
+      },
+      {
+        sv: 'Sex öar till april månads slut. Löven döljer mycket, så titta noga!',
+        en: 'Six islands until the end of April. The leaves hide a lot, so look carefully!',
+      },
+    ],
+  },
+  {
+    id: 'event-midsommar', icon: '🌸', title: { sv: 'Midsommar', en: 'Midsummer' },
+    pages: [
+      {
+        sv: 'Solen går knappt ner. Freja har klätt stången, Björn dansar som en björn och jag … jag håller utkik. Någon måste.',
+        en: 'The sun barely sets. Freja has dressed the pole, Björn dances like a bear and I … I keep watch. Someone has to.',
+      },
+      {
+        sv: 'Sex öar hela juni. Den som klarar alla får en krans att hänga i masten.',
+        en: 'Six islands all through June. Clear them all and we get a wreath to hang on the mast.',
+      },
+    ],
+  },
+  {
+    id: 'event-alvablot', icon: '🏮', title: { sv: 'Alvablot', en: 'Elf Blot' },
+    pages: [
+      {
+        sv: 'Hösten är här och dimman ligger tät. Vid alvablotet tänder vi lyktor åt alverna, så att de inte går vilse – och inte vi heller.',
+        en: 'Autumn is here and the mist lies thick. At the elf blot we light lanterns for the elves, so that they do not get lost – nor do we.',
+      },
+      {
+        sv: 'Sex öar i dimman till november månads slut. Sigrid ser längst, så låt henne gå först.',
+        en: 'Six islands in the mist until the end of November. Sigrid sees furthest, so let her go first.',
       },
     ],
   },

@@ -28,6 +28,13 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'sail-glod', slot: 'sail', name: 'Glödsegel', text: 'Sotsvart med lavaglödande vinklar.', source: ach('muspelheim') },
   { id: 'sail-regnbage', slot: 'sail', name: 'Bifrostsegel', text: 'Alla regnbågens färger, som bron till Asgård.', source: ach('asgard') },
   { id: 'sail-sol', slot: 'sail', name: 'Solsegel', text: 'En gyllene sol – för den som besegrat alla bossar.', source: ach('boss-hunter') },
+  // 0.6 fas 5: the events and the weekly challenge
+  { id: 'sail-midvinter', slot: 'sail', name: 'Snöflingesegel', text: 'En vit snöflinga på nattblått, från Midvinterblot.', source: { kind: 'event', id: 'midvinterblot' } },
+  { id: 'sail-var', slot: 'sail', name: 'Vårsegel', text: 'En vitsippa på ljusgrönt, från Vårblot.', source: { kind: 'event', id: 'varblot' } },
+  { id: 'sail-midsommar', slot: 'sail', name: 'Kranssegel', text: 'En blomsterkrans från midsommarnatten.', source: { kind: 'event', id: 'midsommar' } },
+  { id: 'sail-alva', slot: 'sail', name: 'Lyktsegel', text: 'Lyktor som lyser i dimman, från Alvablot.', source: { kind: 'event', id: 'alvablot' } },
+  { id: 'sail-vagor', slot: 'sail', name: 'Vågsegel', text: 'Vita vågor på blått.', source: { kind: 'weekly' } },
+  { id: 'sail-sparre', slot: 'sail', name: 'Sparresegel', text: 'Rött och guld i sneda band.', source: { kind: 'weekly' } },
   { id: DEFAULT_SHIELDS, slot: 'shields', name: 'Skeppets egna', text: 'Sköldarna som hör till skeppet.', source: { kind: 'default' } },
   { id: 'shields-havet', slot: 'shields', name: 'Havets sköldar', text: 'Blått och vitt som skummet på vågorna.', source: ach('loot-100') },
   { id: 'shields-lag', slot: 'shields', name: 'Lagets sköldar', text: 'Rött, blått och gult – Ragnar, Björn och Freja.', source: ach('perfect-10') },
@@ -70,5 +77,9 @@ export function grant<T extends { owned: string[] }>(meta: T, ids: string[]): T 
   const add = ids.filter(id => !meta.owned.includes(id) && (cosmetic(id) || RELICS.some(r => r.id === id)))
   return add.length ? { ...meta, owned: [...meta.owned, ...add] } : meta
 }
+/** The weekly challenge's reward rotates through these, one per ISO week ('2026-W48' → week 48). */
+export const WEEKLY_REWARDS = ['relic-korpfjader', 'sail-vagor', 'relic-barnsten', 'sail-sparre', 'relic-runsten', 'relic-mjodhorn']
+export const weeklyReward = (week: string) => WEEKLY_REWARDS[Number(week.slice(-2)) % WEEKLY_REWARDS.length]
+
 /** The overlay to draw for a slot, or null for the ship's own sail or shields. */
 export const overlayOf = (id: string) => (id === DEFAULT_SAIL || id === DEFAULT_SHIELDS || !cosmetic(id) ? null : id)

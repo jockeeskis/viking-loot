@@ -11,7 +11,7 @@ import {
 } from './art'
 import {
   preloadAssets, createAnims, ensureVikings, assetFor, teamAsset, hasSheet, hasLoot, hasShip, hasIsland, hasBoats, lootAsset, shipAsset,
-  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, ensureCosmetic, cosmeticKey, cosmeticSheet, shipKey, shipAnimKey, ensureBoss, bossKey, bossAsset, hasRaven, RAVEN_KEY, ravenAsset, type IslandStyle,
+  islandAsset, islandKey, boatsAsset, lootFrame, namedLootFrame, sheetKey, animKey, portraitKey, LOOT_KEY, SHIP_KEY, BOATS_KEY, ensureShip, ensureCosmetic, cosmeticKey, cosmeticSheet, ensureDecor, decorKey, shipKey, shipAnimKey, ensureBoss, bossKey, bossAsset, hasRaven, RAVEN_KEY, ravenAsset, type IslandStyle,
   type VikingAnim, type VikingAsset,
 } from './assets'
 import { createFxTextures, coinBurst, woodChips, dustPuff, rockBits, floatText, victory, iceShards, sparkle, explosion, wave, CAMERA_ZOOM } from './fx'
@@ -49,6 +49,7 @@ const BOAT = { x: 314, y: 436 }
 const BOAT_W = 88
 /** How many moves can wait while an earlier one animates (0.6). */
 const MOVES_AHEAD = 3
+const DECK_DECOR = { dx: 50, dy: 0, h: 50 } // an event's decoration on the longship's deck
 const AHEAD_Y = 401 // the row of waiting moves, by the dock (clear of the seat warning below)
 const SHIP_SHIFT = 28 // the longship makes room for the colour ship
 const BOAT_SCALE = 0.48
@@ -141,6 +142,10 @@ export class RaidScene extends Phaser.Scene {
   private shipId = 'ormen'
   // 0.6: sail and shield overlays drawn on top of the longship, frame by frame
   private overlays: Partial<Record<'sail' | 'shields', Phaser.GameObjects.Sprite>> = {}
+  // 0.6 fas 5: an event's look – a decoration on a free corner of the island, the island style and mist
+  private eventLook: { decor: string; island: IslandStyle; mist: boolean } | null = null
+  private eventDecor: Phaser.GameObjects.GameObject[] = []
+  private deckDecor?: Phaser.GameObjects.Image
   private looks: Record<'sail' | 'shields', string | null> = { sail: null, shields: null }
   private queueLabel?: Phaser.GameObjects.Text
   private seatsLabel?: Phaser.GameObjects.Text
@@ -300,10 +305,41 @@ export class RaidScene extends Phaser.Scene {
   private syncOverlays() {
     const ship = this.longship
     if (!ship) return
+    this.deckDecor?.setPosition(ship.x + DECK_DECOR.dx, ship.y + DECK_DECOR.dy)
     for (const ov of Object.values(this.overlays)) {
       if (!ov?.visible) continue
       ov.setPosition(ship.x, ship.y)
       ov.setFrame(ship.frame.name)
+    }
+  }
+
+  /** The look of the event being played (null outside events). Takes effect with the next play(). */
+  setEventLook(look: { decor: string; island: IslandStyle; mist: boolean } | null) { this.eventLook = look }
+
+  /**
+   * The event's decoration stands on the longship's deck, between the mast and the dragon (the island is
+   * full of loot), and follows the ship; Alvablot also gets a drifting mist over the island.
+   */
+  private drawEventDecor() {
+    this.eventDecor.forEach(o => o.destroy()); this.eventDecor = []; this.deckDecor = undefined
+    const look = this.eventLook
+    if (!look) return
+    const gen = this.generation
+    ensureDecor(this, look.decor, () => {
+      if (gen !== this.generation || this.eventLook !== look) return
+      const img = this.add.image(0, 0, decorKey(look.decor)).setOrigin(0.5, 0.86).setDepth(1.7)
+      img.setScale(DECK_DECOR.h / img.height)
+      this.eventDecor.push(img)
+      this.deckDecor = img
+      this.syncOverlays()
+    })
+    if (look.mist) {
+      for (let i = 0; i < 4; i++) {
+        const y = 120 + i * 70
+        const g = this.add.ellipse(60 + ((i * 97) % 240), y, 280, 64, 0xc9d2e6, 0.26).setDepth(2.9) // a thin haze over the loot
+        this.eventDecor.push(g)
+        if (!this.reduced) this.tweens.add({ targets: g, x: g.x + 70, duration: 5200 + i * 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+      }
     }
   }
 
@@ -325,7 +361,7 @@ export class RaidScene extends Phaser.Scene {
     this.trail = []
     this.title?.setText(title)
     // Isriket is a winter island and Muspelheim a volcano – and so are generated raids that use their mechanics.
-    if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(islandStyleOf(data)))
+    if (this.islandImg && hasIsland(this)) this.islandImg.setTexture(islandKey(this.eventLook?.island ?? islandStyleOf(data)))
     const state = startGame(data)
     this.rebuild(state)
     // Harald, Ylva and Sigrid are downloaded the first time a level needs them; refresh the cards when they arrive.
@@ -353,6 +389,7 @@ export class RaidScene extends Phaser.Scene {
     this.decor.forEach(d => d.destroy()); this.decor = []
     this.tip?.destroy(); this.tip = undefined
     this.drawLootSprites()
+    this.drawEventDecor()
     this.drawBoat()
     this.layout(false)
     this.placeBoss(state)

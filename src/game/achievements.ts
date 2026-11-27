@@ -2,7 +2,8 @@
 import { levels, worlds } from './levels.ts'
 import { bosses } from './bosses.ts'
 import type { Progress } from './progress.ts'
-import type { ModeProgress } from './modes.ts'
+import { weekDone, eventDone, type ModeProgress } from './modes.ts'
+import { EVENTS, EVENT_NAMES, type EventId } from './events.ts'
 import { COSMETICS, DEFAULT_SAIL, DEFAULT_SHIELDS } from './cosmetics.ts'
 import { RELICS } from './relics.ts'
 
@@ -54,6 +55,7 @@ const countIn = (p: Progress, first: number, last: number, stars = 1) =>
 const [KUSTEN, FJORDARNA, ISRIKET, MUSPELHEIM, ASGARD] = worlds
 const bossesBeaten = (p: Progress, stars = 1) => (p.bossStars ?? []).filter(s => (s ?? 0) >= stars).length
 const LAST = levels.length - 1
+const EVENT_TITLES: Record<EventId, string> = { midvinterblot: 'Blotad vid midvinter', varblot: 'Vårens hjälte', midsommar: 'Midsommarnattens dröm', alvablot: 'Alvornas vän' }
 
 export type Achievement = {
   id: string; icon: string; title: string; text: string
@@ -137,6 +139,12 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'endless-10', icon: '🐉', title: 'Oändlig', text: 'Klara tio rundor i den oändliga räden.',
     done: c => c.modes.endless.best >= 10, progress: c => [Math.min(c.modes.endless.best, 10), 10],
   },
+  // 0.6: the weekly challenge and the events
+  { id: 'weekly-1', icon: '🗓️', title: 'Veckans hjälte', text: 'Klara alla tre öar i en veckas utmaning.', done: c => Object.keys(c.modes.weekly).some(w => weekDone(c.modes, w)) },
+  ...EVENTS.map((e): Achievement => ({
+    id: `event-${e.id}`, icon: e.icon, title: EVENT_TITLES[e.id], text: `Klara alla sex öar i ${EVENT_NAMES[e.id]}.`,
+    done: c => Object.keys(c.modes.events).some(k => k.startsWith(`${e.id}-`) && eventDone(c.modes, k)),
+  })),
 ]
 
 /** Achievements earned now that are not yet recorded, in list order. */
@@ -152,7 +160,7 @@ export function unlock(meta: Meta, ids: string[], day: string): Meta {
 // ---------------------------------------------------------------- statistics
 
 export type RaidResult = {
-  mode: 'campaign' | 'daily' | 'endless' | 'boss'
+  mode: 'campaign' | 'daily' | 'endless' | 'boss' | 'weekly' | 'event'
   stars: number
   par: number
   loot: number // items plundered (every item is taken on a win)

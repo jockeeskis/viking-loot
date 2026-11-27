@@ -107,3 +107,20 @@ button:disabled{cursor:not-allowed;opacity:.4}
 .album li small{font-size:12px;opacity:.85}
 .album li:not(.owned){opacity:.6}
 .relic-icon{font-size:28px;line-height:1;width:34px;text-align:center}
+/* 0.6 fas 5 – the weekly challenge and the events */
+.mode-wide{margin-top:10px;padding:10px;border-radius:16px;background:linear-gradient(#2f6a82,#193a4b);color:#fff3dc;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.mode-wide.current{box-shadow:0 3px 0 #3b2414,0 0 0 3px #ffd45a}
+.mode-wide.done .mode-icon{filter:drop-shadow(0 0 6px #ffd45a)}
+.mode-wide.event.midvinterblot{background:linear-gradient(#3a5f8f,#1d2f52)}
+.mode-wide.event.varblot{background:linear-gradient(#4f8f5a,#24502f)}
+.mode-wide.event.midsommar{background:linear-gradient(#5c8fc4,#2f5f8f)}
+.mode-wide.event.alvablot{background:linear-gradient(#5b4a7a,#2e2440)}
+.mode-head{display:flex;align-items:center;gap:10px}
+.isles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.isles.six{grid-template-columns:repeat(6,1fr)}
+.isles button{margin:0;padding:6px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:13px;background:#193a4b;color:#fff3dc;box-shadow:0 3px 0 #0e2430}
+.isles button small{font-size:11px;color:#ffd45a;letter-spacing:-1px}
+.isles button.won{background:#2b5a3c}
+.isles button.on{outline:2px solid #ffd45a}
+.isles button.finale{background:#6b3a22}
+.isles button.finale.won{background:#8a6a1a}

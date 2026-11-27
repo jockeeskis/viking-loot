@@ -1,6 +1,6 @@
 # Viking Loot 0.6 – Asgård, säsonger och en bättre start
 
-> **Status (2026-11-26):** Fas 1–4 är klara. Fas 1: guidad första räd, förklarade förluster, Mindre rörelse och Spara batteri. Fas 2: gyllene skatten, Valhalls port och valkyrian i regelmotorn. Fas 3: Asgård (bana 49–60), bossen Loke, berättelsen och grafiken. Fas 4: segel, sköldar och samlaralbumet. Nästa: fas 5 (veckans utmaning och händelser). Användaren startar varje fas själv.
+> **Status (2026-11-27):** Fas 1–5 är klara. Fas 1: guidad första räd, förklarade förluster, Mindre rörelse och Spara batteri. Fas 2: gyllene skatten, Valhalls port och valkyrian i regelmotorn. Fas 3: Asgård (bana 49–60), bossen Loke, berättelsen och grafiken. Fas 4: segel, sköldar och samlaralbumet, samt drag som köas i förväg. Fas 5: veckans utmaning och fyra händelser. Nästa: fas 6 (0.6.0 och test på Android). Användaren startar varje fas själv.
 
 ## Syfte
 
@@ -212,6 +212,31 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
   - Belöningen är en relik, ett segel och en prestation.
   - Dekoren är egna figurer ovanpå ön.
   - I utvecklingsläget kan en händelse tvingas fram med `?event=<id>`.
+
+**Så blev det (fas 5):**
+
+- **Veckans utmaning:**
+  - Tre öar per ISO-vecka, till exempel `2026-W48`, med seed från veckan, ön och nivån (`weeklySpec` och `weeklyLevel` i `modes.ts`). Ö 1 är uppvärmning, ö 2 ett riktigt pussel och ö 3 svår, med få vinnande vägar.
+  - Öarna är hållna små, med högar på högst 4, så att de genereras på några sekunder även på en telefon. Den svåraste veckoön tog till en början upp till en minut.
+  - När man öppnar en ö genereras veckans övriga öar i bakgrunden.
+  - En nödö, som skapas när generatorn tar för lång tid, sparas aldrig som den riktiga ön. Det gäller även Dagens räd.
+- **Veckans belöning** växlar mellan de fyra veckorelikerna, Vågsegel och Sparresegel (`WEEKLY_REWARDS`). Den delas ut en gång när alla tre öarna är klara. Prestationen *Veckans hjälte* är ny.
+- **Fyra händelser** i `events.ts`, styrda av telefonens datum och därför offline:
+
+  | Händelse | Tid | Ö-stil och dekor |
+  |---|---|---|
+  | Midvinterblot | 1 dec – 6 jan | snöö, julbock |
+  | Vårblot | mars–april | björkris |
+  | Midsommar | juni | midsommarstång |
+  | Alvablot | okt–nov | lyktor och dimma |
+
+  - Varje händelse har fem genererade öar. De är desamma för alla samma år och lutar åt händelsens tema, men bara med mekaniker som spelaren redan känner till.
+  - Varje händelse har också en handgjord final, framtagen med `npm run generate-levels -- --events`.
+  - Belöningen är en relik, ett segel (Snöflinge-, Vår-, Krans- och Lyktsegel) och en prestation per händelse.
+  - Ett berättelsekort visas första gången en händelse öppnas.
+- **Dekoren** står på långskeppets däck mellan masten och draken. Ön är oftast full av skatter, så i ett hörn syntes den knappt. Dimman i Alvablot är ett tunt dis som driver över ön, och den står still med Mindre rörelse.
+- **Kartan:** korten för veckans utmaning och för den pågående händelsen ligger under Dagens räd och den oändliga räden, med en knapp per ö och stjärnor. Efter en vinst finns knappen "Nästa ö".
+- **Testa:** i utvecklingsläget tvingar `?event=<id>` fram en händelse. Tester i `events.test.ts` täcker datum över nyår, ISO-veckor, att seeden är densamma, att öarna och finalerna går att vinna, sparningen och att belöningarna delas ut en gång.
 
 ## 6. Faser
 
