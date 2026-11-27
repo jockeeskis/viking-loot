@@ -182,6 +182,15 @@ Alla nya fält är valfria. Ett regressionstest kontrollerar att banorna 1–48 
   - Okända reliker visas som ❔ tillsammans med var man hittar dem.
 - **Notiser:** efter en vunnen räd visas en notis för varje nytt segel, nya sköldar eller ny relik.
 
+**Tillägg före fas 5: köa drag i förväg.** Man kan välja upp till tre drag medan ett drag animeras.
+
+- Regelmotorn räknar ut varje drag direkt. Scenen spelar sedan upp dragen i tur och ordning (`ahead` och `replay()` i `RaidScene`).
+- Kortraden visar alltid läget efter det senast valda draget. Ett kort som ligger kvar glider till sin nya plats, och det tryckta kortet tonas bort.
+- Vikingar, platser och nedräkningar ritas från det drag som just spelats upp (`layoutBoard`).
+- Ett fjärde tryck i förväg blockeras, och kortet skakar lite.
+- Ångra och tips väntar tills alla drag har spelats upp.
+- Testat i Chrome: bana 21, 36 och 53 vanns med drag i skurar om 1+3. Efter uppspelningen stämmer brädet exakt med regelmotorns läge.
+
 ## 5. Veckans utmaning och händelser
 
 - **Veckans utmaning**

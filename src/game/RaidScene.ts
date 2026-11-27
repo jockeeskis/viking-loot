@@ -47,6 +47,8 @@ const SLOT_SCALE = 0.62
 // The small colour ship (0.4) sails beside the longship; its seats are on its deck.
 const BOAT = { x: 314, y: 436 }
 const BOAT_W = 88
+/** How many moves can wait while an earlier one animates (0.6). */
+const MOVES_AHEAD = 3
 const SHIP_SHIFT = 28 // the longship makes room for the colour ship
 const BOAT_SCALE = 0.48
 const SCOUT_COLOR = 0x3e7d6a
@@ -106,6 +108,9 @@ export class RaidScene extends Phaser.Scene {
   private bossTotal = 0
   private entrance: 'none' | 'waiting' | 'wanted' = 'none' // the boss's entrance waits for the story card
   private busy = false
+  // Moves chosen while an earlier move still animates (0.6). The engine applies each at once; the scene
+  // replays them in order. `this.state` is always the newest state, and the cards always show it.
+  private ahead: { before: GameState; after: GameState }[] = []
   private generation = 0
   private lootSprites = new Map<string, Sprite>()
   private actors = new Map<string, Sprite>() // vikings out on the island or seated on the ship
@@ -338,6 +343,7 @@ export class RaidScene extends Phaser.Scene {
     this.time.removeAllEvents()
     this.cameras.main.setZoom(CAMERA_ZOOM) // never carry a half-finished victory punch into the next level
     this.busy = false
+    this.ahead = []
     this.state = state
     this.lootSprites.forEach(s => s.destroy()); this.lootSprites.clear()
     this.actors.forEach(s => s.destroy()); this.actors.clear()
@@ -1053,12 +1059,20 @@ export class RaidScene extends Phaser.Scene {
 
   /** Rebuild cards, the queue preview and seated vikings from the current state. */
   private layout(animate: boolean) {
+    this.layoutCards(animate)
+    this.layoutBoard(this.state, animate)
+  }
+
+  /** The three cards and the queue preview, always from the newest state (moves can be chosen ahead). */
+  private layoutCards(animate: boolean) {
     const playing = this.state.status === 'playing'
     this.clearHint()
+    const oldX = new Map(this.cards.map(c => [c.getData('vid') as string, c.x]))
     this.cards.forEach(c => c.destroy())
     this.cards = []
     this.state.queue.slice(0, SELECTABLE).forEach((v, i) => {
       const card = this.makeCard(v, i)
+      card.setData('vid', v.id)
       if (playing) {
         card.setInteractive({ useHandCursor: true })
         // Choose on release, and only for a tap: a swipe that starts on a card scrolls the page instead
@@ -1066,7 +1080,7 @@ export class RaidScene extends Phaser.Scene {
         card.on('pointerup', (p: Phaser.Input.Pointer) => {
           if (!p.wasCanceled && p.getDistance() < TAP_SLOP && p.getDuration() < 900) this.choose(v.id)
         })
-        card.on('pointerover', () => { if (!this.busy) card.setScale(1.04) })
+        card.on('pointerover', () => card.setScale(1.04))
         card.on('pointerout', () => card.setScale(1))
         // A viking that would find nothing right now is dimmed and shows the seat it would take.
         if (findsNothing(this.state, v.id)) {
@@ -1075,7 +1089,12 @@ export class RaidScene extends Phaser.Scene {
           card.add([veil, this.add.text(CARD.w / 2 - 14, CARD.h / 2 - 14, '⛵', { fontSize: '15px', resolution: 2 }).setOrigin(0.5)])
         }
       }
-      if (animate) {
+      const x0 = oldX.get(v.id)
+      if (animate && x0 !== undefined) {
+        // A card that was already showing slides to its new place.
+        const x = card.x
+        if (x0 !== x) { card.setX(x0); this.tweens.add({ targets: card, x, duration: 200, ease: 'Sine.easeOut' }) }
+      } else if (animate) {
         card.setAlpha(0).setY(CARD.y + 16)
         this.tweens.add({ targets: card, alpha: 1, y: CARD.y, duration: 240, delay: i * 50, ease: 'Back.easeOut' })
       }
@@ -1104,21 +1123,24 @@ export class RaidScene extends Phaser.Scene {
     })
     if (rest.length > PREVIEW_MAX) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w - 10, PANEL_Y + 34, `+${rest.length - PREVIEW_MAX}`, cartoonText(12)).setOrigin(1, 0.5).setDepth(6))
     if (rest.length === 0) this.preview.push(this.add.text(QUEUE_PANEL.x + QUEUE_PANEL.w / 2, PANEL_Y + 34, this.state.queue.length ? t('scene.lastVikings') : t('scene.emptyQueue'), cartoonText(11, '#e8d6bb')).setOrigin(0.5).setDepth(6))
+  }
 
-    const seated = new Set(this.state.waiting.map(v => v.id))
+  /** Seated vikings, the seats and the countdowns for a state that has been played out on the board. */
+  private layoutBoard(state: GameState, animate: boolean) {
+    const seated = new Set(state.waiting.map(v => v.id))
     // Keep the victory crew on deck; everyone else not seated has left.
     this.actors.forEach((a, id) => { if (!seated.has(id) && !id.startsWith('cheer-')) { a.destroy(); this.actors.delete(id) } })
-    this.state.waiting.forEach(v => {
+    state.waiting.forEach(v => {
       let a = this.actors.get(v.id)
       if (!a) { a = this.makeActor(v); this.actors.set(v.id, a) }
-      const { x, y, s: scale } = this.seatFor(this.state.waiting, v.id)!
+      const { x, y, s: scale } = this.seatFor(state.waiting, v.id)!
       this.tweens.killTweensOf(a)
       if (animate) this.tweens.add({ targets: a, x, y: y - 6, scale, duration: 240 })
       else a.setPosition(x, y - 6).setScale(scale)
       this.setBadge(a, v.collectedCount, v.capacity)
     })
-    this.drawSlots()
-    this.updateCountdowns(this.state)
+    this.drawSlots(state.waiting)
+    this.updateCountdowns(state)
     this.drawPointer()
   }
 
@@ -1132,7 +1154,13 @@ export class RaidScene extends Phaser.Scene {
   // ---------- Moves ----------
 
   private choose(vikingId: string) {
-    if (this.busy || this.state.status !== 'playing') return
+    if (this.state.status !== 'playing') return
+    const tapped = this.cards.find(c => c.getData('vid') === vikingId)
+    if (this.ahead.length >= MOVES_AHEAD) {
+      // Already three moves waiting: a small shake says "not yet".
+      if (tapped) this.tweens.add({ targets: tapped, x: tapped.x + 4, duration: 50, yoyo: true, repeat: 2 })
+      return
+    }
     const before = this.state
     const after = selectViking(before, vikingId)
     if (after === before) return
@@ -1142,13 +1170,28 @@ export class RaidScene extends Phaser.Scene {
     this.state = after
     this.tip?.destroy(); this.tip = undefined
     this.pointer?.destroy(); this.pointer = undefined
-    this.busy = true
-    this.clearHint()
-    this.cards.forEach(c => c.disableInteractive().setScale(1))
-    this.notify()
-    const gen = this.generation
+    // The tapped card fades away and the row moves up to the newest state, so the next move can be chosen at once.
+    if (tapped) {
+      this.cards = this.cards.filter(c => c !== tapped)
+      tapped.disableInteractive()
+      this.tweens.add({ targets: tapped, scale: 0.88, alpha: 0, duration: 200, onComplete: () => tapped.destroy() })
+    }
+    this.layoutCards(true)
     sfx.click()
-    this.playEvents(before, after.events, gen).then(async () => {
+    this.ahead.push({ before, after })
+    if (!this.busy) {
+      this.busy = true
+      void this.replay()
+    }
+    this.notify()
+  }
+
+  /** Play the chosen moves one after another, then settle the board. */
+  private async replay() {
+    const gen = this.generation
+    while (this.ahead.length) {
+      const { before, after } = this.ahead.shift()!
+      await this.playEvents(before, after, gen)
       if (gen !== this.generation) return
       if (after.status === 'won') {
         void this.bossEnd(true)
@@ -1161,10 +1204,12 @@ export class RaidScene extends Phaser.Scene {
         await this.delay(900)
       }
       if (gen !== this.generation) return
-      this.busy = false
-      this.layout(true)
-      this.notify()
-    })
+      this.layoutBoard(after, true)
+    }
+    this.busy = false
+    this.layoutCards(false)
+    this.drawPointer()
+    this.notify()
   }
 
   /** The three team vikings jump onto the longship and cheer; anyone still seated cheers too. */
@@ -1205,7 +1250,8 @@ export class RaidScene extends Phaser.Scene {
     this.animate(actor, 'idle')
   }
 
-  private async playEvents(before: GameState, events: GameEvent[], gen: number) {
+  private async playEvents(before: GameState, after: GameState, gen: number) {
+    const events = after.events
     let view = before
     const seatOf = (id: string) => view.waiting.findIndex(w => w.id === id)
     const setLoot = (id: string, patch: Partial<GameState['loot'][number]>) => {
@@ -1416,9 +1462,8 @@ export class RaidScene extends Phaser.Scene {
         if (dripped) sfx.drip()
         view = { ...view, moves: view.moves + 1 }
         this.updateCountdowns(view)
+        // The card is already gone (the row shows the newest state); the viking jumps out where it stood.
         const index = view.queue.findIndex(v => v.id === e.vikingId)
-        const card = this.cards[index]
-        if (card) this.tweens.add({ targets: card, scale: 0.88, alpha: 0.3, duration: 160 })
         const actor = this.makeActor(view.queue[index]).setPosition(cardX(index), CARD.y - 10).setScale(0.4)
         this.actors.set(e.vikingId, actor)
         sfx.dispatch(); haptics.dispatch()
@@ -1489,7 +1534,7 @@ export class RaidScene extends Phaser.Scene {
         const { x, y, s: scale } = this.seatPos(e.ship, e.slot)
         await this.runTo(actor, x, y - 6, scale)
         sfx.wait()
-        const seated = this.state.waiting.find(v => v.id === e.vikingId)
+        const seated = after.waiting.find(v => v.id === e.vikingId)
         if (seated) {
           this.setBadge(actor, seated.collectedCount, seated.capacity)
           view = { ...view, waiting: [...view.waiting, seated] }
